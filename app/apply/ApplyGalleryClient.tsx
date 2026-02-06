@@ -142,6 +142,7 @@ export default function ApplyGalleryClient() {
 
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [pledgeOpen, setPledgeOpen] = useState(false);
+  const [galleryInfoOpen, setGalleryInfoOpen] = useState(false);
 
   const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
 
@@ -309,7 +310,7 @@ export default function ApplyGalleryClient() {
           <div className="space-y-1">
             <div className="font-medium text-gray-900">운영시간</div>
             <div className="text-sm text-gray-700">평일 09:00~18:00 / 화 야간 18:00~20:00 / 토 09:00~13:00 / 일 휴관</div>
-            <div className="text-sm text-gray-700">일요일은 자동 제외됩니다. 공휴일은 자동 제외되지 않으며(Blocks로 처리), 준비(세팅)일 1일은 무료로 포함됩니다.</div>
+            <div className="text-sm text-gray-700">일요일은 자동 제외되며, 준비(세팅)일 1일은 무료로 포함됩니다.</div>
           </div>
         </Notice>
 
@@ -340,9 +341,9 @@ export default function ApplyGalleryClient() {
                     <span className="ml-2 text-gray-600">(준비일 포함: {sessionsBundle.prepDate})</span>
                   ) : null}
                 </div>
-                <Link href="/space?category=gallery" className="text-sm font-medium text-blue-700 hover:underline">
+                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-medium text-blue-700 hover:underline">
                   갤러리 안내 보기
-                </Link>
+                </button>
               </div>
               {hasSundayInRange ? (
                 <p className="mt-2 text-xs text-gray-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
@@ -546,7 +547,140 @@ export default function ApplyGalleryClient() {
             setValue("pledgeAgree", false, { shouldValidate: true, shouldDirty: true });
           }}
         />
+
+        <GalleryInfoModal open={galleryInfoOpen} onClose={() => setGalleryInfoOpen(false)} />
       </main>
+    </div>
+  );
+}
+
+/* 갤러리 안내 팝업 */
+function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      role="dialog"
+      aria-modal="true"
+    >
+      <button
+        type="button"
+        className="absolute inset-0 bg-black/40"
+        aria-label="닫기"
+        onClick={onClose}
+        tabIndex={-1}
+      />
+
+      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
+        <div className="flex items-center justify-between border-b px-5 py-4">
+          <h3 className="text-base font-semibold">우리동네 갤러리 안내</h3>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+          >
+            닫기
+          </button>
+        </div>
+
+        <div className="max-h-[70vh] overflow-auto px-5 py-4 space-y-4 text-sm text-gray-800">
+          {/* 운영 시간 */}
+          <div>
+            <h4 className="font-semibold mb-2">운영 시간</h4>
+            <div className="overflow-hidden rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">시간</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr><td className="px-3 py-2">평일 (월~금)</td><td className="px-3 py-2">09:00 ~ 18:00</td></tr>
+                  <tr><td className="px-3 py-2">야간 (화요일)</td><td className="px-3 py-2">18:00 ~ 20:00</td></tr>
+                  <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2">09:00 ~ 13:00</td></tr>
+                  <tr><td className="px-3 py-2 text-slate-500">일요일·공휴일</td><td className="px-3 py-2 text-slate-500">휴관</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 대관비 */}
+          <div>
+            <h4 className="font-semibold mb-2">대관비 기준 (1일 기준)</h4>
+            <div className="overflow-hidden rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">대관료</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr><td className="px-3 py-2">평일 (월~금)</td><td className="px-3 py-2 font-semibold">20,000원</td></tr>
+                  <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2 font-semibold">10,000원</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1 text-xs text-slate-600">※ 할인 및 바우처 적용 불가 / 준비(세팅)일 1일 무료 지원</p>
+          </div>
+
+          {/* 전시 참고사항 */}
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+            <h4 className="font-semibold mb-2 text-blue-900">전시 참고사항</h4>
+            <ul className="list-disc space-y-1.5 pl-5 text-sm text-blue-800">
+              <li>신청자가 직접 설치(준비, 세팅) 및 철수 진행 (작품 보관·지원·관리 인력 제공 불가)</li>
+              <li>와이어 걸이(고리)를 활용한 형식의 작품만 전시 가능</li>
+              <li>액자 형태 작품: 가로/세로 최대 60cm, 최대 15점</li>
+              <li>작품 크기·무게에 따라 전시 불가 시 사전 담당자 상담 필요</li>
+              <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수</li>
+              <li>홍보 콘텐츠 제작을 위해 준비일 이전에 전시 고리 사진 파일을 서초센터 메일로 공유 필요</li>
+            </ul>
+          </div>
+
+          {/* 환불 규정 */}
+          <div>
+            <h4 className="font-semibold mb-2">환불 규정</h4>
+            <div className="overflow-hidden rounded-md border">
+              <table className="w-full text-sm">
+                <thead className="bg-slate-50">
+                  <tr>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">취소 시점</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">환불 비율</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  <tr><td className="px-3 py-2">사용일 3일 전까지</td><td className="px-3 py-2 font-semibold text-green-700">전액 환불</td></tr>
+                  <tr><td className="px-3 py-2">사용일 2일 전까지</td><td className="px-3 py-2 font-semibold">90% 환불</td></tr>
+                  <tr><td className="px-3 py-2">사용일 1일 전까지</td><td className="px-3 py-2 font-semibold">80% 환불</td></tr>
+                  <tr><td className="px-3 py-2 text-red-600">사용일 당일 이후</td><td className="px-3 py-2 font-semibold text-red-600">환불 불가</td></tr>
+                </tbody>
+              </table>
+            </div>
+            <p className="mt-1 text-xs text-slate-600">※ 환불 절차: 센터 방문 → 환불신청서 작성 및 제출 (비대면 접수 불가)</p>
+          </div>
+
+          {/* 신청 제한 */}
+          <div>
+            <h4 className="font-semibold mb-2">신청 제한 사항</h4>
+            <ul className="list-disc space-y-1.5 pl-5 text-gray-700">
+              <li>부적절한 목적, 시설 훼손 우려, 종교 포교, 정치적 목적, 영리적 목적</li>
+              <li>작품 판매, 세미나, 퍼포먼스, 기타 판촉행사 등 부대행사 진행</li>
+              <li>대관 규정 미진 시 대관 중 발견 시 즉시 취소 및 환불 불가</li>
+            </ul>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

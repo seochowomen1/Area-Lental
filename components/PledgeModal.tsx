@@ -15,7 +15,7 @@ type Props = {
 
 export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree }: Props) {
   const isGallery = roomId === "gallery";
-  const sections = isGallery ? [...PLEDGE_SECTIONS, ...GALLERY_PLEDGE_SECTIONS] : PLEDGE_SECTIONS;
+  const sections = isGallery ? GALLERY_PLEDGE_SECTIONS : PLEDGE_SECTIONS;
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
