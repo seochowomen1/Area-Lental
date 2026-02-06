@@ -66,6 +66,47 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     return diffDaysInclusive(startDate, endDate);
   }, [startDate, endDate]);
 
+  // 대관비 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  const feeBreakdown = useMemo(() => {
+    if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) {
+      return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
+    }
+
+    // 준비일: 시작일 이전 1일(일요일이면 직전 영업일)
+    let prepYmd = dateToYmdLocal(new Date(toDateLocal(startDate).getFullYear(), toDateLocal(startDate).getMonth(), toDateLocal(startDate).getDate() - 1));
+    while (isYmd(prepYmd) && dayOfWeekLocal(prepYmd) === 0) {
+      const d = toDateLocal(prepYmd);
+      d.setDate(d.getDate() - 1);
+      prepYmd = dateToYmdLocal(d);
+    }
+
+    let weekdays = 0;
+    let saturdays = 0;
+    let prepDays = 0;
+
+    // 준비일 카운트
+    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0) {
+      prepDays = 1;
+    }
+
+    // 전시 기간 카운트
+    let cur = startDate;
+    let guard = 0;
+    while (cur <= endDate && guard++ < 400) {
+      const dow = dayOfWeekLocal(cur);
+      if (dow !== 0) {
+        if (dow === 6) saturdays++;
+        else weekdays++;
+      }
+      const d = toDateLocal(cur);
+      d.setDate(d.getDate() + 1);
+      cur = dateToYmdLocal(d);
+    }
+
+    const total = weekdays * 20000 + saturdays * 10000;
+    return { weekdays, saturdays, prepDays, total };
+  }, [startDate, endDate]);
+
   const canSubmit = Boolean(startDate) && Boolean(endDate) && !error;
 
   function clearRange() {
@@ -320,6 +361,43 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
         {!error && days > 0 ? <FieldHelp>선택 기간: {days}일 (일요일 제외/준비일 포함은 서버에서 자동 계산됩니다)</FieldHelp> : null}
       </div>
+
+      {/* 대관비 자동 계산 */}
+      {!error && days > 0 && (feeBreakdown.weekdays > 0 || feeBreakdown.saturdays > 0) && (
+        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+          <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+            <span className="text-base">💰</span>
+            <span className="text-sm font-bold text-slate-800">예상 대관비</span>
+          </div>
+          <div className="px-4 py-3">
+            <div className="space-y-2">
+              {feeBreakdown.weekdays > 0 && (
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
+                  <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                </div>
+              )}
+              {feeBreakdown.saturdays > 0 && (
+                <div className="flex items-center justify-between text-sm text-slate-600">
+                  <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
+                  <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                </div>
+              )}
+              {feeBreakdown.prepDays > 0 && (
+                <div className="flex items-center justify-between text-sm text-slate-400">
+                  <span>준비일 {feeBreakdown.prepDays}일</span>
+                  <span className="font-medium">무료</span>
+                </div>
+              )}
+            </div>
+            <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+              <span className="text-sm font-bold text-slate-900">합계</span>
+              <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+            </div>
+            <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
+          </div>
+        </div>
+      )}
 
       <div className="mt-5">
         <Button type="button" className="w-full" disabled={!canSubmit} onClick={goApply}>

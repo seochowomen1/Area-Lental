@@ -476,24 +476,36 @@ export default function SpaceBooking({
             </div>
 
             {durationMinutes > 0 ? (
-              <div className="mt-3">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                  <span className="text-base">💰</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관 이용료</span>
+                </div>
                 {hourlyFee > 0 ? (
-                  <Notice variant="info" title="예상 대관 이용료">
-                    <div className="flex items-end justify-between gap-3">
-                      <span className="text-sm text-slate-700">
-                        {fmtDuration(durationMinutes)} · 시간당 {hourlyFee.toLocaleString()}원
-                      </span>
-                      <span className="text-base font-semibold text-slate-900">{estimatedFeeKRW.toLocaleString()}원</span>
+                  <div className="px-4 py-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm text-slate-600">
+                        <span>이용시간</span>
+                        <span className="font-semibold text-slate-800">{fmtDuration(durationMinutes)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-slate-600">
+                        <span>시간당 요금</span>
+                        <span className="font-semibold text-slate-800">{hourlyFee.toLocaleString()}원</span>
+                      </div>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-500">※ 기자재 사용료 별도</div>
-                  </Notice>
+                    <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                      <span className="text-sm font-bold text-slate-900">합계</span>
+                      <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{estimatedFeeKRW.toLocaleString()}원</span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">※ 기자재 사용료 별도</p>
+                  </div>
                 ) : (
-                  <Notice variant="info" title="대관 이용료 안내">
-                    <div className="text-sm text-slate-700">
+                  <div className="px-4 py-3">
+                    <p className="text-sm text-slate-700">
                       선택하신 이용시간 기준 <b>대관 이용료는 별도 협의</b> 대상입니다.
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-500">※ 기자재 사용료 별도</div>
-                  </Notice>
+                    </p>
+                    <p className="mt-2 text-[11px] text-slate-400">※ 기자재 사용료 별도</p>
+                  </div>
                 )}
               </div>
             ) : null}
