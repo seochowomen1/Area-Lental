@@ -5,7 +5,6 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 
 import { GalleryRequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { todayYmdSeoul } from "@/lib/datetime";
@@ -17,7 +16,6 @@ import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
 import { FieldHelp, FieldLabel, Input, Textarea } from "@/components/ui/Field";
-import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
 
 // 갤러리 신청(B안): 기간(start/end) 선택 → 회차 자동 생성
 // - 일요일 자동 제외
@@ -121,13 +119,13 @@ function buildGallerySessions(startDate: string, endDate: string): {
   return { prepDate, sessions: out };
 }
 
-function composePurpose(fields: Pick<GalleryFields, "exhibitionPurpose" | "genreContent" | "awarenessPath" | "specialNotes">) {
+function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string }) {
   // RequestInputSchema의 purpose(min 5) 충족 + 관리자 확인 편의
   const lines: string[] = [];
-  if (fields.exhibitionPurpose.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
-  if (fields.genreContent.trim()) lines.push(`장르·내용: ${fields.genreContent.trim()}`);
-  if (fields.awarenessPath.trim()) lines.push(`인지 경로: ${fields.awarenessPath.trim()}`);
-  if (fields.specialNotes.trim()) lines.push(`특이사항: ${fields.specialNotes.trim()}`);
+  if (fields.exhibitionPurpose?.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
+  if (fields.genreContent?.trim()) lines.push(`장르·내용: ${fields.genreContent.trim()}`);
+  if (fields.awarenessPath?.trim()) lines.push(`인지 경로: ${fields.awarenessPath.trim()}`);
+  if (fields.specialNotes?.trim()) lines.push(`특이사항: ${fields.specialNotes.trim()}`);
   const joined = lines.join("\n").trim();
   return joined.length >= 5 ? joined : "전시 신청";
 }
@@ -294,11 +292,11 @@ export default function ApplyGalleryClient() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <SiteHeader />
+      <SiteHeader title="갤러리 대관 신청" />
 
       <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">{SECTION_TITLE.apply}</h1>
+          <h1 className="text-2xl font-bold tracking-tight text-gray-900">갤러리 대관 신청</h1>
           <p className="mt-2 text-sm text-gray-600">우리동네 갤러리(4층) 전시 대관 신청서입니다.</p>
         </div>
 
@@ -487,8 +485,8 @@ export default function ApplyGalleryClient() {
             </div>
           </Card>
 
-          {batchError ? <Notice tone="warning"><pre className="whitespace-pre-wrap text-sm">{batchError}</pre></Notice> : null}
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {batchError ? <Notice variant="warn"><pre className="whitespace-pre-wrap text-sm">{batchError}</pre></Notice> : null}
+          {error ? <Notice variant="danger">{error}</Notice> : null}
 
           {/* 갤러리: 장비/할인 UI 제거(완전 차단) */}
           <input type="hidden" value="false" {...register("laptop")} />
@@ -504,7 +502,7 @@ export default function ApplyGalleryClient() {
             </Button>
           </div>
 
-          <p className="text-xs text-gray-500">{SECTION_DESC.apply}</p>
+          <p className="text-xs text-gray-500">신청 후 담당자 검토를 거쳐 승인/반려 결과를 이메일로 안내드립니다.</p>
         </form>
 
         <PrivacyModal

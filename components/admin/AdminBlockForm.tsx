@@ -101,6 +101,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
 
     const safeEnd = endOptions.includes(endTime) ? endTime : endOptions[0];
     if (safeEnd && safeEnd !== endTime) setEndTime(safeEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, startOptions, endOptions, isGallery, galleryHours]);
 
   const canSubmit = isGallery ? Boolean(date) && Boolean(galleryHours) : Boolean(date) && Boolean(startTime) && Boolean(endTime);

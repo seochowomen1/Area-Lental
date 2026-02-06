@@ -86,6 +86,7 @@ export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, res
 
     const safeEnd = endOptions.includes(endTime) ? endTime : endOptions[0];
     if (safeEnd && safeEnd !== endTime) setEndTime(safeEnd);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dayOfWeek, startOptions, endOptions]);
 
   const canSubmit = Boolean(startTime) && Boolean(endTime);

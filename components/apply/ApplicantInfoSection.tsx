@@ -51,7 +51,7 @@ export default function ApplicantInfoSection({
           <Input
             id="phone"
             {...register("phone", {
-              onChange: (e) => {
+              onChange: (e: React.ChangeEvent<HTMLInputElement>) => {
                 const formatted = formatPhoneKR((e.target as HTMLInputElement).value);
                 setValue("phone", formatted, { shouldDirty: true, shouldValidate: true });
               },

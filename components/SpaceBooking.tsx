@@ -410,7 +410,7 @@ export default function SpaceBooking({
 
         {!busy && !!noSlotsMessage && (
           <div className="mt-3">
-            <Notice variant="subtle" title="예약 안내">
+            <Notice variant="info" title="예약 안내">
               <div className="text-sm text-slate-700">{noSlotsMessage}</div>
             </Notice>
           </div>

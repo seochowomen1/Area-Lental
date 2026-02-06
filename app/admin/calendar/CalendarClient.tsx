@@ -316,6 +316,7 @@ export default function CalendarClient({
     if (current.toString() !== desired.toString()) {
       router.replace(`${pathname}?${desired.toString()}`, { scroll: false });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     category,
     floorId,
