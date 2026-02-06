@@ -1,0 +1,847 @@
+import { getGoogleClient } from "@/lib/google";
+import { isMockMode, requireGoogleEnv } from "@/lib/env";
+import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
+import { ROOMS } from "@/lib/config";
+import {
+  mock_getAllRequests,
+  mock_getRequestById,
+  mock_appendRequest,
+  mock_updateRequestStatus,
+  mock_getBlocks,
+  mock_addBlock,
+  mock_deleteBlock,
+  mock_getClassSchedules,
+  mock_addClassSchedule,
+  mock_deleteClassSchedule
+} from "@/lib/mockdb";
+
+const SHEET_REQUESTS = "requests";
+const SHEET_SCHEDULE = "class_schedule";
+const SHEET_BLOCKS = "blocks";
+
+// 관리자 입력(할인) 필드 - 시트에 컬럼이 없더라도 로컬/Mock 모드가 깨지지 않도록 "옵션"으로 취급
+// 기존 운영 시트와의 호환을 위해 '없으면 자동으로 헤더에 추가'하는 optional 컬럼들
+// (추가해도 기존 데이터 파싱/업데이트가 깨지지 않도록 끝에 append)
+const REQUEST_OPTIONAL_HEADERS = [
+  "discountRatePct",
+  "discountAmountKRW",
+  "discountReason",
+  "batchId",
+  "batchSeq",
+  "batchSize",
+
+  // 갤러리(B안) 추가 필드 (없으면 자동으로 끝에 추가)
+  "isPrepDay",
+  "startDate",
+  "endDate",
+  "exhibitionTitle",
+  "exhibitionPurpose",
+  "genreContent",
+  "awarenessPath",
+  "specialNotes",
+
+  // 갤러리: 서버 생성(감사) 로그
+  "galleryGeneratedAt",
+  "galleryGenerationVersion",
+  "galleryWeekdayCount",
+  "gallerySaturdayCount",
+  "galleryExhibitionDayCount",
+  "galleryPrepDate",
+  "galleryAuditJson",
+] as const;
+
+function colToLetter(col1: number): string {
+  // 1 -> A, 26 -> Z, 27 -> AA
+  let n = col1;
+  let s = "";
+  while (n > 0) {
+    const r = (n - 1) % 26;
+    s = String.fromCharCode(65 + r) + s;
+    n = Math.floor((n - 1) / 26);
+  }
+  return s;
+}
+
+async function ensureRequestOptionalHeaders() {
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!1:1`
+  });
+
+  const header = ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v).trim());
+  if (!header.length) return;
+
+  const missing = REQUEST_OPTIONAL_HEADERS.filter((h) => !header.includes(h));
+  if (!missing.length) return;
+
+  const nextHeader = [...header, ...missing];
+  const endCol = colToLetter(nextHeader.length);
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A1:${endCol}1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [nextHeader] }
+  });
+}
+
+function roomName(roomId: string): string {
+  return ROOMS.find(r => r.id === roomId)?.name ?? roomId;
+}
+
+function createHeaderIndex(header: string[], required: string[], sheetName: string) {
+  const map = new Map<string, number>();
+  header.forEach((h, i) => map.set(String(h).trim(), i));
+
+  const missing = required.filter((col) => !map.has(col));
+  if (missing.length) {
+    throw new Error(
+      `[Sheets] ${sheetName} 시트의 헤더가 누락되었습니다: ${missing.join(", ")}`
+    );
+  }
+
+  return (name: string) => {
+    const idx = map.get(name);
+    if (idx === undefined) {
+      throw new Error(`[Sheets] ${sheetName} 시트에서 '${name}' 헤더를 찾을 수 없습니다.`);
+    }
+    return idx;
+  };
+}
+
+export async function getAllRequests(): Promise<RentalRequest[]> {
+  if (isMockMode()) return mock_getAllRequests();
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  // optional 컬럼이 추가될 수 있으므로 충분히 넓게 읽습니다.
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:AZ`
+  });
+
+  const rows = (res.data.values ?? []) as string[][];
+  if (rows.length <= 1) return [];
+  const header = rows[0];
+  const idx = createHeaderIndex(
+    header,
+    [
+      "requestId",
+      "createdAt",
+      "roomId",
+      "roomName",
+      "date",
+      "startTime",
+      "endTime",
+      "applicantName",
+      "birth",
+      "address",
+      "phone",
+      "email",
+      "orgName",
+      "headcount",
+      "equipment_laptop",
+      "equipment_projector",
+      "equipment_audio",
+      "purpose",
+      "attachments",
+      "privacyAgree",
+      "pledgeAgree",
+      "pledgeDate",
+      "pledgeName",
+      "status",
+      "adminMemo",
+      "rejectReason",
+      "decidedAt",
+      "decidedBy"
+    ],
+    SHEET_REQUESTS
+  );
+
+  // optional columns (없으면 -1)
+  const opt = (name: string) => {
+    const m = new Map<string, number>();
+    header.forEach((h, i) => m.set(String(h).trim(), i));
+    return m.get(name) ?? -1;
+  };
+  const iDiscountRate = opt("discountRatePct");
+  const iDiscountAmount = opt("discountAmountKRW");
+  const iDiscountReason = opt("discountReason");
+  const iBatchId = opt("batchId");
+  const iBatchSeq = opt("batchSeq");
+  const iBatchSize = opt("batchSize");
+  const iIsPrepDay = opt("isPrepDay");
+  const iStartDate = opt("startDate");
+  const iEndDate = opt("endDate");
+  const iExhibitionTitle = opt("exhibitionTitle");
+  const iExhibitionPurpose = opt("exhibitionPurpose");
+  const iGenreContent = opt("genreContent");
+  const iAwarenessPath = opt("awarenessPath");
+  const iSpecialNotes = opt("specialNotes");
+
+  const iGalleryGeneratedAt = opt("galleryGeneratedAt");
+  const iGalleryGenerationVersion = opt("galleryGenerationVersion");
+  const iGalleryWeekdayCount = opt("galleryWeekdayCount");
+  const iGallerySaturdayCount = opt("gallerySaturdayCount");
+  const iGalleryExhibitionDayCount = opt("galleryExhibitionDayCount");
+  const iGalleryPrepDate = opt("galleryPrepDate");
+  const iGalleryAuditJson = opt("galleryAuditJson");
+
+  return rows
+    .slice(1)
+    .filter(r => r.length > 0 && r[idx("requestId")])
+    .map((r) => ({
+      requestId: r[idx("requestId")],
+      createdAt: r[idx("createdAt")],
+
+      batchId: iBatchId >= 0 ? (String(r[iBatchId] ?? "").trim() || undefined) : undefined,
+      batchSeq: iBatchSeq >= 0 ? (parseInt(String(r[iBatchSeq] ?? "0"), 10) || undefined) : undefined,
+      batchSize: iBatchSize >= 0 ? (parseInt(String(r[iBatchSize] ?? "0"), 10) || undefined) : undefined,
+
+
+      roomId: r[idx("roomId")],
+      roomName: r[idx("roomName")],
+
+      date: r[idx("date")],
+      startTime: r[idx("startTime")],
+      endTime: r[idx("endTime")],
+
+      isPrepDay: iIsPrepDay >= 0 ? (String(r[iIsPrepDay] ?? "").trim().toUpperCase() === "TRUE") : undefined,
+      startDate: iStartDate >= 0 ? (String(r[iStartDate] ?? "").trim() || undefined) : undefined,
+      endDate: iEndDate >= 0 ? (String(r[iEndDate] ?? "").trim() || undefined) : undefined,
+      exhibitionTitle: iExhibitionTitle >= 0 ? (String(r[iExhibitionTitle] ?? "").trim() || undefined) : undefined,
+      exhibitionPurpose: iExhibitionPurpose >= 0 ? (String(r[iExhibitionPurpose] ?? "").trim() || undefined) : undefined,
+      genreContent: iGenreContent >= 0 ? (String(r[iGenreContent] ?? "").trim() || undefined) : undefined,
+      awarenessPath: iAwarenessPath >= 0 ? (String(r[iAwarenessPath] ?? "").trim() || undefined) : undefined,
+      specialNotes: iSpecialNotes >= 0 ? (String(r[iSpecialNotes] ?? "").trim() || undefined) : undefined,
+
+      galleryGeneratedAt: iGalleryGeneratedAt >= 0 ? (String(r[iGalleryGeneratedAt] ?? "").trim() || undefined) : undefined,
+      galleryGenerationVersion: iGalleryGenerationVersion >= 0 ? (String(r[iGalleryGenerationVersion] ?? "").trim() || undefined) : undefined,
+      galleryWeekdayCount: iGalleryWeekdayCount >= 0 ? (parseInt(String(r[iGalleryWeekdayCount] ?? "0"), 10) || 0) : undefined,
+      gallerySaturdayCount: iGallerySaturdayCount >= 0 ? (parseInt(String(r[iGallerySaturdayCount] ?? "0"), 10) || 0) : undefined,
+      galleryExhibitionDayCount: iGalleryExhibitionDayCount >= 0 ? (parseInt(String(r[iGalleryExhibitionDayCount] ?? "0"), 10) || 0) : undefined,
+      galleryPrepDate: iGalleryPrepDate >= 0 ? (String(r[iGalleryPrepDate] ?? "").trim() || undefined) : undefined,
+      galleryAuditJson: iGalleryAuditJson >= 0 ? (String(r[iGalleryAuditJson] ?? "").trim() || undefined) : undefined,
+
+      applicantName: r[idx("applicantName")],
+      birth: r[idx("birth")],
+      address: r[idx("address")],
+      phone: r[idx("phone")],
+      email: r[idx("email")],
+
+      orgName: r[idx("orgName")],
+      headcount: parseInt(r[idx("headcount")] || "0", 10),
+
+      equipment: {
+        laptop: r[idx("equipment_laptop")] === "TRUE",
+        projector: r[idx("equipment_projector")] === "TRUE",
+        audio: r[idx("equipment_audio")] === "TRUE"
+      },
+
+      purpose: r[idx("purpose")],
+
+      attachments: (r[idx("attachments")] || "").split("|").filter(Boolean),
+
+      privacyAgree: r[idx("privacyAgree")] === "TRUE",
+      pledgeAgree: r[idx("pledgeAgree")] === "TRUE",
+      pledgeDate: r[idx("pledgeDate")],
+      pledgeName: r[idx("pledgeName")],
+
+      discountRatePct: iDiscountRate >= 0 ? parseFloat(r[iDiscountRate] || "0") : 0,
+      discountAmountKRW: iDiscountAmount >= 0 ? parseInt(r[iDiscountAmount] || "0", 10) : 0,
+      discountReason: iDiscountReason >= 0 ? (r[iDiscountReason] || "") : "",
+
+      status: (r[idx("status")] as RequestStatus) || "접수",
+      adminMemo: r[idx("adminMemo")] || "",
+      rejectReason: r[idx("rejectReason")] || "",
+      decidedAt: r[idx("decidedAt")] || "",
+      decidedBy: r[idx("decidedBy")] || ""
+    }));
+}
+
+export async function getRequestById(id: string): Promise<RentalRequest | null> {
+  if (isMockMode()) return mock_getRequestById(id);
+  const all = await getAllRequests();
+  return all.find(r => r.requestId === id) ?? null;
+}
+
+export async function nextRequestId(): Promise<string> {
+  if (isMockMode()) {
+    // mockdb 내부에서 계산
+    const { mock_nextRequestId } = await import("./mockdb");
+    return mock_nextRequestId();
+  }
+
+  const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
+  const all = await getAllRequests();
+  const nums = all
+    .map(r => r.requestId)
+    .filter(v => v.startsWith(prefix))
+    .map(v => parseInt(v.slice(prefix.length), 10))
+    .filter(n => Number.isFinite(n));
+  const next = (nums.length ? Math.max(...nums) : 0) + 1;
+  return `${prefix}${String(next).padStart(4, "0")}`;
+}
+
+export async function appendRequest(
+  input: Omit<RentalRequest, "requestId" | "createdAt" | "status" | "adminMemo" | "rejectReason" | "decidedAt" | "decidedBy" | "roomName">
+): Promise<RentalRequest> {
+  if (isMockMode()) return mock_appendRequest(input);
+
+  const env = requireGoogleEnv();
+
+  // optional 할인 컬럼이 없다면 헤더에 자동 추가
+  await ensureRequestOptionalHeaders();
+
+  const { sheets } = getGoogleClient();
+
+  const requestId = await nextRequestId();
+  const createdAt = nowIsoSeoul();
+
+  const record: RentalRequest = {
+    requestId,
+    createdAt,
+
+    batchId: input.batchId,
+    batchSeq: input.batchSeq,
+    batchSize: input.batchSize,
+
+    roomId: input.roomId,
+    roomName: roomName(input.roomId),
+
+    date: input.date,
+    startTime: input.startTime,
+    endTime: input.endTime,
+
+    isPrepDay: input.isPrepDay,
+    startDate: input.startDate,
+    endDate: input.endDate,
+    exhibitionTitle: input.exhibitionTitle,
+    exhibitionPurpose: input.exhibitionPurpose,
+    genreContent: input.genreContent,
+    awarenessPath: input.awarenessPath,
+    specialNotes: input.specialNotes,
+
+    galleryGeneratedAt: input.galleryGeneratedAt,
+    galleryGenerationVersion: input.galleryGenerationVersion,
+    galleryWeekdayCount: input.galleryWeekdayCount,
+    gallerySaturdayCount: input.gallerySaturdayCount,
+    galleryExhibitionDayCount: input.galleryExhibitionDayCount,
+    galleryPrepDate: input.galleryPrepDate,
+    galleryAuditJson: input.galleryAuditJson,
+
+    applicantName: input.applicantName,
+    birth: input.birth,
+    address: input.address,
+    phone: input.phone,
+    email: input.email,
+
+    orgName: input.orgName,
+    headcount: input.headcount,
+
+    equipment: input.equipment,
+    purpose: input.purpose,
+
+    attachments: input.attachments,
+
+    privacyAgree: input.privacyAgree,
+    pledgeAgree: input.pledgeAgree,
+    pledgeDate: input.pledgeDate,
+    pledgeName: input.pledgeName,
+
+    discountRatePct: 0,
+    discountAmountKRW: 0,
+    discountReason: "",
+
+    status: "접수",
+    adminMemo: "",
+    rejectReason: "",
+    decidedAt: "",
+    decidedBy: ""
+  };
+
+  const values = [[
+    record.requestId,
+    record.createdAt,
+    record.roomId,
+    record.roomName,
+    record.date,
+    record.startTime,
+    record.endTime,
+    record.applicantName,
+    record.birth,
+    record.address,
+    record.phone,
+    record.email,
+    record.orgName,
+    String(record.headcount),
+    record.equipment.laptop ? "TRUE" : "FALSE",
+    record.equipment.projector ? "TRUE" : "FALSE",
+    record.equipment.audio ? "TRUE" : "FALSE",
+    record.purpose,
+    record.attachments.join("|"),
+    record.privacyAgree ? "TRUE" : "FALSE",
+    record.pledgeAgree ? "TRUE" : "FALSE",
+    record.pledgeDate,
+    record.pledgeName,
+    record.status,
+    record.adminMemo,
+    record.rejectReason,
+    record.decidedAt,
+    record.decidedBy,
+    String(record.discountRatePct ?? 0),
+    String(record.discountAmountKRW ?? 0),
+    record.discountReason ?? "",
+    record.batchId ?? "",
+    String(record.batchSeq ?? 0),
+    String(record.batchSize ?? 0),
+    record.isPrepDay ? "TRUE" : "FALSE",
+    record.startDate ?? "",
+    record.endDate ?? "",
+    record.exhibitionTitle ?? "",
+    record.exhibitionPurpose ?? "",
+    record.genreContent ?? "",
+    record.awarenessPath ?? "",
+    record.specialNotes ?? "",
+    record.galleryGeneratedAt ?? "",
+    record.galleryGenerationVersion ?? "",
+    String(record.galleryWeekdayCount ?? 0),
+    String(record.gallerySaturdayCount ?? 0),
+    String(record.galleryExhibitionDayCount ?? 0),
+    record.galleryPrepDate ?? "",
+    record.galleryAuditJson ?? ""
+  ]];
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:AZ`,
+    valueInputOption: "RAW",
+    requestBody: { values }
+  });
+
+  return record;
+}
+
+export async function appendRequestsBatch(
+  inputs: Array<Omit<RentalRequest, "requestId" | "createdAt" | "status" | "adminMemo" | "rejectReason" | "decidedAt" | "decidedBy" | "roomName">>
+): Promise<RentalRequest[]> {
+  if (isMockMode()) {
+    const { mock_appendRequestsBatch } = await import("./mockdb");
+    return mock_appendRequestsBatch(inputs);
+  }
+
+  const env = requireGoogleEnv();
+
+  // optional 컬럼이 없다면 헤더에 자동 추가
+  await ensureRequestOptionalHeaders();
+
+  const { sheets } = getGoogleClient();
+
+  // prefix 기준으로 한 번만 조회하여 연속 ID를 생성합니다.
+  const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
+  const all = await getAllRequests();
+  const nums = all
+    .map(r => r.requestId)
+    .filter(v => v.startsWith(prefix))
+    .map(v => parseInt(v.slice(prefix.length), 10))
+    .filter(n => Number.isFinite(n));
+  let next = (nums.length ? Math.max(...nums) : 0) + 1;
+
+  const createdAt = nowIsoSeoul();
+  const saved: RentalRequest[] = [];
+  const values: string[][] = [];
+
+  for (const input of inputs) {
+    const requestId = `${prefix}${String(next++).padStart(4, "0")}`;
+
+    const record: RentalRequest = {
+      requestId,
+      createdAt,
+
+      batchId: input.batchId,
+      batchSeq: input.batchSeq,
+      batchSize: input.batchSize,
+
+      roomId: input.roomId,
+      roomName: roomName(input.roomId),
+
+      date: input.date,
+      startTime: input.startTime,
+      endTime: input.endTime,
+
+      isPrepDay: input.isPrepDay,
+      startDate: input.startDate,
+      endDate: input.endDate,
+      exhibitionTitle: input.exhibitionTitle,
+      exhibitionPurpose: input.exhibitionPurpose,
+      genreContent: input.genreContent,
+      awarenessPath: input.awarenessPath,
+      specialNotes: input.specialNotes,
+
+      galleryGeneratedAt: input.galleryGeneratedAt,
+      galleryGenerationVersion: input.galleryGenerationVersion,
+      galleryWeekdayCount: input.galleryWeekdayCount,
+      gallerySaturdayCount: input.gallerySaturdayCount,
+      galleryExhibitionDayCount: input.galleryExhibitionDayCount,
+      galleryPrepDate: input.galleryPrepDate,
+      galleryAuditJson: input.galleryAuditJson,
+
+      applicantName: input.applicantName,
+      birth: input.birth,
+      address: input.address,
+      phone: input.phone,
+      email: input.email,
+
+      orgName: input.orgName,
+      headcount: input.headcount,
+
+      equipment: input.equipment,
+      purpose: input.purpose,
+
+      attachments: input.attachments,
+
+      privacyAgree: input.privacyAgree,
+      pledgeAgree: input.pledgeAgree,
+      pledgeDate: input.pledgeDate,
+      pledgeName: input.pledgeName,
+
+      discountRatePct: 0,
+      discountAmountKRW: 0,
+      discountReason: "",
+
+      status: "접수",
+      adminMemo: "",
+      rejectReason: "",
+      decidedAt: "",
+      decidedBy: ""
+    };
+
+    saved.push(record);
+    values.push([
+      record.requestId,
+      record.createdAt,
+      record.roomId,
+      record.roomName,
+      record.date,
+      record.startTime,
+      record.endTime,
+      record.applicantName,
+      record.birth,
+      record.address,
+      record.phone,
+      record.email,
+      record.orgName,
+      String(record.headcount),
+      record.equipment.laptop ? "TRUE" : "FALSE",
+      record.equipment.projector ? "TRUE" : "FALSE",
+      record.equipment.audio ? "TRUE" : "FALSE",
+      record.purpose,
+      (record.attachments ?? []).join("|"),
+      record.privacyAgree ? "TRUE" : "FALSE",
+      record.pledgeAgree ? "TRUE" : "FALSE",
+      record.pledgeDate,
+      record.pledgeName,
+      record.status,
+      record.adminMemo,
+      record.rejectReason,
+      record.decidedAt,
+      record.decidedBy,
+      String(record.discountRatePct ?? 0),
+      String(record.discountAmountKRW ?? 0),
+      record.discountReason ?? "",
+      record.batchId ?? "",
+      String(record.batchSeq ?? 0),
+      String(record.batchSize ?? 0),
+      record.isPrepDay ? "TRUE" : "FALSE",
+      record.startDate ?? "",
+      record.endDate ?? "",
+      record.exhibitionTitle ?? "",
+      record.exhibitionPurpose ?? "",
+      record.genreContent ?? "",
+      record.awarenessPath ?? "",
+      record.specialNotes ?? "",
+      record.galleryGeneratedAt ?? "",
+      record.galleryGenerationVersion ?? "",
+      String(record.galleryWeekdayCount ?? 0),
+      String(record.gallerySaturdayCount ?? 0),
+      String(record.galleryExhibitionDayCount ?? 0),
+      record.galleryPrepDate ?? "",
+      record.galleryAuditJson ?? ""
+    ]);
+  }
+
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:AZ`,
+    valueInputOption: "RAW",
+    requestBody: { values }
+  });
+
+  return saved;
+}
+
+export async function updateRequestStatus(args: {
+  requestId: string;
+  status: RequestStatus;
+  adminMemo?: string;
+  rejectReason?: string;
+  decidedBy: string;
+  discountRatePct?: number;
+  discountAmountKRW?: number;
+  discountReason?: string;
+}): Promise<RentalRequest> {
+  if (isMockMode()) return mock_updateRequestStatus(args);
+
+  const env = requireGoogleEnv();
+
+  // optional 할인 컬럼이 없다면 헤더에 자동 추가
+  await ensureRequestOptionalHeaders();
+
+  const { sheets } = getGoogleClient();
+  const all = await getAllRequests();
+  const idx0 = all.findIndex(r => r.requestId === args.requestId);
+  if (idx0 < 0) throw new Error("해당 신청건을 찾을 수 없습니다.");
+
+  const rowNumber = idx0 + 2; // header + 1
+
+  const status = args.status;
+
+  const current = all[idx0];
+  const statusChanged = current.status !== status;
+  const decidedAt = statusChanged ? nowIsoSeoul() : (current.decidedAt || "");
+  const decidedBy = statusChanged ? args.decidedBy : (current.decidedBy || "");
+
+  // X..AB (status, adminMemo, rejectReason, decidedAt, decidedBy)
+  const range = `${SHEET_REQUESTS}!X${rowNumber}:AB${rowNumber}`;
+  const values = [[status, args.adminMemo ?? "", args.rejectReason ?? "", decidedAt, decidedBy]];
+
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range,
+    valueInputOption: "RAW",
+    requestBody: { values }
+  });
+
+  // discount columns (있을 경우에만 업데이트)
+  // 할인은 '묶음' 단위로 적용되므로, batchId가 있으면 같은 묶음 전체에 동기화합니다.
+  const shouldUpdateDiscount =
+    typeof args.discountRatePct === "number" ||
+    typeof args.discountAmountKRW === "number" ||
+    typeof args.discountReason === "string";
+
+  if (shouldUpdateDiscount) {
+    // 헤더를 다시 읽어 컬럼 위치를 찾습니다.
+    const headerRes = await sheets.spreadsheets.values.get({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_REQUESTS}!1:1`
+    });
+    const header = ((headerRes.data.values?.[0] ?? []) as string[]).map((v) => String(v).trim());
+    const m = new Map<string, number>();
+    header.forEach((h, i) => m.set(h, i));
+
+    const idxRate0 = m.get("discountRatePct");
+    const idxAmt0 = m.get("discountAmountKRW");
+    const idxReason0 = m.get("discountReason");
+
+    const colRate = idxRate0 === undefined ? null : colToLetter(idxRate0 + 1);
+    const colAmt = idxAmt0 === undefined ? null : colToLetter(idxAmt0 + 1);
+    const colReason = idxReason0 === undefined ? null : colToLetter(idxReason0 + 1);
+
+    // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정
+    const target = all[idx0];
+    const batchId = (target.batchId ?? "").trim();
+    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() == batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
+
+    const rateVal = typeof args.discountRatePct === "number" ? args.discountRatePct : (target.discountRatePct ?? 0);
+    const amtVal = typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (target.discountAmountKRW ?? 0);
+    const reasonVal = typeof args.discountReason === "string" ? args.discountReason : (target.discountReason ?? "");
+
+    const data: any[] = [];
+    for (const rn of rowNumbers) {
+      if (colRate && typeof args.discountRatePct === "number") {
+        data.push({ range: `${SHEET_REQUESTS}!${colRate}${rn}:${colRate}${rn}`, values: [[String(rateVal)]] });
+      }
+      if (colAmt && typeof args.discountAmountKRW === "number") {
+        data.push({ range: `${SHEET_REQUESTS}!${colAmt}${rn}:${colAmt}${rn}`, values: [[String(amtVal)]] });
+      }
+      if (colReason && typeof args.discountReason === "string") {
+        data.push({ range: `${SHEET_REQUESTS}!${colReason}${rn}:${colReason}${rn}`, values: [[reasonVal]] });
+      }
+    }
+
+    if (data.length) {
+      await sheets.spreadsheets.values.batchUpdate({
+        spreadsheetId: env.GOOGLE_SHEET_ID,
+        requestBody: { valueInputOption: "RAW", data }
+      });
+    }
+  }
+
+
+  const updated = await getRequestById(args.requestId);
+  if (!updated) throw new Error("업데이트 후 데이터를 다시 불러오지 못했습니다.");
+  return updated;
+}
+
+export async function getClassSchedules(): Promise<ClassSchedule[]> {
+  if (isMockMode()) return mock_getClassSchedules();
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A:H`
+  });
+  const rows = (res.data.values ?? []) as string[][];
+  if (rows.length <= 1) return [];
+  const header = rows[0];
+  const idx = createHeaderIndex(
+    header,
+    ["id", "roomId", "dayOfWeek", "startTime", "endTime", "title", "effectiveFrom", "effectiveTo"],
+    SHEET_SCHEDULE
+  );
+
+  return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
+    id: r[idx("id")],
+    roomId: r[idx("roomId")],
+    dayOfWeek: parseInt(r[idx("dayOfWeek")] || "0", 10),
+    startTime: r[idx("startTime")],
+    endTime: r[idx("endTime")],
+    title: r[idx("title")] || "",
+    effectiveFrom: r[idx("effectiveFrom")] || "",
+    effectiveTo: r[idx("effectiveTo")] || ""
+  }));
+}
+
+export async function addClassSchedule(s: Omit<ClassSchedule, "id">): Promise<ClassSchedule> {
+  if (isMockMode()) return mock_addClassSchedule(s);
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const id = `CS-${Date.now()}`;
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A:H`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[id, s.roomId, String(s.dayOfWeek), s.startTime, s.endTime, s.title, s.effectiveFrom, s.effectiveTo]]
+    }
+  });
+
+  return { id, ...s };
+}
+
+async function getSheetIdByTitle(title: string): Promise<number> {
+  if (isMockMode()) throw new Error("MOCK_MODE에서는 시트ID 조회가 필요 없습니다.");
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const sheetInfo = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID });
+  const sheetId = sheetInfo.data.sheets?.find(s => s.properties?.title === title)?.properties?.sheetId;
+  if (sheetId == null) throw new Error(`${title} 시트를 찾을 수 없습니다.`);
+  return sheetId;
+}
+
+export async function deleteClassSchedule(id: string): Promise<void> {
+  if (isMockMode()) return mock_deleteClassSchedule(id);
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.GOOGLE_SHEET_ID, range: `${SHEET_SCHEDULE}!A:A` });
+  const col = (res.data.values ?? []) as string[][];
+  const rowIndex = col.findIndex((r) => r[0] === id);
+  if (rowIndex < 0) return;
+
+  const sheetId = await getSheetIdByTitle(SHEET_SCHEDULE);
+  const deleteRow = rowIndex; // 0=header
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: { sheetId, dimension: "ROWS", startIndex: deleteRow, endIndex: deleteRow + 1 }
+        }
+      }]
+    }
+  });
+}
+
+export async function getBlocks(): Promise<BlockTime[]> {
+  if (isMockMode()) return mock_getBlocks();
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_BLOCKS}!A:F`
+  });
+  const rows = (res.data.values ?? []) as string[][];
+  if (rows.length <= 1) return [];
+  const header = rows[0];
+  const idx = createHeaderIndex(
+    header,
+    ["id", "roomId", "date", "startTime", "endTime", "reason"],
+    SHEET_BLOCKS
+  );
+
+  return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
+    id: r[idx("id")],
+    roomId: r[idx("roomId")],
+    date: r[idx("date")],
+    startTime: r[idx("startTime")],
+    endTime: r[idx("endTime")],
+    reason: r[idx("reason")] || ""
+  }));
+}
+
+export async function addBlock(b: Omit<BlockTime, "id">): Promise<BlockTime> {
+  if (isMockMode()) return mock_addBlock(b);
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const id = `BL-${Date.now()}`;
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_BLOCKS}!A:F`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[id, b.roomId, b.date, b.startTime, b.endTime, b.reason]] }
+  });
+
+  return { id, ...b };
+}
+
+export async function deleteBlock(id: string): Promise<void> {
+  if (isMockMode()) return mock_deleteBlock(id);
+
+  const env = requireGoogleEnv();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.GOOGLE_SHEET_ID, range: `${SHEET_BLOCKS}!A:A` });
+  const col = (res.data.values ?? []) as string[][];
+  const rowIndex = col.findIndex((r) => r[0] === id);
+  if (rowIndex < 0) return;
+
+  const sheetId = await getSheetIdByTitle(SHEET_BLOCKS);
+  const deleteRow = rowIndex;
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [{
+        deleteDimension: {
+          range: { sheetId, dimension: "ROWS", startIndex: deleteRow, endIndex: deleteRow + 1 }
+        }
+      }]
+    }
+  });
+}

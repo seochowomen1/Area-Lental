@@ -1,0 +1,35 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+  /* 서초센터 톤(대략): 네이비/오렌지 포인트 */
+  --brand-primary: 14 74 122; /* rgb */
+  --brand-accent: 242 132 43; /* rgb */
+  --brand-bg: 246 248 250;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  background: rgb(var(--brand-bg));
+}
+
+/* 달력: 대관불가 표시(사선 패턴) */
+.calendar-hatch {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(239, 68, 68, 0.12) 0,
+    rgba(239, 68, 68, 0.12) 6px,
+    rgba(239, 68, 68, 0.04) 6px,
+    rgba(239, 68, 68, 0.04) 12px
+  );
+}
+
+@media print {
+  .no-print { display: none !important; }
+  .print-break { break-after: page; }
+}

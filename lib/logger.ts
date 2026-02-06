@@ -1,0 +1,81 @@
+/**
+ * 구조화된 로깅 유틸리티
+ * 
+ * 개발 환경에서는 읽기 쉬운 형태로 출력
+ * 프로덕션에서는 JSON 형태로 출력하여 로그 수집 도구와 연동 가능
+ */
+
+type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+
+interface LogContext {
+  userId?: string;
+  requestId?: string;
+  roomId?: string;
+  [key: string]: any;
+}
+
+class Logger {
+  private isDev = process.env.NODE_ENV === 'development';
+
+  private log(level: LogLevel, message: string, context?: LogContext) {
+    const timestamp = new Date().toISOString();
+    const logEntry = {
+      timestamp,
+      level,
+      message,
+      ...context,
+    };
+
+    if (this.isDev) {
+      // 개발 환경: 콘솔에 읽기 쉬운 형태로 출력
+      const emoji = {
+        debug: '🔍',
+        info: 'ℹ️',
+        warn: '⚠️',
+        error: '❌',
+      }[level];
+      
+      console.log(`${emoji} [${level.toUpperCase()}] ${message}`);
+      if (context && Object.keys(context).length > 0) {
+        console.log('  Context:', context);
+      }
+    } else {
+      // 프로덕션: JSON 형태로 출력 (로그 수집 도구 연동용)
+      console.log(JSON.stringify(logEntry));
+    }
+  }
+
+  debug(message: string, context?: LogContext) {
+    this.log('debug', message, context);
+  }
+
+  info(message: string, context?: LogContext) {
+    this.log('info', message, context);
+  }
+
+  warn(message: string, context?: LogContext) {
+    this.log('warn', message, context);
+  }
+
+  error(message: string, context?: LogContext) {
+    this.log('error', message, context);
+  }
+
+  /**
+   * 민감 정보를 로그에서 제거
+   */
+  sanitize(data: any): any {
+    const sensitive = ['password', 'token', 'secret', 'birth', 'privateKey'];
+    const sanitized = { ...data };
+
+    sensitive.forEach(key => {
+      if (sanitized[key]) {
+        sanitized[key] = '***';
+      }
+    });
+
+    return sanitized;
+  }
+}
+
+export const logger = new Logger();
