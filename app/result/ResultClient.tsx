@@ -141,6 +141,7 @@ export default function ResultClient() {
         setLoading(false);
       }
     })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [prefillRequestId, prefillEmail, token]);
 
   const [cancelLoading, setCancelLoading] = useState(false);
@@ -179,7 +180,10 @@ export default function ResultClient() {
 
   const feeAvailable = data && data.ok && !!data.feeAvailable;
   const rejectedOnly = data && data.ok && data.status === "반려" && (data.approvedCount ?? 0) === 0;
-  const sessions: SessionInfo[] = data && data.ok && data.sessions ? data.sessions : [];
+  const sessions: SessionInfo[] = useMemo(
+    () => (data && data.ok && data.sessions ? data.sessions : []),
+    [data],
+  );
   const isBatch = !!(data && data.ok && data.isBatch);
   const isGallery = !!(data && data.ok && data.roomId === "gallery");
 

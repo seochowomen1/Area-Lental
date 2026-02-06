@@ -60,7 +60,9 @@ export async function POST(req: Request) {
   }
 
   for (const r of group) {
-    await db.updateRequestStatus(r.requestId, "취소", {
+    await db.updateRequestStatus({
+      requestId: r.requestId,
+      status: "취소",
       decidedBy: "사용자",
       rejectReason: "사용자 취소",
       adminMemo: r.adminMemo ?? "",

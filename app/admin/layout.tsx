@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import type { ReactNode } from "react";
+import { Suspense, type ReactNode } from "react";
 
 import AdminNavTabs from "@/components/AdminNavTabs";
 
@@ -33,7 +33,9 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           </div>
 
           <div className="pb-5">
-            <AdminNavTabs />
+            <Suspense>
+              <AdminNavTabs />
+            </Suspense>
           </div>
         </div>
       </header>

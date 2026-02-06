@@ -39,7 +39,6 @@ function transporter() {
   const smtp = getSmtpEnvOptional();
   if (!smtp) return null;
 
-  // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
   return nodemailer.createTransport({
     host: smtp.SMTP_HOST,
     port: parseInt(smtp.SMTP_PORT, 10),

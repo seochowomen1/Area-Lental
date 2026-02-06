@@ -36,7 +36,7 @@ export default function SettingsClient(props: {
     if (highlightTimer.current) window.clearTimeout(highlightTimer.current);
     highlightTimer.current = window.setTimeout(() => setHighlightId(null), 2500);
   };
-  useEffect(() => () => highlightTimer.current && window.clearTimeout(highlightTimer.current), []);
+  useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current); }, []);
 
   const [submitting, setSubmitting] = useState<null | "schedule" | "block" | "delete">(null);
 
