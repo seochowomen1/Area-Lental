@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,11 +10,13 @@ import { todayYmdSeoul } from "@/lib/datetime";
 import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
+import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
-import { FieldHelp, FieldLabel, Input, Textarea } from "@/components/ui/Field";
+import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
+import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
 
 // 갤러리 신청(B안): 기간(start/end) 선택 → 회차 자동 생성
 // - 일요일 자동 제외
@@ -318,56 +319,83 @@ export default function ApplyGalleryClient() {
   }, [startDate, endDate]);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <SiteHeader title="갤러리 대관 신청" />
+    <div>
+      <SiteHeader title="갤러리 대관 신청" backHref="/space?category=gallery" backLabel="목록" />
 
-      <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">갤러리 대관 신청</h1>
-          <p className="mt-2 text-sm text-gray-600">우리동네 갤러리(4층) 전시 대관 신청서입니다.</p>
+      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
+        <h2 className="text-2xl font-bold">갤러리 대관 신청서 작성</h2>
+        <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 관리자 검토/승인 절차를 거쳐 확정됩니다.</p>
+
+        <div className="mt-4">
+          <OperatingHoursNotice roomId="gallery" />
         </div>
 
-        <Notice>
-          <div className="space-y-1">
-            <div className="font-medium text-gray-900">운영시간</div>
-            <div className="text-sm text-gray-700">평일 09:00~18:00 / 화 야간 18:00~20:00 / 토 09:00~13:00 / 일 휴관</div>
-            <div className="text-sm text-gray-700">일요일은 자동 제외되며, 준비(세팅)일 1일은 무료로 포함됩니다.</div>
-          </div>
-        </Notice>
+        <div className="mt-5">
+          <Notice title="신청 전 확인" variant="info" pad="md">
+            <ul className="list-disc space-y-1 pl-5">
+              <li>갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
+              <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 포함됩니다.</li>
+              <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
+              <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
+              <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
+            </ul>
+          </Notice>
+        </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
-          <Card>
-            <h2 className="text-base font-semibold text-gray-900">전시 기간</h2>
-            <p className="mt-1 text-sm text-gray-600">기간을 선택하면 회차가 자동 생성됩니다.</p>
+        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-8">
+          {/* hidden - roomId/date/start/end are driven by UI */}
+          <input type="hidden" {...register("roomId")} />
+          <input type="hidden" {...register("date")} />
+          <input type="hidden" {...register("startTime")} />
+          <input type="hidden" {...register("endTime")} />
+          <input type="hidden" value="false" {...register("laptop")} />
+          <input type="hidden" value="false" {...register("projector")} />
+          <input type="hidden" value="false" {...register("audio")} />
+
+          {error ? (
+            <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">
+              {error}
+            </Notice>
+          ) : null}
+
+          {batchError ? (
+            <Notice variant="warn" title="일부 회차는 신청할 수 없습니다" pad="md">
+              <div className="whitespace-pre-line text-sm">{batchError}</div>
+            </Notice>
+          ) : null}
+
+          <Card pad="lg">
+            <h3 className={SECTION_TITLE}>전시 기간</h3>
+            <p className={SECTION_DESC}>기간을 선택하면 회차가 자동 생성됩니다.</p>
 
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
-                <FieldLabel htmlFor="startDate">시작일</FieldLabel>
+                <FieldLabel htmlFor="startDate">시작일 *</FieldLabel>
                 <Input id="startDate" type="date" {...register("startDate")} />
                 {errors.startDate?.message ? <FieldHelp className="text-red-600">{errors.startDate.message}</FieldHelp> : null}
               </div>
 
               <div>
-                <FieldLabel htmlFor="endDate">종료일</FieldLabel>
+                <FieldLabel htmlFor="endDate">종료일 *</FieldLabel>
                 <Input id="endDate" type="date" {...register("endDate")} />
                 {errors.endDate?.message ? <FieldHelp className="text-red-600">{errors.endDate.message}</FieldHelp> : null}
               </div>
             </div>
 
-            <div className="mt-4 rounded-xl bg-white/60 p-4 ring-1 ring-gray-200">
+            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-gray-700">
-                  자동 생성 회차: <span className="font-semibold text-gray-900">{sessionCount || 0}회</span>
+                <div className="text-sm text-slate-700">
+                  자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
                   {sessionsBundle.prepDate ? (
-                    <span className="ml-2 text-gray-600">(준비일 포함: {sessionsBundle.prepDate})</span>
+                    <span className="ml-2 text-slate-600">(준비일 포함: {sessionsBundle.prepDate})</span>
                   ) : null}
                 </div>
-                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-medium text-blue-700 hover:underline">
+                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-[rgb(var(--brand-primary))] hover:underline">
                   갤러리 안내 보기
                 </button>
               </div>
               {hasSundayInRange ? (
-                <p className="mt-2 text-xs text-gray-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
+                <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
               ) : null}
             </div>
 
@@ -407,26 +435,73 @@ export default function ApplyGalleryClient() {
                 </div>
               </div>
             )}
+
+            <FieldHelp className="mt-2">
+              ※ 일요일은 자동 제외되며, 공휴일은 관리자 차단으로 관리됩니다.
+            </FieldHelp>
           </Card>
 
-          <Card>
-            <h2 className="text-base font-semibold text-gray-900">전시 정보</h2>
-            <p className="mt-1 text-sm text-gray-600">전시 운영에 필요한 정보를 입력해 주세요.</p>
+          <Card pad="lg">
+            <h3 className={SECTION_TITLE}>신청자 정보</h3>
+            <p className={SECTION_DESC}>담당자에게 연락할 정보를 입력해 주세요.</p>
 
-            <div className="mt-4 space-y-4">
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <div>
-                <FieldLabel htmlFor="exhibitionTitle">전시명(필수)</FieldLabel>
+                <FieldLabel htmlFor="applicantName">성명 *</FieldLabel>
+                <Input id="applicantName" {...register("applicantName")} placeholder="홍길동" />
+                {errors.applicantName?.message ? <FieldHelp className="text-red-600">{errors.applicantName.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="birth">생년월일 *</FieldLabel>
+                <Input id="birth" type="date" {...register("birth")} />
+                {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
+              </div>
+
+              <div className="md:col-span-2">
+                <FieldLabel htmlFor="address">주소 *</FieldLabel>
+                <Input id="address" {...register("address")} placeholder="서울특별시 서초구 서운로26길 3, 4층" />
+                {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="phone">연락처 *</FieldLabel>
+                <Input id="phone" {...register("phone")} placeholder="010-0000-0000" inputMode="numeric" autoComplete="tel" />
+                {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="email">이메일 *</FieldLabel>
+                <Input id="email" type="email" {...register("email")} placeholder="example@email.com" />
+                {errors.email?.message ? <FieldHelp className="text-red-600">{errors.email.message}</FieldHelp> : null}
+              </div>
+            </div>
+
+            <div className="mt-4">
+              <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
+              <Input id="orgName" {...register("orgName")} placeholder="개인 신청 시 '개인'으로 입력" />
+              {errors.orgName?.message ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
+            </div>
+          </Card>
+
+          <Card pad="lg">
+            <h3 className={SECTION_TITLE}>전시 정보</h3>
+            <p className={SECTION_DESC}>전시 운영에 필요한 정보를 입력해 주세요.</p>
+
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div className="md:col-span-2">
+                <FieldLabel htmlFor="exhibitionTitle">전시명 *</FieldLabel>
                 <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
                 {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <FieldLabel htmlFor="exhibitionPurpose">전시 목적</FieldLabel>
                 <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
                 {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
                 <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
                 {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
@@ -434,23 +509,18 @@ export default function ApplyGalleryClient() {
 
               <div>
                 <FieldLabel htmlFor="awarenessPath">인지 경로</FieldLabel>
-                <select
-                  id="awarenessPath"
-                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-                  {...register("awarenessPath")}
-                  defaultValue=""
-                >
+                <Select id="awarenessPath" {...register("awarenessPath")}>
                   <option value="">선택해 주세요</option>
                   <option value="서초센터 홈페이지">서초센터 홈페이지</option>
                   <option value="센터 내 홍보 리플릿">센터 내 홍보 리플릿</option>
                   <option value="서초구청 홈페이지">서초구청 홈페이지</option>
                   <option value="지인 소개">지인 소개</option>
                   <option value="기타">기타</option>
-                </select>
+                </Select>
                 {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
               </div>
 
-              <div>
+              <div className="md:col-span-2">
                 <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
                 <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
                 {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
@@ -458,54 +528,9 @@ export default function ApplyGalleryClient() {
             </div>
           </Card>
 
-          <Card>
-            <h2 className="text-base font-semibold text-gray-900">신청자 정보</h2>
-            <p className="mt-1 text-sm text-gray-600">담당자에게 연락할 정보를 입력해 주세요.</p>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="applicantName">신청자 성명</FieldLabel>
-                <Input id="applicantName" {...register("applicantName")} />
-                {errors.applicantName?.message ? <FieldHelp className="text-red-600">{errors.applicantName.message}</FieldHelp> : null}
-              </div>
-              <div>
-                <FieldLabel htmlFor="birth">생년월일</FieldLabel>
-                <Input id="birth" type="date" {...register("birth")} />
-                {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
-              </div>
-              <div>
-                <FieldLabel htmlFor="phone">연락처</FieldLabel>
-                <Input id="phone" placeholder="예: 010-1234-5678" {...register("phone")} />
-                {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
-              </div>
-              <div>
-                <FieldLabel htmlFor="email">이메일</FieldLabel>
-                <Input id="email" type="email" placeholder="example@domain.com" {...register("email")} />
-                {errors.email?.message ? <FieldHelp className="text-red-600">{errors.email.message}</FieldHelp> : null}
-              </div>
-            </div>
-
-            <div className="mt-4 space-y-4">
-              <div>
-                <FieldLabel htmlFor="orgName">단체명</FieldLabel>
-                <Input id="orgName" placeholder="개인 신청 시 '개인'으로 입력" {...register("orgName")} />
-                {errors.orgName?.message ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="address">주소</FieldLabel>
-                <Input id="address" placeholder="예: 서울시 서초구 …" {...register("address")} />
-                {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
-              </div>
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="text-base font-semibold text-gray-900">동의 및 서약</h2>
-            <p className="mt-1 text-sm text-gray-600">필수 항목입니다.</p>
-
-            <div className="mt-4 space-y-3">
-              {/* privacyAgree는 모달 동의/비동의로만 결정 (ApplyClient 패턴 통일) */}
+          <Card pad="lg">
+            <h3 className={SECTION_TITLE}>동의/서약</h3>
+            <div className="mt-4">
               <input type="hidden" {...register("privacyAgree")} />
               <Checkbox
                 checked={!!privacyAgree}
@@ -524,9 +549,8 @@ export default function ApplyGalleryClient() {
                 error={errors.privacyAgree?.message}
               />
               <FieldHelp className="mt-1">* 체크 시 안내 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
-
-              {/* pledgeAgree는 모달 동의/비동의로만 결정 (ApplyClient 패턴 통일) */}
-              <div className="pt-1" />
+            </div>
+            <div className="mt-4">
               <input type="hidden" {...register("pledgeAgree")} />
               <Checkbox
                 checked={!!pledgeAgree}
@@ -544,41 +568,29 @@ export default function ApplyGalleryClient() {
                 label="서약 내용에 동의합니다. (필수)"
                 error={errors.pledgeAgree?.message}
               />
-              <FieldHelp className="mt-1">* 체크 시 서약서 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
+              <FieldHelp className="mt-1">
+                * 체크 시 서약서 내용을 확인한 후 동의 여부가 반영됩니다.
+              </FieldHelp>
+            </div>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2">
+              <div>
+                <FieldLabel htmlFor="pledgeDate">서약 일자 *</FieldLabel>
+                <input type="hidden" {...register("pledgeDate")} />
+                <Input id="pledgeDate" type="text" value={fixedPledgeDate} readOnly className="bg-slate-50 text-slate-700" />
+                {errors.pledgeDate?.message ? <FieldHelp className="text-red-600">{errors.pledgeDate.message}</FieldHelp> : null}
+              </div>
 
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div>
-                  <FieldLabel htmlFor="pledgeDate">서약일</FieldLabel>
-                  <input type="hidden" {...register("pledgeDate")} />
-                  <Input id="pledgeDate" type="text" readOnly value={fixedPledgeDate} className="bg-slate-50 text-slate-700" />
-                </div>
-                <div>
-                  <FieldLabel htmlFor="pledgeName">서약자 성명</FieldLabel>
-                  <Input id="pledgeName" {...register("pledgeName")} />
-                  {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
-                </div>
+              <div>
+                <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
+                <Input id="pledgeName" {...register("pledgeName")} />
+                {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
               </div>
             </div>
           </Card>
 
-          {batchError ? <Notice variant="warn"><pre className="whitespace-pre-wrap text-sm">{batchError}</pre></Notice> : null}
-          {error ? <Notice variant="danger">{error}</Notice> : null}
-
-          {/* 갤러리: 장비/할인 UI 제거(완전 차단) */}
-          <input type="hidden" value="false" {...register("laptop")} />
-          <input type="hidden" value="false" {...register("projector")} />
-          <input type="hidden" value="false" {...register("audio")} />
-
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/space?category=gallery" className="text-sm font-medium text-gray-700 hover:underline">
-              ← 공간 선택으로 돌아가기
-            </Link>
-            <Button type="submit" disabled={submitting || !exhibitionTitle || sessionCount === 0}>
-              {submitting ? "등록 중…" : "신청하기"}
-            </Button>
-          </div>
-
-          <p className="text-xs text-gray-500">신청 후 담당자 검토를 거쳐 승인/반려 결과를 이메일로 안내드립니다.</p>
+          <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0} className="w-full py-3 shadow-sm hover:opacity-90">
+            {submitting ? "신청 중..." : "신청하기"}
+          </Button>
         </form>
 
         <PrivacyModal
