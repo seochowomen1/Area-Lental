@@ -82,33 +82,35 @@ export default function SpaceFloorTabs({
 
   return (
     <div>
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-800">층 선택</div>
-          <div className="text-xs text-slate-500">원하는 층을 선택해 공간을 확인하세요</div>
-        </div>
+      {floors.length > 1 ? (
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-semibold text-slate-800">층 선택</div>
+            <div className="text-xs text-slate-500">원하는 층을 선택해 공간을 확인하세요</div>
+          </div>
 
-        <Card pad="sm" className="flex w-full justify-center gap-2">
-          {floors.map((f) => {
-            const active = selected === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setSelected(f.id)}
-                className={cn(
-                  BUTTON_BASE,
-                  active ? BUTTON_VARIANT.primary : BUTTON_VARIANT.outline,
-                  "rounded-full px-5 py-2.5 text-sm",
-                  active ? "shadow" : ""
-                )}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </Card>
-      </div>
+          <Card pad="sm" className="flex w-full justify-center gap-2">
+            {floors.map((f) => {
+              const active = selected === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setSelected(f.id)}
+                  className={cn(
+                    BUTTON_BASE,
+                    active ? BUTTON_VARIANT.primary : BUTTON_VARIANT.outline,
+                    "rounded-full px-5 py-2.5 text-sm",
+                    active ? "shadow" : ""
+                  )}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </Card>
+        </div>
+      ) : null}
 
       {/*
         ✅ 반응형 카드 배치 규칙

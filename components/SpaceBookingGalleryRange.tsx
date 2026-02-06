@@ -258,7 +258,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           <div className="mt-1 grid grid-cols-7 gap-1">
             {monthGrid.map((c, idx) => {
               if (!c.inMonth) {
-                return <div key={idx} className="h-10" />;
+                return <div key={idx} className="h-14" />;
               }
               const isSunday = dayOfWeekLocal(c.ymd) === 0;
               const isStart = c.ymd === startDate;
@@ -267,6 +267,16 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
               const disabled = isCellDisabled(c.ymd);
               const isSelected = isStart || isEnd;
+
+              let cellStyle = "border-slate-200 bg-white text-slate-900 hover:bg-slate-50";
+              if (disabled) {
+                cellStyle = "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300";
+              } else if (isSelected) {
+                cellStyle = "border-orange-500 bg-orange-500 text-white shadow-md ring-2 ring-orange-200";
+              } else if (isBetween) {
+                cellStyle = "border-blue-200 bg-blue-50 text-blue-900";
+              }
+
               return (
                 <button
                   key={c.ymd}
@@ -274,37 +284,25 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   disabled={disabled}
                   onClick={() => onPickDay(c.ymd)}
                   className={cn(
-                    "relative h-12 rounded-xl border text-sm font-semibold transition",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
-                    disabled
-                      ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
-                      : "border-slate-200 bg-white text-slate-900 hover:bg-slate-50",
-                    // 범위 선택 표시(시각적 확인 강화)
-                    isBetween && !disabled
-                      ? "border-[rgba(var(--brand-primary),0.20)] bg-[rgba(var(--brand-primary),0.12)]"
-                      : "",
-                    isSelected && !disabled
-                      ? "z-10 border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary))] text-white shadow-sm"
-                      : ""
+                    "relative flex h-14 flex-col items-center justify-center rounded-xl border text-sm font-bold transition",
+                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
+                    cellStyle
                   )}
                   aria-pressed={isSelected}
                 >
-                  <span className="block leading-tight">{c.day}</span>
+                  <span className={cn("text-base", isSelected && !disabled ? "text-white" : "")}>
+                    {c.day}
+                  </span>
                   {isSunday ? (
-                    <span className="block text-[9px] font-medium leading-tight text-slate-300">
+                    <span className="text-[9px] font-medium text-slate-300">
                       휴관
                     </span>
                   ) : null}
-
                   {isStart && !disabled ? (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[rgb(var(--brand-accent))] px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
-                      시작
-                    </span>
+                    <span className="text-[9px] font-bold text-orange-100">시작</span>
                   ) : null}
-                  {isEnd && !disabled ? (
-                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[rgb(var(--brand-accent))] px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
-                      종료
-                    </span>
+                  {isEnd && !disabled && !isStart ? (
+                    <span className="text-[9px] font-bold text-orange-100">종료</span>
                   ) : null}
                 </button>
               );
