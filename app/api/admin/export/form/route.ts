@@ -217,7 +217,7 @@ export async function GET(req: Request) {
     wrapCells.push(XLSX.utils.encode_cell({ r: gTitleRow, c: 1 }));
 
     const gPurposeRow = aoa.length;
-    aoa.push(["전시목적", repInfo.exhibitionPurpose || "", "", "", "", "", "", ""]);
+    aoa.push(["전시 목적", repInfo.exhibitionPurpose || "", "", "", "", "", "", ""]);
     merges.push({ s: { r: gPurposeRow, c: 1 }, e: { r: gPurposeRow, c: 7 } });
     wrapCells.push(XLSX.utils.encode_cell({ r: gPurposeRow, c: 1 }));
 
@@ -227,7 +227,7 @@ export async function GET(req: Request) {
     wrapCells.push(XLSX.utils.encode_cell({ r: gGenreRow, c: 1 }));
 
     const gAwareRow = aoa.length;
-    aoa.push(["인지경로", repInfo.awarenessPath || "", "", "", "", "", "", ""]);
+    aoa.push(["인지 경로", repInfo.awarenessPath || "", "", "", "", "", "", ""]);
     merges.push({ s: { r: gAwareRow, c: 1 }, e: { r: gAwareRow, c: 7 } });
     wrapCells.push(XLSX.utils.encode_cell({ r: gAwareRow, c: 1 }));
 

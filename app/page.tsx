@@ -14,14 +14,14 @@ export default function Home() {
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <HomeCategoryCard
             title="강의실"
-            description="수강인원, 이용시간, 이용금액 등\n상세 정보 확인 및 예약"
+            description="수강인원, 이용시간, 이용금액 등 상세 정보 확인 및 예약"
             icon={<IconLecture />}
             href="/space"
           />
 
           <HomeCategoryCard
             title="E-스튜디오"
-            description="영상 촬영, 편집,\n장비 대여 및 예약"
+            description="영상 촬영, 편집, 장비 대여 및 예약"
             icon={<IconStudio />}
             href="/space?category=studio"
           />

@@ -106,6 +106,20 @@ export default function SpaceDetailTabs({
             </div>
 
             <div className="mt-5 grid gap-4">
+              {isGallery && (
+                <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                  <h4 className="mb-2 text-sm font-semibold text-blue-900">갤러리 참고사항</h4>
+                  <ul className="list-disc space-y-1.5 pl-5 text-sm text-blue-800">
+                    <li>신청자가 직접 설치(준비, 세팅) 및 철수를 진행하며, 작품 보관·지원 및 관리 인력 제공 불가</li>
+                    <li>와이어 걸이(고리)를 활용한 형식의 작품만 전시 가능 (고리를 걸 수 있는 장치 필요)</li>
+                    <li>작품 크기, 무게 등이 환경과 적합하지 않을 경우 전시 불가 (사전 담당자 상담 필요)</li>
+                    <li>액자 형태 작품: 가로/세로 최대 60cm, 최대 15점까지 전시 가능</li>
+                    <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수</li>
+                    <li>할인 및 바우처 적용 불가</li>
+                  </ul>
+                </div>
+              )}
+
               <div className="rounded-lg border p-4">
                 <h4 className="mb-2 text-sm font-semibold">이용 대상 및 사용 범위</h4>
                 <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
@@ -183,15 +197,29 @@ export default function SpaceDetailTabs({
 
               <div className="rounded-lg border p-4">
                 <h4 className="mb-2 text-sm font-semibold">환불 안내</h4>
-                <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
-                  <li>
-                    {room && room.feeKRW > 0
-                      ? "대관료가 발생하는 경우, 환불은 센터 내부 규정 및 회계 처리 기준에 따라 진행됩니다."
-                      : "본 공간의 대관 이용료는 별도 협의 대상이며, 환불 절차는 센터 안내 및 규정에 따라 진행됩니다."}
-                  </li>
-                  <li>결제 수단(카드/계좌이체 등)에 따라 환불 처리 기간이 달라질 수 있습니다.</li>
-                  <li>환불 진행 시 담당자 안내에 따라 증빙 서류 제출을 요청드릴 수 있습니다.</li>
-                </ul>
+                {isGallery ? (
+                  <>
+                    <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+                      <li>사용일 <b>3일 전</b>(운영일 기준, 일요일·공휴일 제외)까지 요청 시 <b>전액 환불</b></li>
+                      <li>사용일 <b>2일 전</b>까지 요청 시 <b>90%</b> 환불</li>
+                      <li>사용일 <b>1일 전</b>까지 요청 시 <b>80%</b> 환불</li>
+                      <li>사용일 <b>당일</b> 및 그 이후는 <b>환불 불가</b></li>
+                    </ul>
+                    <p className="mt-2 text-xs text-slate-600">
+                      ※ 환불 절차: 센터 방문 → 환불신청서 작성 및 제출 (우편, 메일 등 비대면 접수 불가)
+                    </p>
+                  </>
+                ) : (
+                  <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+                    <li>
+                      {room && room.feeKRW > 0
+                        ? "대관료가 발생하는 경우, 환불은 센터 내부 규정 및 회계 처리 기준에 따라 진행됩니다."
+                        : "본 공간의 대관 이용료는 별도 협의 대상이며, 환불 절차는 센터 안내 및 규정에 따라 진행됩니다."}
+                    </li>
+                    <li>결제 수단(카드/계좌이체 등)에 따라 환불 처리 기간이 달라질 수 있습니다.</li>
+                    <li>환불 진행 시 담당자 안내에 따라 증빙 서류 제출을 요청드릴 수 있습니다.</li>
+                  </ul>
+                )}
               </div>
 
               <div className="rounded-lg border p-4">

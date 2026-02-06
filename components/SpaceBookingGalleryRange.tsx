@@ -192,7 +192,8 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           <li>갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
           <li>일요일은 자동 제외되며, 공휴일은 자동 제외되지 않습니다(차단시간으로 관리).</li>
           <li>준비(세팅)일 1일은 무료로 자동 포함됩니다. (시작일 이전, 일요일이면 더 이전)</li>
-          <li>전시기간은 최대 30일까지 신청할 수 있습니다.</li>
+          <li>전시 기간은 최대 30일까지 신청할 수 있습니다.</li>
+          <li>전시 마지막 날 <span className="font-semibold">17시까지 철수 완료</span> 필수</li>
         </ul>
       </div>
 

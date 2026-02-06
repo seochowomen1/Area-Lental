@@ -662,7 +662,7 @@ export default function ApplyClient() {
                                   삭제
                                 </button>
                               ) : (
-                                <span className="text-[10px] text-slate-400">삭제불가</span>
+                                <span className="text-[10px] text-slate-400">삭제 불가</span>
                               )}
                             </div>
                           );
@@ -1134,7 +1134,7 @@ export default function ApplyClient() {
                                   삭제
                                 </button>
                               ) : (
-                                <span className="text-[10px] text-slate-400">삭제불가</span>
+                                <span className="text-[10px] text-slate-400">삭제 불가</span>
                               )}
                             </div>
                           );

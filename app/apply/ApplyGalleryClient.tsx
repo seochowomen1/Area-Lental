@@ -362,7 +362,7 @@ export default function ApplyGalleryClient() {
               </div>
 
               <div>
-                <FieldLabel htmlFor="exhibitionPurpose">전시목적</FieldLabel>
+                <FieldLabel htmlFor="exhibitionPurpose">전시 목적</FieldLabel>
                 <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
                 {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
               </div>
@@ -374,8 +374,20 @@ export default function ApplyGalleryClient() {
               </div>
 
               <div>
-                <FieldLabel htmlFor="awarenessPath">인지경로</FieldLabel>
-                <Input id="awarenessPath" placeholder="예: 홈페이지, SNS, 지인 추천" {...register("awarenessPath")} />
+                <FieldLabel htmlFor="awarenessPath">인지 경로</FieldLabel>
+                <select
+                  id="awarenessPath"
+                  className="block w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+                  {...register("awarenessPath")}
+                  defaultValue=""
+                >
+                  <option value="">선택해 주세요</option>
+                  <option value="서초센터 홈페이지">서초센터 홈페이지</option>
+                  <option value="센터 내 홍보 리플릿">센터 내 홍보 리플릿</option>
+                  <option value="서초구청 홈페이지">서초구청 홈페이지</option>
+                  <option value="지인 소개">지인 소개</option>
+                  <option value="기타">기타</option>
+                </select>
                 {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
               </div>
 

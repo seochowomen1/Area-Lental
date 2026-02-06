@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
-import { PLEDGE_FOOTER, PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
+import { PLEDGE_FOOTER, PLEDGE_SECTIONS, GALLERY_PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
 import { operatingNoticeText } from "@/lib/operating";
 
 type Props = {
@@ -14,6 +14,8 @@ type Props = {
 };
 
 export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree }: Props) {
+  const isGallery = roomId === "gallery";
+  const sections = isGallery ? [...PLEDGE_SECTIONS, ...GALLERY_PLEDGE_SECTIONS] : PLEDGE_SECTIONS;
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -66,7 +68,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
           {/* PDF 원문 링크는 제거(모달 본문에 서약 내용 포함) */}
 
           <div className="mt-4 space-y-4">
-            {PLEDGE_SECTIONS.map((sec) => (
+            {sections.map((sec) => (
               <section key={sec.title} className="rounded-xl border bg-gray-50 p-4">
                 <h4 className="text-sm font-semibold">{sec.title}</h4>
                 <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">

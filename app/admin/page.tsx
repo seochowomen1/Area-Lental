@@ -17,7 +17,7 @@ export default function AdminHomePage() {
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <HomeCategoryCard
           title="강의실"
-          description="강의실 예약 현황(신청/승인/취소)\n목록 및 캘린더 조회"
+          description="강의실 예약 현황(신청/승인/취소) 목록 및 캘린더 조회"
           icon={<IconLecture />}
           href="/admin/requests?category=lecture"
           ctaLabel="조회하기"
@@ -25,7 +25,7 @@ export default function AdminHomePage() {
 
         <HomeCategoryCard
           title="E-스튜디오"
-          description="E-스튜디오 예약 현황\n목록 및 캘린더 조회"
+          description="E-스튜디오 예약 현황 목록 및 캘린더 조회"
           icon={<IconStudio />}
           href="/admin/requests?category=studio"
           ctaLabel="조회하기"

@@ -199,7 +199,7 @@ export default async function AdminRequestDetail({
               {isGallery ? (
                 <>
                   <div className="mt-2">
-                    <b>전시기간</b>: {req.startDate || sessions.find((s) => !s.isPrepDay)?.date} ~ {req.endDate || sessions.slice().reverse().find((s) => !s.isPrepDay)?.date}
+                    <b>전시 기간</b>: {req.startDate || sessions.find((s) => !s.isPrepDay)?.date} ~ {req.endDate || sessions.slice().reverse().find((s) => !s.isPrepDay)?.date}
                     {sessions.some((s) => s.isPrepDay) ? <span className="ml-2 text-xs text-gray-500">(준비일 1일 무료 포함)</span> : null}
                   </div>
                   <div className="mt-1 text-xs text-gray-600">
@@ -220,7 +220,7 @@ export default async function AdminRequestDetail({
                   </div>
                   {req.exhibitionPurpose ? (
                     <div className="mt-1">
-                      <b>전시목적</b>: {req.exhibitionPurpose}
+                      <b>전시 목적</b>: {req.exhibitionPurpose}
                     </div>
                   ) : null}
                   {req.genreContent ? (
@@ -230,7 +230,7 @@ export default async function AdminRequestDetail({
                   ) : null}
                   {req.awarenessPath ? (
                     <div className="mt-1">
-                      <b>인지경로</b>: {req.awarenessPath}
+                      <b>인지 경로</b>: {req.awarenessPath}
                     </div>
                   ) : null}
                   {req.specialNotes ? (
