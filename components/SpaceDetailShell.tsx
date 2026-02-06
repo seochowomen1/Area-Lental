@@ -189,7 +189,7 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
 
             {/* 2) 운영시간 안내 */}
             <div className="mt-4">
-              <OperatingHoursNotice variant="compact" />
+              <OperatingHoursNotice variant="compact" roomId={room.id} />
             </div>
           </div>
         </div>

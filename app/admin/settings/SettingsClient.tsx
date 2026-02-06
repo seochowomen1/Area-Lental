@@ -63,12 +63,14 @@ export default function SettingsClient(props: {
 
     const dow = dayOfWeek(block.date);
     const isSat = dow === 6;
-    const hours = isSat ? "09:00~13:00" : "10:00~18:00";
+    const isTue = dow === 2;
+    const hours = isSat ? "09:00~13:00" : isTue ? "09:00~20:00" : "09:00~18:00";
+    const dayLabel = isSat ? "토" : isTue ? "화" : "평일";
 
     return (
       <div className="space-y-0.5">
         <div className="font-semibold text-slate-900">하루 전체</div>
-        <div className="text-xs text-slate-500">운영시간({isSat ? "토" : "평일"}): {hours}</div>
+        <div className="text-xs text-slate-500">운영시간({dayLabel}): {hours}</div>
       </div>
     );
   }

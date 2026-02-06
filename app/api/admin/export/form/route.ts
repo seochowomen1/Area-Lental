@@ -139,7 +139,7 @@ export async function GET(req: Request) {
   aoa.push([
     "이용시간",
     isGallery
-      ? "일 단위(하루 전체) / 운영시간 자동(평일 10:00~18:00, 토 09:00~13:00)"
+      ? "일 단위(하루 전체) / 운영시간 자동(평일 09:00~18:00, 화 야간 ~20:00, 토 09:00~13:00)"
       : hasMultiple
         ? "회차별 상이(아래 회차표 참고)"
         : `${repInfo.startTime} ~ ${repInfo.endTime}`,

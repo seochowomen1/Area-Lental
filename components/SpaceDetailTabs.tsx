@@ -79,7 +79,7 @@ export default function SpaceDetailTabs({
                   label="이용시간"
                   value={
                     isGallery
-                      ? "일 단위 예약 (평일 10:00~18:00 / 토 09:00~13:00 / 일 휴관)"
+                      ? "일 단위 예약 (평일 09:00~18:00 / 화 야간 18:00~20:00 / 토 09:00~13:00 / 일 휴관)"
                       : `최소 1시간 / 최대 ${room?.durationLimitHours ?? 6}시간 (30분 단위)`
                   }
                 />

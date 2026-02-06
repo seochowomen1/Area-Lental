@@ -1,7 +1,7 @@
 import { operatingNoticeLines } from "@/lib/operating";
 
-export default function OperatingHoursNotice(props: { className?: string; variant?: "default" | "compact" }) {
-  const lines = operatingNoticeLines();
+export default function OperatingHoursNotice(props: { className?: string; variant?: "default" | "compact"; roomId?: string }) {
+  const lines = operatingNoticeLines(props.roomId);
 
   const isCompact = props.variant === "compact";
   // 대표 사이트 공지/박스 톤에 가깝게: 과하지 않은 라운드/테두리/여백

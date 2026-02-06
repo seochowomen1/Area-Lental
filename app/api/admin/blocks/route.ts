@@ -39,8 +39,9 @@ function is30Min(v: string) {
 function galleryHoursForDate(date: string) {
   const dow = dayOfWeek(date);
   if (dow === 0) return null;
+  if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
   if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
-  return { startTime: "10:00", endTime: "18:00" };
+  return { startTime: "09:00", endTime: "18:00" };
 }
 
 
@@ -81,8 +82,8 @@ export async function POST(req: Request) {
     }
 
     // 운영시간 검증(날짜 기준)
-    // - gallery는 별도 운영시간(평일 10~18 / 토 09~13)을 사용하므로,
-    //   일반 운영시간(평일 10~17 등) 검증을 적용하면 false negative가 발생할 수 있습니다.
+    // - gallery는 별도 운영시간(평일 09~18 / 화 09~20 / 토 09~13)을 사용하므로,
+    //   일반 운영시간 검증을 적용하면 false negative가 발생할 수 있습니다.
     if (!isGallery) {
       const op = validateOperatingHours(date, startTime, endTime);
       if (!op.ok) return jsonError(op.message, 400, "OUT_OF_HOURS");

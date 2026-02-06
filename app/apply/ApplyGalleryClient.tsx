@@ -99,7 +99,8 @@ function buildGallerySessions(startDate: string, endDate: string): {
       continue;
     }
     if (dow === 6) sessions.push({ date: cur, startTime: "09:00", endTime: "13:00" });
-    else sessions.push({ date: cur, startTime: "10:00", endTime: "18:00" });
+    else if (dow === 2) sessions.push({ date: cur, startTime: "09:00", endTime: "20:00" });
+    else sessions.push({ date: cur, startTime: "09:00", endTime: "18:00" });
     cur = addDays(cur, 1);
   }
 
@@ -108,7 +109,8 @@ function buildGallerySessions(startDate: string, endDate: string): {
     const dow = dayOfWeekLocal(prepDate);
     if (dow !== 0) {
       if (dow === 6) sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "13:00" });
-      else sessions.unshift({ date: prepDate, startTime: "10:00", endTime: "18:00" });
+      else if (dow === 2) sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "20:00" });
+      else sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "18:00" });
     }
   }
 
@@ -159,7 +161,7 @@ export default function ApplyGalleryClient() {
       // GalleryRequestInputSchema 필수값(갤러리 UI에서는 숨김/고정)
       roomId: "gallery",
       date: qpStart || "",
-      startTime: "10:00",
+      startTime: "09:00",
       endTime: "18:00",
       headcount: 1,
       laptop: false,
@@ -215,8 +217,11 @@ export default function ApplyGalleryClient() {
     if (dow === 6) {
       setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
       setValue("endTime", "13:00", { shouldValidate: true, shouldDirty: true });
+    } else if (dow === 2) {
+      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
+      setValue("endTime", "20:00", { shouldValidate: true, shouldDirty: true });
     } else {
-      setValue("startTime", "10:00", { shouldValidate: true, shouldDirty: true });
+      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
       setValue("endTime", "18:00", { shouldValidate: true, shouldDirty: true });
     }
   }, [startDate, setValue]);
@@ -303,7 +308,7 @@ export default function ApplyGalleryClient() {
         <Notice>
           <div className="space-y-1">
             <div className="font-medium text-gray-900">운영시간</div>
-            <div className="text-sm text-gray-700">평일 10:00~18:00 / 토 09:00~13:00 / 일 휴관</div>
+            <div className="text-sm text-gray-700">평일 09:00~18:00 / 화 야간 18:00~20:00 / 토 09:00~13:00 / 일 휴관</div>
             <div className="text-sm text-gray-700">일요일은 자동 제외됩니다. 공휴일은 자동 제외되지 않으며(Blocks로 처리), 준비(세팅)일 1일은 무료로 포함됩니다.</div>
           </div>
         </Notice>

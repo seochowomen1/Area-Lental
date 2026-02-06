@@ -45,8 +45,9 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
     if (!date) return null;
     const dow = dayOfWeek(date);
     if (dow === 0) return null;
+    if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
     if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
-    return { startTime: "10:00", endTime: "18:00" };
+    return { startTime: "09:00", endTime: "18:00" };
   }, [date]);
 
   const ranges = useMemo(() => {

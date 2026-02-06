@@ -10,7 +10,10 @@ type MockDB = {
   blocks: BlockTime[];
 };
 
-const DB_PATH = path.join(process.cwd(), ".mockdb.json");
+// Vercel 서버리스에서는 process.cwd()가 읽기 전용이므로 /tmp 사용
+const DB_PATH = process.env.VERCEL
+  ? path.join("/tmp", ".mockdb.json")
+  : path.join(process.cwd(), ".mockdb.json");
 
 function ensureDb(): MockDB {
   if (!fs.existsSync(DB_PATH)) {

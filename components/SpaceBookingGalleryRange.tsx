@@ -200,10 +200,16 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
           <div className="flex flex-wrap items-center gap-2">
             <span className="text-sm font-semibold text-slate-900">전시 기간</span>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+            <span className={cn(
+              "rounded-full px-3 py-1 text-xs font-bold",
+              startDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-500"
+            )}>
               시작: {startDate || "-"}
             </span>
-            <span className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
+            <span className={cn(
+              "rounded-full px-3 py-1 text-xs font-bold",
+              endDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-500"
+            )}>
               종료: {endDate || "-"}
             </span>
             {startDate && !endDate ? (
@@ -268,7 +274,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   disabled={disabled}
                   onClick={() => onPickDay(c.ymd)}
                   className={cn(
-                    "relative h-10 rounded-xl border text-sm font-semibold transition",
+                    "relative h-12 rounded-xl border text-sm font-semibold transition",
                     "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
                     disabled
                       ? "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300"
@@ -283,16 +289,21 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   )}
                   aria-pressed={isSelected}
                 >
-                  {c.day}
+                  <span className="block leading-tight">{c.day}</span>
                   {isSunday ? (
-                    <span className="absolute bottom-1 left-1/2 -translate-x-1/2 text-[10px] font-medium text-slate-300">
-                      제외
+                    <span className="block text-[9px] font-medium leading-tight text-slate-300">
+                      휴관
                     </span>
                   ) : null}
 
-                  {isSelected && !disabled ? (
-                    <span className="absolute -top-1 -right-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[rgb(var(--brand-primary))] shadow">
-                      ✓
+                  {isStart && !disabled ? (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[rgb(var(--brand-accent))] px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                      시작
+                    </span>
+                  ) : null}
+                  {isEnd && !disabled ? (
+                    <span className="absolute -top-2 left-1/2 -translate-x-1/2 rounded-full bg-[rgb(var(--brand-accent))] px-1.5 py-0.5 text-[9px] font-bold text-white shadow">
+                      종료
                     </span>
                   ) : null}
                 </button>
