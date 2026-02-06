@@ -716,23 +716,34 @@ export default function ApplyClient() {
             </div>
 
             {hourlyFee > 0 && bundle.sessionCount > 0 && bundle.totalDurationMin > 0 ? (
-              <div className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-3">
-                <div className="flex items-end justify-between gap-3 text-sm text-slate-700">
-                  <span>
-                    {bundle.sessionCount > 1 ? (
-                      <>
-                        예상 대관 이용료 합계 (총 {bundle.sessionCount}회차, 시간당 {hourlyFee.toLocaleString()}원)
-                      </>
-                    ) : (
-                      <>예상 대관 이용료 (시간당 {hourlyFee.toLocaleString()}원)</>
-                    )}
-                  </span>
-                  <span className="text-base font-semibold text-slate-900">
-                    {(bundle.sessionCount > 1 ? bundle.rentalSum : rentalFee).toLocaleString()}원
-                  </span>
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                  <span className="text-base">💰</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관 이용료</span>
                 </div>
-                <div className="mt-1 text-[11px] text-slate-500">
-                  ※ 기자재 사용료 별도{bundle.sessionCount > 1 ? " (회차별 합산)" : ""}
+                <div className="px-4 py-3">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span>이용시간</span>
+                      <span className="font-semibold text-slate-800">
+                        {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"}
+                        {bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span>시간당 요금</span>
+                      <span className="font-semibold text-slate-800">{hourlyFee.toLocaleString()}원</span>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                    <span className="text-sm font-bold text-slate-900">합계</span>
+                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">
+                      {(bundle.sessionCount > 1 ? bundle.rentalSum : rentalFee).toLocaleString()}원
+                    </span>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-400">
+                    ※ 기자재 사용료 별도{bundle.sessionCount > 1 ? " (회차별 합산)" : ""}
+                  </p>
                 </div>
               </div>
             ) : null}
@@ -853,51 +864,38 @@ export default function ApplyClient() {
 
           <Card pad="lg">
             <h3 className={SECTION_TITLE}>이용요금 안내</h3>
-            <div className="mt-4">
-              <Notice variant="info" title="대관 이용료 및 장비 사용료" pad="md">
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-slate-700">
+            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                <span className="text-base">💰</span>
+                <span className="text-sm font-bold text-slate-800">대관 이용료 및 장비 사용료</span>
+              </div>
+              <div className="px-4 py-3">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>
                       {bundle.sessionCount > 1 ? (
-                        <>
-                          대관 이용료 합계 (총 {bundle.sessionCount}회차 · {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"})
-                        </>
+                        <>대관 이용료 ({bundle.sessionCount}회차 · {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"})</>
                       ) : (
                         <>대관 이용료 {durationMinutes ? `(${fmtDuration(durationMinutes)})` : ""}</>
                       )}
                     </span>
-                    <span
-                      aria-hidden
-                      className="flex-1 border-b border-dotted border-slate-300 translate-y-[-2px]"
-                    />
-                    <span className="font-semibold text-slate-900 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
+                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
                   </div>
-
-                  <div className="flex items-baseline gap-3">
-                    <span className="text-slate-700">
-                      {bundle.sessionCount > 1 ? <>장비 사용료 합계 (총 {bundle.sessionCount}회차)</> : <>장비 사용료</>}
+                  <div className="flex items-center justify-between text-sm text-slate-600">
+                    <span>
+                      {bundle.sessionCount > 1 ? <>장비 사용료 ({bundle.sessionCount}회차)</> : <>장비 사용료</>}
                     </span>
-                    <span
-                      aria-hidden
-                      className="flex-1 border-b border-dotted border-slate-300 translate-y-[-2px]"
-                    />
-                    <span className="font-semibold text-slate-900 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
-                  </div>
-
-                  <div className="mt-2 flex items-baseline gap-3 border-t border-slate-200 pt-2">
-                    <span className="font-semibold text-slate-900">총 금액</span>
-                    <span
-                      aria-hidden
-                      className="flex-1 border-b border-dotted border-slate-300 translate-y-[-2px]"
-                    />
-                    <span className="text-base font-bold text-slate-900 tabular-nums">{bundle.total.toLocaleString()}원</span>
-                  </div>
-
-                  <div className="mt-1 text-[11px] text-slate-500">
-                    ※ 장비 사용료는 선택 항목에 따라 변동되며, 선택한 회차 수 기준으로 합산됩니다.
+                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
                   </div>
                 </div>
-              </Notice>
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                  <span className="text-sm font-bold text-slate-900">총 금액</span>
+                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{bundle.total.toLocaleString()}원</span>
+                </div>
+                <p className="mt-2 text-[11px] text-slate-400">
+                  ※ 장비 사용료는 선택 항목에 따라 변동되며, 선택한 회차 수 기준으로 합산됩니다.
+                </p>
+              </div>
             </div>
           </Card>
 

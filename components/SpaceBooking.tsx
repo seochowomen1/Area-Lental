@@ -257,6 +257,12 @@ export default function SpaceBooking({
     return Math.round((hourlyFee * durationMinutes) / 60);
   }, [hourlyFee, durationMinutes]);
 
+  // 선택 가능한 시간이 하나도 없으면 마감 처리
+  const allSlotsDisabled = useMemo(() => {
+    if (busy || !slots.length) return false;
+    return startOptions.length > 0 && startOptions.every((o) => o.disabled);
+  }, [busy, slots.length, startOptions]);
+
   const canApply = Boolean(startSel && endSel && endOptions.length && durationMinutes >= 60);
 
   return (
@@ -427,7 +433,17 @@ export default function SpaceBooking({
           </div>
         )}
 
-        {!busy && !noSlotsMessage && (
+        {!busy && !noSlotsMessage && allSlotsDisabled && (
+          <div className="mt-3">
+            <Notice variant="warn" title="금일 마감">
+              <div className="text-sm text-slate-700">
+                선택 가능한 시간대가 모두 지났습니다. 다른 날짜를 선택해 주세요.
+              </div>
+            </Notice>
+          </div>
+        )}
+
+        {!busy && !noSlotsMessage && !allSlotsDisabled && (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
