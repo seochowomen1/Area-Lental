@@ -5,19 +5,19 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
 
 import { GalleryRequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { todayYmdSeoul } from "@/lib/datetime";
 import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
+import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
 import { FieldHelp, FieldLabel, Input, Textarea } from "@/components/ui/Field";
-import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
+import { SECTION_DESC } from "@/components/ui/presets";
 
 // 갤러리 신청(B안): 기간(start/end) 선택 → 회차 자동 생성
 // - 일요일 자동 제외
@@ -100,8 +100,12 @@ function buildGallerySessions(startDate: string, endDate: string): {
       cur = addDays(cur, 1);
       continue;
     }
-    if (dow === 6) sessions.push({ date: cur, startTime: "09:00", endTime: "13:00" });
-    else sessions.push({ date: cur, startTime: "10:00", endTime: "18:00" });
+    if (dow === 6) {
+      sessions.push({ date: cur, startTime: "09:00", endTime: "13:00" });
+    } else {
+      sessions.push({ date: cur, startTime: "09:00", endTime: "18:00" });
+      if (dow === 2) sessions.push({ date: cur, startTime: "18:00", endTime: "21:00" });
+    }
     cur = addDays(cur, 1);
   }
 
@@ -109,8 +113,12 @@ function buildGallerySessions(startDate: string, endDate: string): {
   if (prepDate && prepDate < startDate) {
     const dow = dayOfWeekLocal(prepDate);
     if (dow !== 0) {
-      if (dow === 6) sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "13:00" });
-      else sessions.unshift({ date: prepDate, startTime: "10:00", endTime: "18:00" });
+      if (dow === 6) {
+        sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "13:00" });
+      } else {
+        sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "18:00" });
+        if (dow === 2) sessions.splice(1, 0, { date: prepDate, startTime: "18:00", endTime: "21:00" });
+      }
     }
   }
 
@@ -121,7 +129,7 @@ function buildGallerySessions(startDate: string, endDate: string): {
   return { prepDate, sessions: out };
 }
 
-function composePurpose(fields: Pick<GalleryFields, "exhibitionPurpose" | "genreContent" | "awarenessPath" | "specialNotes">) {
+function composePurpose(fields: { exhibitionPurpose: string; genreContent: string; awarenessPath: string; specialNotes: string }) {
   // RequestInputSchema의 purpose(min 5) 충족 + 관리자 확인 편의
   const lines: string[] = [];
   if (fields.exhibitionPurpose.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
@@ -161,7 +169,7 @@ export default function ApplyGalleryClient() {
       // GalleryRequestInputSchema 필수값(갤러리 UI에서는 숨김/고정)
       roomId: "gallery",
       date: qpStart || "",
-      startTime: "10:00",
+      startTime: "09:00",
       endTime: "18:00",
       headcount: 1,
       laptop: false,
@@ -183,6 +191,9 @@ export default function ApplyGalleryClient() {
       genreContent: "",
       awarenessPath: "",
       specialNotes: "",
+
+      // purpose: composePurpose로 자동 구성(hidden)
+      purpose: "전시 신청",
     }
   });
 
@@ -206,6 +217,12 @@ export default function ApplyGalleryClient() {
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
 
+  // purpose를 갤러리 필드들로부터 자동 구성(Zod validation 통과를 위해)
+  useEffect(() => {
+    const computed = composePurpose({ exhibitionPurpose: exhibitionPurpose ?? "", genreContent: genreContent ?? "", awarenessPath: awarenessPath ?? "", specialNotes: specialNotes ?? "" });
+    setValue("purpose", computed, { shouldValidate: true, shouldDirty: true });
+  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, setValue]);
+
   const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate), [startDate, endDate]);
 
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
@@ -218,7 +235,7 @@ export default function ApplyGalleryClient() {
       setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
       setValue("endTime", "13:00", { shouldValidate: true, shouldDirty: true });
     } else {
-      setValue("startTime", "10:00", { shouldValidate: true, shouldDirty: true });
+      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
       setValue("endTime", "18:00", { shouldValidate: true, shouldDirty: true });
     }
   }, [startDate, setValue]);
@@ -294,21 +311,24 @@ export default function ApplyGalleryClient() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <SiteHeader />
+      <SiteHeader title="갤러리 대관신청" backHref="/space?category=gallery" backLabel="목록" />
 
       <main className="mx-auto w-full max-w-3xl px-4 pb-16 pt-6">
         <div className="mb-6">
-          <h1 className="text-2xl font-bold tracking-tight text-gray-900">{SECTION_TITLE.apply}</h1>
-          <p className="mt-2 text-sm text-gray-600">우리동네 갤러리(4층) 전시 대관 신청서입니다.</p>
+          <h2 className="text-2xl font-bold">대관신청서 작성</h2>
+          <p className={SECTION_DESC}>우리동네 갤러리(4층) 전시 대관 신청서입니다. 온라인으로 신청서를 작성하면 관리자 검토/승인 절차를 거쳐 확정됩니다.</p>
         </div>
 
-        <Notice>
-          <div className="space-y-1">
-            <div className="font-medium text-gray-900">운영시간</div>
-            <div className="text-sm text-gray-700">평일 10:00~18:00 / 토 09:00~13:00 / 일 휴관</div>
-            <div className="text-sm text-gray-700">일요일은 자동 제외됩니다. 공휴일은 자동 제외되지 않으며(Blocks로 처리), 준비(세팅)일 1일은 무료로 포함됩니다.</div>
-          </div>
-        </Notice>
+        <OperatingHoursNotice roomId="gallery" />
+
+        <div className="mt-4">
+          <Notice title="신청 전 확인" variant="info" pad="md">
+            <ul className="list-disc space-y-1 pl-5">
+              <li>일요일은 자동 제외됩니다. 공휴일은 자동 제외되지 않으며(Blocks로 처리), 준비(세팅)일 1일은 무료로 포함됩니다.</li>
+              <li>신청 시 '관리자 차단/기 승인 일정'과 충돌하면 자동으로 신청이 제한됩니다.</li>
+            </ul>
+          </Notice>
+        </div>
 
         <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-6">
           <Card>
@@ -344,43 +364,6 @@ export default function ApplyGalleryClient() {
               {hasSundayInRange ? (
                 <p className="mt-2 text-xs text-gray-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
               ) : null}
-            </div>
-          </Card>
-
-          <Card>
-            <h2 className="text-base font-semibold text-gray-900">전시 정보</h2>
-            <p className="mt-1 text-sm text-gray-600">전시 운영에 필요한 정보를 입력해 주세요.</p>
-
-            <div className="mt-4 space-y-4">
-              <div>
-                <FieldLabel htmlFor="exhibitionTitle">전시명(필수)</FieldLabel>
-                <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
-                {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="exhibitionPurpose">전시목적</FieldLabel>
-                <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
-                {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
-                <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
-                {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="awarenessPath">인지경로</FieldLabel>
-                <Input id="awarenessPath" placeholder="예: 홈페이지, SNS, 지인 추천" {...register("awarenessPath")} />
-                {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
-                <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
-                {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
-              </div>
             </div>
           </Card>
 
@@ -422,6 +405,43 @@ export default function ApplyGalleryClient() {
                 <FieldLabel htmlFor="address">주소</FieldLabel>
                 <Input id="address" placeholder="예: 서울시 서초구 …" {...register("address")} />
                 {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
+              </div>
+            </div>
+          </Card>
+
+          <Card>
+            <h2 className="text-base font-semibold text-gray-900">전시 정보</h2>
+            <p className="mt-1 text-sm text-gray-600">전시 운영에 필요한 정보를 입력해 주세요.</p>
+
+            <div className="mt-4 space-y-4">
+              <div>
+                <FieldLabel htmlFor="exhibitionTitle">전시명(필수)</FieldLabel>
+                <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
+                {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="exhibitionPurpose">전시목적</FieldLabel>
+                <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
+                {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
+                <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
+                {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="awarenessPath">인지경로</FieldLabel>
+                <Input id="awarenessPath" placeholder="예: 홈페이지, SNS, 지인 추천" {...register("awarenessPath")} />
+                {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
+              </div>
+
+              <div>
+                <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
+                <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
+                {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
               </div>
             </div>
           </Card>
@@ -487,8 +507,14 @@ export default function ApplyGalleryClient() {
             </div>
           </Card>
 
-          {batchError ? <Notice tone="warning"><pre className="whitespace-pre-wrap text-sm">{batchError}</pre></Notice> : null}
-          {error ? <Notice tone="danger">{error}</Notice> : null}
+          {batchError ? <Notice variant="warn"><pre className="whitespace-pre-wrap text-sm">{batchError}</pre></Notice> : null}
+          {error ? <Notice variant="danger">{error}</Notice> : null}
+          {Object.keys(errors).length > 0 && !error ? (
+            <Notice variant="danger">입력 정보를 확인해 주세요. 필수 항목이 누락되었거나 형식이 올바르지 않습니다.</Notice>
+          ) : null}
+
+          {/* 갤러리: purpose는 전시 정보 필드에서 자동 구성 */}
+          <input type="hidden" {...register("purpose")} />
 
           {/* 갤러리: 장비/할인 UI 제거(완전 차단) */}
           <input type="hidden" value="false" {...register("laptop")} />
@@ -504,7 +530,7 @@ export default function ApplyGalleryClient() {
             </Button>
           </div>
 
-          <p className="text-xs text-gray-500">{SECTION_DESC.apply}</p>
+          <p className="text-xs text-gray-500">※ 신청 후 관리자 검토를 거쳐 확정됩니다.</p>
         </form>
 
         <PrivacyModal

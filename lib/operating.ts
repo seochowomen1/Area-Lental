@@ -206,8 +206,17 @@ function fmtRangeKorean(start: string, end: string) {
 /**
  * 운영시간 안내를 멀티라인 UI로 렌더링하기 위한 라인 데이터
  * - 운영 규칙(OPERATING_RULES) 기반으로 자동 생성
+ * - roomId="gallery"이면 갤러리 운영시간 반환
  */
-export function operatingNoticeLines(): Array<{ label: string; text: string }> {
+export function operatingNoticeLines(roomId?: string): Array<{ label: string; text: string }> {
+  if (roomId === "gallery") {
+    return [
+      { label: "평일", text: "9시~18시" },
+      { label: "야간", text: "화 18시~21시" },
+      { label: "주말", text: "토 9시~13시 (일·공휴일 휴관)" }
+    ];
+  }
+
   const weekday = fmtRangeKorean(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
   const tueNight = fmtRangeKorean(OPERATING_RULES.tuesdayNight.start, OPERATING_RULES.tuesdayNight.end);
   const sat = fmtRangeKorean(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
