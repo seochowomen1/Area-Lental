@@ -284,6 +284,27 @@ export default function ApplyGalleryClient() {
   }
 
   const sessionCount = sessionsBundle.sessions.length;
+
+  // 대관비 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  const feeBreakdown = useMemo(() => {
+    if (!sessionsBundle.sessions.length) return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
+    let weekdays = 0;
+    let saturdays = 0;
+    let prepDays = 0;
+    for (const s of sessionsBundle.sessions) {
+      const isPrepDay = s.date === sessionsBundle.prepDate;
+      if (isPrepDay) {
+        prepDays++;
+        continue;
+      }
+      const dow = dayOfWeekLocal(s.date);
+      if (dow === 6) saturdays++;
+      else weekdays++;
+    }
+    const total = weekdays * 20000 + saturdays * 10000;
+    return { weekdays, saturdays, prepDays, total };
+  }, [sessionsBundle]);
+
   const hasSundayInRange = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return false;
     let cur = startDate;
@@ -349,6 +370,39 @@ export default function ApplyGalleryClient() {
                 <p className="mt-2 text-xs text-gray-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
               ) : null}
             </div>
+
+            {/* 대관비 자동 계산 */}
+            {sessionCount > 0 && (
+              <div className="mt-4">
+                <Notice variant="info" title="예상 대관비">
+                  <div className="space-y-1.5 text-sm text-slate-700">
+                    {feeBreakdown.weekdays > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
+                        <span className="font-semibold">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                      </div>
+                    )}
+                    {feeBreakdown.saturdays > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
+                        <span className="font-semibold">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                      </div>
+                    )}
+                    {feeBreakdown.prepDays > 0 && (
+                      <div className="flex items-center justify-between text-slate-500">
+                        <span>준비일 {feeBreakdown.prepDays}일</span>
+                        <span>무료</span>
+                      </div>
+                    )}
+                    <div className="mt-2 flex items-center justify-between border-t pt-2">
+                      <span className="font-semibold text-slate-900">합계</span>
+                      <span className="text-base font-bold text-slate-900">{feeBreakdown.total.toLocaleString()}원</span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-[11px] text-slate-500">※ 할인 및 바우처 적용 불가</p>
+                </Notice>
+              </div>
+            )}
           </Card>
 
           <Card>

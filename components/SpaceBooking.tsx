@@ -159,9 +159,20 @@ export default function SpaceBooking({
     // 운영시간 내 모든 시작 후보를 노출하되,
     //  - 예약/차단/정규수업 등으로 불가한 시간은 비활성화(회색)
     //  - 최소 1시간(60분) 연속 가능해야 선택 가능
+    //  - 오늘 날짜인 경우 이미 지난 시간은 비활성화
     const candidates = Array.from(new Set(slots.map((s) => s.start))).sort((a, b) => toMinutes(a) - toMinutes(b));
 
+    const now = new Date();
+    const todayYmd = fmtYMD(now);
+    const isToday = selectedDate === todayYmd;
+    const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : 0;
+
     return candidates.map((start) => {
+      // 오늘인 경우 이미 지난 시간은 비활성화
+      if (isToday && toMinutes(start) < nowMinutes) {
+        return { value: start, disabled: true };
+      }
+
       let total = 0;
       let curStart = start;
       for (let guard = 0; guard < 200; guard++) {
@@ -174,7 +185,7 @@ export default function SpaceBooking({
       const enabled = total >= 60;
       return { value: start, disabled: !enabled };
     });
-  }, [busy, slots, slotMap, maxMinutes]);
+  }, [busy, slots, slotMap, maxMinutes, selectedDate]);
 
   const [startSel, setStartSel] = useState<string>("");
   const [endSel, setEndSel] = useState<string>("");

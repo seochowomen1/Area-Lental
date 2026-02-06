@@ -175,59 +175,73 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
    강의실/스튜디오 - 공간정보 및 시설안내
    ─────────────────────────────────────────── */
 function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
+  const isStudio = room?.category === "studio";
+
   return (
     <div className={cn(CARD_BASE, "p-5 text-sm text-gray-800")}>
       <SectionTitle>공간정보 및 시설안내</SectionTitle>
 
+      {/* 기본 정보 */}
       <div className="mt-4 grid gap-3 rounded-lg border bg-slate-50 p-4">
         <div className="grid gap-2 sm:grid-cols-2">
           <InfoRow label="공간명" value={room?.name ?? "-"} />
           <InfoRow label="위치" value={room ? `${room.floor}층` : "-"} />
           <InfoRow label="수용인원" value={room ? `최대 ${room.capacity}명` : "-"} />
-          <InfoRow
-            label="이용시간"
-            value={`최소 1시간 / 최대 ${room?.durationLimitHours ?? 6}시간 (30분 단위)`}
-          />
-          <InfoRow
-            label="이용요금"
-            value={
-              room
-                ? room.feeKRW > 0
-                  ? `${room.feeKRW.toLocaleString()}원/시간`
-                  : "별도 협의"
-                : "-"
-            }
-          />
-          <InfoRow
-            label="문의"
-            value={room ? `${room.contactName} (${room.contactPhone})` : "-"}
-          />
+          <InfoRow label="문의" value={room ? `${room.contactName} (${room.contactPhone})` : "-"} />
         </div>
-        <p className="text-xs text-slate-600">
-          ※ 공간별 비치물품 및 이용 가능 범위는 현장 운영 상황에 따라 달라질 수 있습니다.
-        </p>
       </div>
 
       <div className="mt-5 grid gap-4">
+        {/* 운영 시간 */}
         <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">이용 대상 및 사용 범위</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>본 공간은 센터 대관 승인 절차를 거친 개인/단체에 한하여 이용할 수 있습니다.</li>
-            <li>공간 사용 목적(교육, 회의, 프로그램 운영 등)이 센터 운영 취지에 부합하지 않거나, 운영상 부적절하다고 판단될 경우 승인이 제한될 수 있습니다.</li>
-            <li>상업적 판매, 정치·종교 목적 행사 등 센터 운영 원칙에 반하는 이용은 제한될 수 있습니다.</li>
-          </ul>
+          <h4 className="mb-2 text-sm font-semibold">운영 시간</h4>
+          <div className="overflow-hidden rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">시간</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                <tr><td className="px-3 py-2">평일 (월~금)</td><td className="px-3 py-2">10:00 ~ 17:00</td></tr>
+                <tr><td className="px-3 py-2">야간 (화요일)</td><td className="px-3 py-2">18:00 ~ 20:00</td></tr>
+                <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2">10:00 ~ 12:00</td></tr>
+                <tr><td className="px-3 py-2 text-slate-500">일요일·공휴일</td><td className="px-3 py-2 text-slate-500">휴관</td></tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
+        {/* 이용 요금 */}
         <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">기본 비치 및 이용 안내</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>기본 비치물품(테이블·의자 등) 및 제공 설비는 공간별로 상이할 수 있습니다.</li>
-            <li>시설물(가구·장비) 이동이 필요한 경우, 안전사고 예방을 위해 사전에 센터와 협의해 주시기 바랍니다.</li>
-            <li>이용자는 사용 전·후 시설 상태를 확인하고, 이용 종료 후 원상복구 및 정리정돈(쓰레기 수거, 의자 정렬 등)을 완료해야 합니다.</li>
-            <li>소음, 냄새 유발, 위험물 반입, 시설 훼손 우려 행위 등 타 이용자에게 불편을 초래할 수 있는 행위는 제한될 수 있습니다.</li>
-          </ul>
+          <h4 className="mb-2 text-sm font-semibold">이용 요금</h4>
+          <div className="overflow-hidden rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">항목</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">요금</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                <tr>
+                  <td className="px-3 py-2">대관 이용료</td>
+                  <td className="px-3 py-2 font-semibold">
+                    {room && room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">이용시간</td>
+                  <td className="px-3 py-2">최소 1시간 / 최대 {room?.durationLimitHours ?? 6}시간 (30분 단위)</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-xs text-slate-600">※ 기자재 사용료 별도</p>
         </div>
 
+        {/* 공간별 비치물품 */}
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">공간별 비치물품</h4>
           {room?.equipment && room.equipment.length > 0 ? (
@@ -248,12 +262,25 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
               비치물품 정보는 준비 중입니다. 자세한 사항은 센터로 문의해 주시기 바랍니다.
             </p>
           )}
-
           <p className="mt-3 text-xs text-slate-600">
             ※ 비치물품 및 제공 설비는 현장 운영 상황에 따라 변동될 수 있습니다.
           </p>
         </div>
 
+        {/* 이용 안내 */}
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+          <h4 className="mb-2 text-sm font-semibold text-blue-900">이용 안내</h4>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-blue-800">
+            <li>센터 대관 승인 절차를 거친 개인/단체에 한하여 이용 가능</li>
+            {isStudio && <li>촬영/녹음 장비는 대관 목적 및 운영 상황에 따라 제공 범위가 달라질 수 있습니다.</li>}
+            <li>시설물(가구·장비) 이동 시 사전 센터 협의 필요</li>
+            <li>이용 종료 후 원상복구 및 정리정돈 완료</li>
+            <li>상업적 판매, 정치·종교 목적 행사 등은 제한될 수 있습니다.</li>
+            <li>음식물 반입 및 취식은 센터 안내를 준수합니다.</li>
+          </ul>
+        </div>
+
+        {/* 신청 절차 */}
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">신청 및 승인 절차</h4>
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
@@ -261,7 +288,6 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
             <li>센터는 신청 내용을 바탕으로 일정·안전·운영 적정성 등을 검토합니다.</li>
             <li>승인(또는 반려) 결과는 신청 시 입력한 연락처/이메일 등으로 안내됩니다.</li>
             <li>승인된 예약은 이용 당일 안내된 시간에 따라 입·퇴실을 진행합니다.</li>
-            <li>운영상 필요 시 센터는 추가 자료 요청 또는 일정 조정을 안내할 수 있습니다.</li>
           </ol>
         </div>
 
@@ -357,15 +383,34 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">환불 안내</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>
-              {room && room.feeKRW > 0
-                ? "대관료가 발생하는 경우, 환불은 센터 내부 규정 및 회계 처리 기준에 따라 진행됩니다."
-                : "본 공간의 대관 이용료는 별도 협의 대상이며, 환불 절차는 센터 안내 및 규정에 따라 진행됩니다."}
-            </li>
-            <li>결제 수단(카드/계좌이체 등)에 따라 환불 처리 기간이 달라질 수 있습니다.</li>
-            <li>환불 진행 시 담당자 안내에 따라 증빙 서류 제출을 요청드릴 수 있습니다.</li>
-          </ul>
+          <div className="overflow-hidden rounded-md border">
+            <table className="w-full text-sm">
+              <thead className="bg-slate-50">
+                <tr>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">내용</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y">
+                <tr>
+                  <td className="px-3 py-2">대관료 환불</td>
+                  <td className="px-3 py-2">
+                    {room && room.feeKRW > 0
+                      ? "센터 내부 규정 및 회계 처리 기준에 따라 진행"
+                      : "별도 협의 대상 (센터 안내 및 규정에 따라 진행)"}
+                  </td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">환불 처리 기간</td>
+                  <td className="px-3 py-2">결제 수단(카드/계좌이체 등)에 따라 상이</td>
+                </tr>
+                <tr>
+                  <td className="px-3 py-2">필요 서류</td>
+                  <td className="px-3 py-2">담당자 안내에 따라 증빙 서류 제출 요청 가능</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
 
         <div className="rounded-lg border p-4">
@@ -380,7 +425,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
         <div className="rounded-lg border bg-slate-50 p-4">
           <h4 className="mb-2 text-sm font-semibold">문의</h4>
           <p className="text-sm text-gray-700">
-            취소/환불 관련 문의는 공간정보에 안내된 연락처로 문의해 주세요.
+            취소/환불 관련 문의: {room ? `${room.contactName} (${room.contactPhone})` : "센터 문의처"}
           </p>
         </div>
 
