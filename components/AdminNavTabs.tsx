@@ -56,11 +56,6 @@ export default function AdminNavTabs() {
 
   const pageTabs = [
     {
-      href: `/admin?category=${encodeURIComponent(category)}`,
-      label: "공간",
-      active: pathname === "/admin",
-    },
-    {
       href: `/admin/requests?category=${encodeURIComponent(category)}`,
       label: "목록",
       active: pathname.startsWith("/admin/requests"),

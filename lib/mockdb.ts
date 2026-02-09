@@ -15,28 +15,42 @@ const DB_PATH = process.env.VERCEL
   ? path.join("/tmp", ".mockdb.json")
   : path.join(process.cwd(), ".mockdb.json");
 
+/**
+ * 모듈 레벨 인메모리 캐시 — Vercel 서버리스에서 warm instance 내에서
+ * 여러 함수 호출(API route + page SSR)이 같은 데이터를 보도록 합니다.
+ */
+let memCache: MockDB | null = null;
+
 function ensureDb(): MockDB {
+  // 메모리 캐시가 있으면 그대로 반환
+  if (memCache) return memCache;
+
   if (!fs.existsSync(DB_PATH)) {
     const empty: MockDB = { requests: [], schedules: [], blocks: [] };
     fs.writeFileSync(DB_PATH, JSON.stringify(empty, null, 2), "utf-8");
+    memCache = empty;
     return empty;
   }
   try {
     const raw = fs.readFileSync(DB_PATH, "utf-8");
     const data = JSON.parse(raw) as MockDB;
-    return {
+    const db: MockDB = {
       requests: Array.isArray(data.requests) ? data.requests : [],
       schedules: Array.isArray(data.schedules) ? data.schedules : [],
       blocks: Array.isArray(data.blocks) ? data.blocks : []
     };
+    memCache = db;
+    return db;
   } catch {
     const empty: MockDB = { requests: [], schedules: [], blocks: [] };
     fs.writeFileSync(DB_PATH, JSON.stringify(empty, null, 2), "utf-8");
+    memCache = empty;
     return empty;
   }
 }
 
 function saveDb(db: MockDB) {
+  memCache = db;
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2), "utf-8");
 }
 

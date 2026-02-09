@@ -8,7 +8,6 @@ import { cn } from "@/lib/cn";
 import {
   FLOORS,
   ROOMS_BY_ID,
-  getCategoryLabel,
   getRoomsByCategory,
   normalizeRoomCategory,
   type FloorId,
@@ -481,7 +480,7 @@ export default function CalendarClient({
           </div>
 
           <div>
-            <label className="text-sm font-medium">{getCategoryLabel(category) === "강의실" ? "강의실" : "공간"}</label>
+            <label className="text-sm font-medium">{category === "lecture" ? "강의실" : "공간"}</label>
             <select
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}

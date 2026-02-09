@@ -21,6 +21,7 @@ type Props = {
   resetAfterSuccess: boolean;
   onCreate: (payload: Omit<ClassSchedule, "id">) => Promise<string | void>;
   onToast?: (t: ToastState) => void;
+  spaceLabel?: string;
 };
 
 function pad2(n: number) {
@@ -33,7 +34,7 @@ function minToHm(min: number) {
   return `${pad2(h)}:${pad2(m)}`;
 }
 
-export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, resetAfterSuccess, onCreate, onToast }: Props) {
+export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, resetAfterSuccess, onCreate, onToast, spaceLabel = "강의실" }: Props) {
   const formRef = useRef<HTMLFormElement | null>(null);
 
   const [roomId, setRoomId] = useState<string>(rooms[0]?.id ?? "all");
@@ -135,7 +136,7 @@ export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, res
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-12">
       <div className="md:col-span-3">
-        <FieldLabel>강의실</FieldLabel>
+        <FieldLabel>{spaceLabel}</FieldLabel>
         <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
           {rooms.map((r) => (
             <option key={r.id} value={r.id}>
@@ -145,7 +146,7 @@ export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, res
         </Select>
         {showAllWarning ? (
           <FieldHelp className="text-xs text-red-600">
-            전체 선택 시 모든 강의실에 동일한 수업시간이 적용됩니다.
+            전체 선택 시 모든 {spaceLabel}에 동일한 수업시간이 적용됩니다.
           </FieldHelp>
         ) : null}
       </div>

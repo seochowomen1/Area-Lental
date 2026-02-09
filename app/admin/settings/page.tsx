@@ -97,7 +97,7 @@ export default async function AdminSettingsPage({
       </div>
 
       <div className="mt-6">
-        <SettingsClient rooms={allRooms} dayOptions={DAY_OPTIONS} initialSchedules={schedules} initialBlocks={blocks} />
+        <SettingsClient rooms={allRooms} dayOptions={DAY_OPTIONS} initialSchedules={schedules} initialBlocks={blocks} category={category} />
       </div>
     </div>
   );

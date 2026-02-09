@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
 import AdminDiscountFields from "@/components/admin/AdminDiscountFields";
 import BatchSessionSelector from "@/components/admin/BatchSessionSelector";
@@ -45,8 +45,43 @@ export default async function AdminRequestDetail({
   await assertAdminAuth();
 
   const db = getDatabase();
-  const req = await db.getRequestById(params.id);
-  if (!req) return notFound();
+  let req: RentalRequest | null = null;
+  try {
+    req = await db.getRequestById(params.id);
+  } catch (e) {
+    // DB 에러 — 로깅 후 빈 결과로 처리
+    console.error("[admin/requests/[id]] getRequestById error:", e);
+  }
+
+  if (!req) {
+    const cat = normalizeRoomCategory(searchParams?.category);
+    return (
+      <main className="mx-auto max-w-5xl p-6">
+        <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
+          <div className="text-4xl text-amber-400">!</div>
+          <h1 className="mt-3 text-lg font-bold text-gray-900">신청 정보를 찾을 수 없습니다</h1>
+          <p className="mt-2 text-sm text-gray-600">
+            신청번호 <b>{params.id}</b>에 해당하는 데이터가 없습니다.<br />
+            Mock 모드에서는 서버 재시작 시 데이터가 초기화될 수 있습니다.
+          </p>
+          <div className="mt-6 flex items-center justify-center gap-3">
+            <Link
+              href={`/admin/requests?category=${encodeURIComponent(cat)}`}
+              className="rounded-full bg-[rgb(var(--brand-primary))] px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+            >
+              목록으로 돌아가기
+            </Link>
+            <Link
+              href={`/admin/calendar?category=${encodeURIComponent(cat)}`}
+              className="rounded-full border border-gray-200 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              캘린더 보기
+            </Link>
+          </div>
+        </div>
+      </main>
+    );
+  }
 
   // ✅ 상세 URL에 category가 없을 때, 해당 신청의 roomId 기반으로 category를 붙여줍니다.
   //    (관리자 탭/뒤로가기 흐름에서 카테고리 유지)
