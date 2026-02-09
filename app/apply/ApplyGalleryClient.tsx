@@ -164,6 +164,7 @@ export default function ApplyGalleryClient() {
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const [pledgeOpen, setPledgeOpen] = useState(false);
   const [galleryInfoOpen, setGalleryInfoOpen] = useState(false);
+  const [confirmData, setConfirmData] = useState<GalleryApplyValues | null>(null);
 
   const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
 
@@ -257,6 +258,18 @@ export default function ApplyGalleryClient() {
     }
   }, [startDate, setValue]);
 
+  function handleConfirm(values: GalleryApplyValues) {
+    setError(null);
+    setBatchError(null);
+    setConfirmData(values);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+
+  async function submitConfirmed() {
+    if (!confirmData) return;
+    await onSubmit(confirmData);
+  }
+
   async function onSubmit(values: GalleryApplyValues) {
     setError(null);
     setBatchError(null);
@@ -347,6 +360,157 @@ export default function ApplyGalleryClient() {
     return false;
   }, [startDate, endDate]);
 
+  // ─── 확인 화면 ───
+  if (confirmData) {
+    return (
+      <div>
+        <SiteHeader title="신청 내용 확인" backHref="/space?category=gallery" backLabel="목록" />
+        <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
+          <div className="text-center">
+            <h2 className="text-2xl font-bold text-slate-900">신청 내용 확인</h2>
+            <p className="mt-2 text-sm text-slate-600">아래 내용을 확인하신 후 제출해 주세요.</p>
+          </div>
+
+          {error && (
+            <div className="mt-4">
+              <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">{error}</Notice>
+            </div>
+          )}
+          {batchError && (
+            <div className="mt-4">
+              <Notice variant="warn" title="일부 회차는 신청할 수 없습니다" pad="md">
+                <div className="whitespace-pre-line text-sm">{batchError}</div>
+              </Notice>
+            </div>
+          )}
+
+          <div className="mt-6 space-y-4">
+            {/* 전시 기간 */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>전시 기간</h3>
+              <div className="mt-3 divide-y divide-slate-100">
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">공간</span>
+                  <span className="text-sm font-semibold text-slate-900">우리동네 갤러리</span>
+                </div>
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">전시 기간</span>
+                  <span className="text-sm font-semibold text-slate-900">{confirmData.startDate} ~ {confirmData.endDate}</span>
+                </div>
+                {sessionsBundle.prepDate && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500">준비일</span>
+                    <span className="text-sm font-semibold text-slate-900">{sessionsBundle.prepDate} (무료)</span>
+                  </div>
+                )}
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">총 회차</span>
+                  <span className="text-sm font-semibold text-slate-900">{sessionCount}회</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* 신청자 정보 */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>신청자 정보</h3>
+              <div className="mt-3 divide-y divide-slate-100">
+                {([
+                  ["성명", confirmData.applicantName],
+                  ["생년월일", confirmData.birth],
+                  ["주소", confirmData.address],
+                  ["연락처", confirmData.phone],
+                  ["이메일", confirmData.email],
+                  ["단체명", confirmData.orgName],
+                ] as const).map(([label, value]) => (
+                  <div key={label} className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500 shrink-0">{label}</span>
+                    <span className="text-sm font-semibold text-slate-900 text-right">{value}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* 전시 정보 */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>전시 정보</h3>
+              <div className="mt-3 divide-y divide-slate-100">
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">전시명</span>
+                  <span className="text-sm font-semibold text-slate-900">{confirmData.exhibitionTitle}</span>
+                </div>
+                {confirmData.exhibitionPurpose && (
+                  <div className="py-2.5">
+                    <span className="text-sm text-slate-500">전시 목적</span>
+                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.exhibitionPurpose}</p>
+                  </div>
+                )}
+                {confirmData.genreContent && (
+                  <div className="py-2.5">
+                    <span className="text-sm text-slate-500">장르·내용</span>
+                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.genreContent}</p>
+                  </div>
+                )}
+                {confirmData.awarenessPath && (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500">인지 경로</span>
+                    <span className="text-sm font-semibold text-slate-900">{confirmData.awarenessPath}</span>
+                  </div>
+                )}
+                {confirmData.specialNotes && (
+                  <div className="py-2.5">
+                    <span className="text-sm text-slate-500">특이사항</span>
+                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.specialNotes}</p>
+                  </div>
+                )}
+              </div>
+            </Card>
+
+            {/* 예상 대관비 */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>예상 대관비</h3>
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+                <div className="px-4 py-3 space-y-2">
+                  {feeBreakdown.weekdays > 0 && (
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span>평일 {feeBreakdown.weekdays}일 x 20,000원</span>
+                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                    </div>
+                  )}
+                  {feeBreakdown.saturdays > 0 && (
+                    <div className="flex items-center justify-between text-sm text-slate-600">
+                      <span>토요일 {feeBreakdown.saturdays}일 x 10,000원</span>
+                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                    </div>
+                  )}
+                  {feeBreakdown.prepDays > 0 && (
+                    <div className="flex items-center justify-between text-sm text-slate-400">
+                      <span>준비일 {feeBreakdown.prepDays}일</span>
+                      <span className="font-medium">무료</span>
+                    </div>
+                  )}
+                </div>
+                <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                  <span className="text-sm font-bold text-slate-900">합계</span>
+                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+                </div>
+              </div>
+            </Card>
+
+            {/* 버튼 */}
+            <div className="flex gap-3 pt-2">
+              <Button type="button" variant="outline" className="flex-1 py-3" onClick={() => setConfirmData(null)}>
+                수정하기
+              </Button>
+              <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting} onClick={submitConfirmed}>
+                {submitting ? "제출 중..." : "최종 제출"}
+              </Button>
+            </div>
+          </div>
+        </main>
+      </div>
+    );
+  }
+
   return (
     <div>
       <SiteHeader title="갤러리 대관 신청" backHref="/space?category=gallery" backLabel="목록" />
@@ -371,7 +535,7 @@ export default function ApplyGalleryClient() {
           </Notice>
         </div>
 
-        <form onSubmit={handleSubmit(onSubmit)} className="mt-6 space-y-8">
+        <form onSubmit={handleSubmit(handleConfirm)} className="mt-6 space-y-8">
           {/* hidden - roomId/date/start/end are driven by UI */}
           <input type="hidden" {...register("roomId")} />
           <input type="hidden" {...register("date")} />
