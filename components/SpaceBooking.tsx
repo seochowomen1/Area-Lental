@@ -68,18 +68,32 @@ function addMonths(d: Date, delta: number) {
 }
 
 function getCalendarGrid(monthStart: Date) {
-  // monthStart is the first day of the month
   const year = monthStart.getFullYear();
   const month = monthStart.getMonth();
   const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
   const startDow = first.getDay(); // 0(Sun)...6
-  const start = new Date(year, month, 1 - startDow);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+
   const days: Date[] = [];
-  for (let i = 0; i < 42; i++) {
-    days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+
+  // 이전 달 날짜로 첫 줄 채우기
+  const prevMonthLast = new Date(year, month, 0).getDate();
+  for (let i = startDow - 1; i >= 0; i--) {
+    days.push(new Date(year, month - 1, prevMonthLast - i));
   }
-  return { days, first, last };
+
+  // 이번 달 날짜
+  for (let d = 1; d <= lastDay; d++) {
+    days.push(new Date(year, month, d));
+  }
+
+  // 다음 달 날짜로 마지막 줄 채우기
+  let nextDay = 1;
+  while (days.length % 7 !== 0) {
+    days.push(new Date(year, month + 1, nextDay++));
+  }
+
+  return { days, first, last: new Date(year, month + 1, 0) };
 }
 
 export default function SpaceBooking({
