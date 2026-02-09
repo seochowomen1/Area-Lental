@@ -1,10 +1,9 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { getDatabase } from "@/lib/database";
 import { statusLabel, REQUEST_ID_LABEL } from "@/lib/labels";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
-import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory } from "@/lib/space";
+import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
@@ -83,6 +82,29 @@ function formatPeriod(items: RentalRequest[]) {
   return { datePart, timePart, countPart };
 }
 
+/* 상태 뱃지 */
+function StatusBadge({ status }: { status: string }) {
+  const label = statusLabel(status as RequestStatus);
+  const base = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
+  let cls = "border-gray-200 bg-gray-50 text-gray-700";
+
+  if (status === "접수") cls = "border-amber-200 bg-amber-50 text-amber-800";
+  else if (status === "검토중") cls = "border-sky-200 bg-sky-50 text-sky-800";
+  else if (status === "승인") cls = "border-emerald-200 bg-emerald-50 text-emerald-700";
+  else if (status === "반려") cls = "border-rose-200 bg-rose-50 text-rose-700";
+  else if (status === "취소") cls = "border-gray-200 bg-gray-100 text-gray-600";
+  else if (status === "완료") cls = "border-slate-200 bg-slate-100 text-slate-700";
+
+  return <span className={`${base} ${cls}`}>{label}</span>;
+}
+
+/* 카테고리 색상 매핑 */
+function categoryAccent(cat: RoomCategory) {
+  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
+  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
+  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
+}
+
 export default async function AdminRequestsPage({
   searchParams,
 }: {
@@ -93,6 +115,7 @@ export default async function AdminRequestsPage({
   const roomsInCategory = getRoomsByCategory(category);
   const allowedRoomIds = new Set(roomsInCategory.map((r) => r.id));
   const roomLabel = getCategoryLabel(category);
+  const accent = categoryAccent(category);
 
   let roomId = searchParams.roomId ?? "all";
   const status = searchParams.status ?? "all";
@@ -208,151 +231,166 @@ export default async function AdminRequestsPage({
 
   return (
     <div className="space-y-4">
+      {/* 카테고리 헤더 */}
+      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 shadow-sm`}>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex h-3 w-3 rounded-full ${accent.dot}`} />
+          <h1 className={`text-lg font-bold ${accent.text}`}>{roomLabel} 대관 신청 목록</h1>
+        </div>
+        <p className="mt-1 ml-6 text-sm text-gray-600">
+          {roomLabel} 대관 신청 현황을 조회하고 관리합니다.
+        </p>
+      </div>
+
+      {/* 필터 영역 */}
       <div className="no-print rounded-xl bg-white p-4 shadow">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
-          <form
-            className="grid flex-1 grid-cols-1 gap-3 md:grid-cols-5"
-            action="/admin/requests"
-            method="get"
-          >
-            <input type="hidden" name="category" value={category} />
+        <form
+          className="grid grid-cols-1 gap-3 md:grid-cols-5"
+          action="/admin/requests"
+          method="get"
+        >
+          <input type="hidden" name="category" value={category} />
 
-            <div>
-              <label className="text-sm font-medium">{roomLabel}</label>
-              <select name="roomId" defaultValue={roomId} className="mt-1 w-full rounded-xl border px-3 py-2">
-                {roomOptions.map((r) => (
-                  <option key={r.id} value={r.id}>
-                    {r.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700">
+              {category === "gallery" ? "공간" : category === "studio" ? "공간" : "강의실"}
+            </label>
+            <select name="roomId" defaultValue={roomId} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
+              {roomOptions.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="text-sm font-medium">상태</label>
-              <select name="status" defaultValue={status} className="mt-1 w-full rounded-xl border px-3 py-2">
-                {["all", "접수", "검토중", "승인", "반려", "취소", "완료"].map((s) => (
-                  <option key={s} value={s}>
-                    {s === "all" ? "전체" : statusLabel(s as any)}
-                  </option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700">상태</label>
+            <select name="status" defaultValue={status} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
+              {["all", "접수", "검토중", "승인", "반려", "취소", "완료"].map((s) => (
+                <option key={s} value={s}>
+                  {s === "all" ? "전체" : statusLabel(s as any)}
+                </option>
+              ))}
+            </select>
+          </div>
 
-            <div>
-              <label className="text-sm font-medium">날짜(선택)</label>
-              <input type="date" name="date" defaultValue={date} className="mt-1 w-full rounded-xl border px-3 py-2" />
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700">날짜</label>
+            <input type="date" name="date" defaultValue={date} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]" />
+          </div>
 
-            <div>
-              <label className="text-sm font-medium">검색</label>
-              <input
-                name="q"
-                defaultValue={q}
-                className="mt-1 w-full rounded-xl border px-3 py-2"
-                placeholder="이름/연락처/단체/신청번호..."
-              />
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700">검색</label>
+            <input
+              name="q"
+              defaultValue={q}
+              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]"
+              placeholder="이름/연락처/단체/신청번호..."
+            />
+          </div>
 
-            <div>
-              <label className="text-sm font-medium">보기</label>
-              <select name="view" defaultValue={view} className="mt-1 w-full rounded-xl border px-3 py-2">
-                <option value="group">묶음 기준</option>
-                <option value="items">개별 건</option>
-              </select>
-            </div>
+          <div>
+            <label className="text-xs font-semibold text-gray-700">보기</label>
+            <select name="view" defaultValue={view} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
+              <option value="group">묶음 기준</option>
+              <option value="items">개별 건</option>
+            </select>
+          </div>
 
-            <div className="md:col-span-5 flex gap-2">
-              <button className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2 disabled:opacity-60">
+          <div className="md:col-span-5 flex items-center justify-between gap-3">
+            <div className="flex gap-2">
+              <button className="rounded-full bg-[rgb(var(--brand-primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2">
                 검색
               </button>
               <a
-                className="rounded-full border border-gray-200 bg-white px-4 py-2 text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
                 href={exportUrl}
               >
                 엑셀 다운로드
               </a>
             </div>
-          </form>
 
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="inline-flex overflow-hidden rounded-full border border-gray-200 bg-white shadow-sm">
-              <Link
-                href={makeUrl("group")}
-                className={
-                  "px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2 " +
-                  (view === "group" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
-                }
-              >
-                그룹 보기
-              </Link>
-              <Link
-                href={makeUrl("items")}
-                className={
-                  "px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2 " +
-                  (view === "items" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
-                }
-              >
-                회차 보기
-              </Link>
-            </div>
-            <div className="text-sm text-gray-600">
-              총 <b className="text-gray-900">{totalCount}</b>건
+            <div className="flex items-center gap-3">
+              <div className="inline-flex overflow-hidden rounded-full border border-gray-200 bg-white shadow-sm">
+                <Link
+                  href={makeUrl("group")}
+                  className={
+                    "px-4 py-2 text-sm transition focus-visible:outline-none " +
+                    (view === "group" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
+                  }
+                >
+                  그룹
+                </Link>
+                <Link
+                  href={makeUrl("items")}
+                  className={
+                    "px-4 py-2 text-sm transition focus-visible:outline-none " +
+                    (view === "items" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
+                  }
+                >
+                  회차
+                </Link>
+              </div>
+              <div className="text-sm text-gray-600">
+                총 <b className="text-gray-900">{totalCount}</b>건
+              </div>
             </div>
           </div>
-        </div>
+        </form>
       </div>
 
+      {/* 테이블 */}
       <div className="rounded-xl bg-white shadow">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-left">
+            <thead className="border-b bg-gray-50/80 text-left">
               <tr>
-                <th className="p-3">{REQUEST_ID_LABEL}</th>
-                <th className="p-3">{roomLabel}</th>
-                <th className="p-3">일시</th>
-                <th className="p-3">신청자</th>
-                <th className="p-3">단체/인원</th>
-                <th className="p-3">상태</th>
-                <th className="p-3">총액</th>
-                {!isGalleryCategory && <th className="p-3">할인</th>}
-                <th className="p-3">최종금액</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">{REQUEST_ID_LABEL}</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">공간</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">일시</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">신청자</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">단체/인원</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">상태</th>
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">총액</th>
+                {!isGalleryCategory && <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">할인</th>}
+                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">최종금액</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-gray-100">
               {view === "items" &&
                 filteredItems.map((r) => {
                   const fee = computeFeesForRequest(r);
                   return (
-                    <tr key={r.requestId} className="border-t hover:bg-gray-50">
-                      <td className="p-3">
+                    <tr key={r.requestId} className="transition hover:bg-gray-50/50">
+                      <td className="px-4 py-3">
                         <Link
-                          className="text-[rgb(var(--brand-primary))] underline"
+                          className="font-medium text-[rgb(var(--brand-primary))] hover:underline"
                           href={`/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(category)}`}
                         >
                           {r.requestId}
                         </Link>
                       </td>
-                      <td className="p-3">{r.roomName}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3">{r.roomName}</td>
+                      <td className="px-4 py-3">
                         {r.roomId === "gallery"
                           ? `${r.date} (${r.isPrepDay ? "준비일" : "전시일"})`
                           : `${r.date} ${r.startTime}-${r.endTime}`}
                       </td>
-                      <td className="p-3">{r.applicantName}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3 font-medium">{r.applicantName}</td>
+                      <td className="px-4 py-3">
                         {r.orgName} / {r.headcount}명
                       </td>
-                      <td className="p-3">{statusLabel(r.status)}</td>
-                      <td className="p-3 whitespace-nowrap">{formatKRW(fee.totalFeeKRW)}</td>
+                      <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">{formatKRW(fee.totalFeeKRW)}</td>
                       {!isGalleryCategory && (
-                        <td className="p-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
                           {fee.discountAmountKRW > 0
                             ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})`
                             : "-"}
                         </td>
                       )}
-                      <td className="p-3 whitespace-nowrap font-medium">{formatKRW(fee.finalFeeKRW)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-semibold">{formatKRW(fee.finalFeeKRW)}</td>
                     </tr>
                   );
                 })}
@@ -368,55 +406,57 @@ export default async function AdminRequestsPage({
                   const p = formatPeriod(g.items);
 
                   return (
-                    <tr key={g.key} className="border-t hover:bg-gray-50">
-                      <td className="p-3">
+                    <tr key={g.key} className="transition hover:bg-gray-50/50">
+                      <td className="px-4 py-3">
                         <Link
-                          className="text-[rgb(var(--brand-primary))] underline"
+                          className="font-medium text-[rgb(var(--brand-primary))] hover:underline"
                           href={`/admin/requests/${encodeURIComponent(rep.requestId)}?category=${encodeURIComponent(category)}`}
                         >
                           {rep.requestId}
                         </Link>
-                        {isBatch && hasMultiple && <div className="mt-1 text-xs text-gray-600">외 {g.items.length - 1}건</div>}
+                        {isBatch && hasMultiple && <div className="mt-0.5 text-xs text-gray-500">외 {g.items.length - 1}건</div>}
                       </td>
-                      <td className="p-3">{rep.roomName}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3">{rep.roomName}</td>
+                      <td className="px-4 py-3">
                         <div>
-                          {p.datePart} {p.countPart && <span className="ml-1 text-xs text-gray-600">({p.countPart})</span>}
+                          {p.datePart} {p.countPart && <span className="ml-1 text-xs text-gray-500">({p.countPart})</span>}
                         </div>
-                        <div className="text-xs text-gray-600">{p.timePart}</div>
+                        <div className="text-xs text-gray-500">{p.timePart}</div>
                       </td>
-                      <td className="p-3">{rep.applicantName}</td>
-                      <td className="p-3">
+                      <td className="px-4 py-3 font-medium">{rep.applicantName}</td>
+                      <td className="px-4 py-3">
                         {rep.orgName} / {rep.headcount}명
                       </td>
-                      <td className="p-3">
-                        <div>{statusLabel(g.groupStatus)}</div>
+                      <td className="px-4 py-3">
+                        <StatusBadge status={g.groupStatus} />
                         {g.displayStatus === "부분처리" && (
-                          <div className="mt-1 inline-flex rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700">
-                            부분처리
+                          <div className="mt-1">
+                            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                              부분처리
+                            </span>
                           </div>
                         )}
-                        {usingApprovedBasis && <div className="mt-1 text-xs text-gray-600">승인 {g.approvedCount}/{g.totalCount}회</div>}
+                        {usingApprovedBasis && <div className="mt-1 text-xs text-gray-500">승인 {g.approvedCount}/{g.totalCount}회</div>}
                       </td>
-                      <td className="p-3 whitespace-nowrap">
+                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
                         {formatKRW(fee.totalFeeKRW)}
-                        {usingApprovedBasis && <div className="mt-0.5 text-xs text-gray-600">(승인 회차 기준)</div>}
+                        {usingApprovedBasis && <div className="mt-0.5 text-xs text-gray-500">(승인기준)</div>}
                       </td>
                       {!isGalleryCategory && (
-                        <td className="p-3 whitespace-nowrap">
+                        <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
                           {fee.discountAmountKRW > 0
                             ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})`
                             : "-"}
                         </td>
                       )}
-                      <td className="p-3 whitespace-nowrap font-medium">{formatKRW(fee.finalFeeKRW)}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-semibold">{formatKRW(fee.finalFeeKRW)}</td>
                     </tr>
                   );
                 })}
 
               {!totalCount && (
                 <tr>
-                  <td colSpan={isGalleryCategory ? 8 : 9} className="p-6 text-center text-gray-500">
+                  <td colSpan={isGalleryCategory ? 8 : 9} className="px-4 py-12 text-center text-gray-400">
                     조건에 맞는 신청이 없습니다.
                   </td>
                 </tr>

@@ -11,8 +11,14 @@ import { getDatabase } from "@/lib/database";
 import { REQUEST_ID_LABEL, statusLabel } from "@/lib/labels";
 import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
 import { dayOfWeek } from "@/lib/datetime";
-import { getRoom, normalizeRoomCategory } from "@/lib/space";
+import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
+
+function categoryAccent(cat: RoomCategory) {
+  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500", badge: "border-violet-200 bg-violet-50 text-violet-700" };
+  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500", badge: "border-emerald-200 bg-emerald-50 text-emerald-700" };
+  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500", badge: "border-blue-200 bg-blue-50 text-blue-700" };
+}
 
 import {
   decideSingleAction,
@@ -117,31 +123,41 @@ export default async function AdminRequestDetail({
         .join("\n")
     : req.rejectReason ?? "";
 
+  const accent = categoryAccent(normalizedCategory);
+  const categoryLabel = getCategoryLabel(normalizedCategory);
+
   return (
     <main className="mx-auto max-w-5xl p-6">
-      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold">대관 신청 상세</h1>
-          <p className="mt-1 text-sm text-gray-600">
-            {REQUEST_ID_LABEL}: <b className="text-gray-900">{req.requestId}</b>
-            {isBatch ? (
-              <>
-                <span className="mx-2 text-gray-300">|</span>
-                묶음({req.batchId}) · {sessions.length}회
-              </>
-            ) : null}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href={backToListHref} className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50">
-            목록
-          </Link>
-          <Link
-            href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
-            className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
-          >
-            신청서 Excel
-          </Link>
+      {/* 카테고리 표시 + 헤더 */}
+      <div className={`mb-6 rounded-xl border ${accent.border} ${accent.bg} p-4`}>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className={`inline-flex h-2.5 w-2.5 rounded-full ${accent.dot}`} />
+              <span className={`text-xs font-semibold ${accent.text}`}>{categoryLabel}</span>
+            </div>
+            <h1 className="mt-1 text-xl font-bold text-gray-900">대관 신청 상세</h1>
+            <p className="mt-1 text-sm text-gray-600">
+              {REQUEST_ID_LABEL}: <b className="text-gray-900">{req.requestId}</b>
+              {isBatch ? (
+                <>
+                  <span className="mx-2 text-gray-300">|</span>
+                  묶음({req.batchId}) · {sessions.length}회
+                </>
+              ) : null}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Link href={backToListHref} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+              목록
+            </Link>
+            <Link
+              href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
+              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+            >
+              신청서 Excel
+            </Link>
+          </div>
         </div>
       </div>
 

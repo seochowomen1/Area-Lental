@@ -4,7 +4,7 @@ import Card from "@/components/ui/Card";
 import SettingsClient from "@/app/admin/settings/SettingsClient";
 
 import { rooms } from "@/lib/rooms";
-import { ROOMS } from "@/lib/space";
+import { ROOMS, getCategoryLabel, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
@@ -19,7 +19,21 @@ const DAY_OPTIONS = [
   { value: 6, label: "토" }
 ];
 
-export default async function AdminSettingsPage() {
+function categoryAccent(cat: RoomCategory) {
+  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
+  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
+  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
+}
+
+export default async function AdminSettingsPage({
+  searchParams,
+}: {
+  searchParams?: { category?: string };
+}) {
+  const category = normalizeRoomCategory(searchParams?.category);
+  const categoryLabel = getCategoryLabel(category);
+  const accent = categoryAccent(category);
+
   const db = getDatabase();
   const allRooms = [{ id: "all", name: "전체" }, ...rooms];
   const [schedules, blocks] = await Promise.all([db.getClassSchedules(), db.getBlocks()]);
@@ -35,10 +49,19 @@ export default async function AdminSettingsPage() {
     return Array.from(map.entries()).sort(([a], [b]) => b - a);
   })();
 
-  // NOTE: AdminLayout(app/admin/layout.tsx) already provides the shell + tabs.
-  // Keep this page focused on content only to avoid duplicating layouts.
   return (
     <div className="mx-auto max-w-5xl pb-16 pt-2">
+      {/* 카테고리 헤더 */}
+      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 shadow-sm mb-6`}>
+        <div className="flex items-center gap-3">
+          <span className={`inline-flex h-3 w-3 rounded-full ${accent.dot}`} />
+          <h1 className={`text-lg font-bold ${accent.text}`}>{categoryLabel} 운영 설정</h1>
+        </div>
+        <p className="mt-1 ml-6 text-sm text-gray-600">
+          정규 수업시간 및 차단 시간을 관리합니다. 등록된 시간에는 대관 신청이 불가능합니다.
+        </p>
+      </div>
+
       <Notice title="안내" variant="info">
         <ul className="list-disc pl-5">
           <li>정규 수업시간/수동 차단 시간을 등록하면 해당 시간에는 대관 신청이 불가능합니다.</li>
