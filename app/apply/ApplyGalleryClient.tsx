@@ -22,6 +22,26 @@ import { FieldHelp, FieldLabel, Input, Textarea } from "@/components/ui/Field";
 // - 준비(세팅)일 1일 무료: 시작일 이전 1일(일요일이면 직전 영업일)
 // - 공휴일 자동 제외 X (Blocks로 처리)
 
+function formatPhoneKR(input: string) {
+  const digits = input.replace(/\D/g, "").slice(0, 11);
+  if (!digits) return "";
+
+  // 02 지역번호(서울)
+  if (digits.startsWith("02")) {
+    const rest = digits.slice(2);
+    if (rest.length <= 3) return `02-${rest}`;
+    if (rest.length <= 7) return `02-${rest.slice(0, 3)}-${rest.slice(3)}`;
+    return `02-${rest.slice(0, 4)}-${rest.slice(4, 8)}`;
+  }
+
+  // 휴대폰/기타(보통 3-3/4-4)
+  const a = digits.slice(0, 3);
+  const b = digits.slice(3);
+  if (b.length <= 4) return `${a}-${b}`;
+  if (b.length <= 7) return `${a}-${b.slice(0, 3)}-${b.slice(3)}`;
+  return `${a}-${b.slice(0, 4)}-${b.slice(4, 8)}`;
+}
+
 const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
 
 function isYmd(s: string) {
@@ -181,6 +201,9 @@ export default function ApplyGalleryClient() {
       genreContent: "",
       awarenessPath: "",
       specialNotes: "",
+
+      // purpose는 전시 정보 필드에서 자동 구성(useEffect로 동기화)
+      purpose: "전시 신청",
     }
   });
 
@@ -203,6 +226,12 @@ export default function ApplyGalleryClient() {
   const genreContent = watch("genreContent");
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
+
+  // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
+  useEffect(() => {
+    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes });
+    setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
+  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, setValue]);
 
   const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate), [startDate, endDate]);
 
@@ -399,7 +428,18 @@ export default function ApplyGalleryClient() {
               </div>
               <div>
                 <FieldLabel htmlFor="phone">연락처</FieldLabel>
-                <Input id="phone" placeholder="예: 010-1234-5678" {...register("phone")} />
+                <Input
+                  id="phone"
+                  placeholder="010-0000-0000"
+                  inputMode="numeric"
+                  autoComplete="tel"
+                  {...register("phone", {
+                    onChange: (e) => {
+                      const formatted = formatPhoneKR((e.target as HTMLInputElement).value);
+                      setValue("phone", formatted, { shouldDirty: true, shouldValidate: true });
+                    },
+                  })}
+                />
                 {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
               </div>
               <div>
@@ -493,13 +533,21 @@ export default function ApplyGalleryClient() {
           <input type="hidden" value="false" {...register("projector")} />
           <input type="hidden" value="false" {...register("audio")} />
 
-          <div className="flex items-center justify-between gap-3">
-            <Link href="/space?category=gallery" className="text-sm font-medium text-gray-700 hover:underline">
-              ← 공간 선택으로 돌아가기
-            </Link>
-            <Button type="submit" disabled={submitting || !exhibitionTitle || sessionCount === 0}>
-              {submitting ? "등록 중…" : "신청하기"}
-            </Button>
+          <div className="space-y-2">
+            {sessionCount === 0 && (startDate || endDate) ? (
+              <Notice variant="warn">전시 기간(시작일·종료일)을 올바르게 입력해 주세요. 회차가 0회이면 신청할 수 없습니다.</Notice>
+            ) : null}
+            {sessionCount === 0 && !startDate && !endDate ? (
+              <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
+            ) : null}
+            <div className="flex items-center justify-between gap-3">
+              <Link href="/space?category=gallery" className="text-sm font-medium text-gray-700 hover:underline">
+                ← 공간 선택으로 돌아가기
+              </Link>
+              <Button type="submit" disabled={submitting || !exhibitionTitle || sessionCount === 0}>
+                {submitting ? "등록 중…" : "신청하기"}
+              </Button>
+            </div>
           </div>
 
           <p className="text-xs text-gray-500">신청 후 담당자 검토를 거쳐 승인/반려 결과를 이메일로 안내드립니다.</p>
