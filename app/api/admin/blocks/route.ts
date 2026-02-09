@@ -12,6 +12,7 @@ type Block = {
   id: string;
   roomId: string;
   date: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD (갤러리 날짜 범위 차단용)
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   reason: string;
@@ -61,6 +62,7 @@ export async function POST(req: Request) {
     const body = (await req.json()) as Partial<Block>;
     const roomId = String(body.roomId ?? "").trim();
     const date = body.date;
+    const endDateRaw = body.endDate;
     let startTime = body.startTime;
     let endTime = body.endTime;
     const isGallery = roomId === "gallery";
@@ -68,6 +70,32 @@ export async function POST(req: Request) {
 
     if (!roomId) return jsonError("대상을 선택해 주세요.", 400, "VALIDATION");
     if (!isYmd(date)) return jsonError("날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)", 400, "VALIDATION");
+
+    // 갤러리 날짜 범위 차단 모드
+    if (isGallery && isYmd(endDateRaw)) {
+      if (endDateRaw < date) return jsonError("종료일은 시작일 이후여야 합니다.", 400, "VALIDATION");
+
+      const db = getDatabase();
+      const existingBlocks = await db.getBlocks();
+
+      // 범위 내 기존 갤러리 블록 겹침 체크
+      const rangeConflict = existingBlocks.some((b) => {
+        if (b.roomId !== roomId && b.roomId !== "all") return false;
+        const bStart = b.date;
+        const bEnd = b.endDate || b.date;
+        // 두 범위 [date, endDate] 과 [bStart, bEnd] 가 겹치는지 체크
+        return bStart <= endDateRaw && bEnd >= date;
+      });
+      if (rangeConflict) {
+        return jsonError("이미 등록된 일정과 기간이 겹칩니다.", 409, "CONFLICT");
+      }
+
+      const item = { roomId, date, endDate: endDateRaw, startTime: "09:00", endTime: "18:00", reason };
+      const result = await db.addBlock(item);
+      return NextResponse.json({ ok: true, created: result });
+    }
+
+    // 단일 날짜 갤러리 차단 (레거시 호환)
     if (isGallery) {
       const hours = galleryHoursForDate(date);
       if (!hours) return jsonError("일요일은 차단할 수 없습니다.", 400, "VALIDATION");
@@ -82,8 +110,6 @@ export async function POST(req: Request) {
     }
 
     // 운영시간 검증(날짜 기준)
-    // - gallery는 별도 운영시간(평일 09~18 / 화 09~20 / 토 09~13)을 사용하므로,
-    //   일반 운영시간 검증을 적용하면 false negative가 발생할 수 있습니다.
     if (!isGallery) {
       const op = validateOperatingHours(date, startTime, endTime);
       if (!op.ok) return jsonError(op.message, 400, "OUT_OF_HOURS");
@@ -103,7 +129,7 @@ export async function POST(req: Request) {
       return overlaps(b.startTime, b.endTime, startTime, endTime);
     });
     if (blockConflict) {
-      return jsonError("이미 등록된 수동 차단 시간과 겹칩니다.", 409, "CONFLICT");
+      return jsonError("이미 등록된 차단 시간과 겹칩니다.", 409, "CONFLICT");
     }
 
     // 2) 정규수업과 겹침 방지(적용 기간 포함)

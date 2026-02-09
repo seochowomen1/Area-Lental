@@ -69,7 +69,13 @@ export async function GET(req: Request) {
     );
 
     // ✅ "전체(all)"로 등록된 차단/정규수업은 모든 강의실에 적용
-    const sameRoomBlocks = blocks.filter((b) => (b.roomId === roomId || b.roomId === "all") && b.date === date);
+    // endDate가 있는 블록(갤러리 날짜 범위)은 date가 [b.date, b.endDate] 범위인지 확인
+    const sameRoomBlocks = blocks.filter((b) => {
+      if (b.roomId !== roomId && b.roomId !== "all") return false;
+      const blockStart = b.date;
+      const blockEnd = b.endDate || b.date;
+      return date >= blockStart && date <= blockEnd;
+    });
 
     const dow = dayOfWeek(date);
     const sameRoomSchedules = schedules

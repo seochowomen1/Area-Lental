@@ -192,28 +192,33 @@ export async function GET(req: Request) {
     });
   }
 
-  // 2) Blocks
+  // 2) Blocks (endDate 범위 블록은 각 날짜로 확장)
   if (includeBlocks) {
     for (const b of blocks) {
-      if (!inRangeYmd(b.date, from, to)) continue;
-
       if (!isAllowedRoom(b.roomId)) continue;
 
       const rf = filterByRoomAndFloor(roomId, floorId, b.roomId, b.roomId === "all" ? "전체" : undefined);
       if (!rf.ok) continue;
 
-      items.push({
-        kind: "block",
-        id: `block:${b.id}`,
-        roomId: b.roomId,
-        roomName: rf.roomName,
-        floorId: rf.floorId,
-        date: b.date,
-        startTime: b.startTime,
-        endTime: b.endTime,
-        title: "차단시간",
-        reason: b.reason
-      });
+      const blockEnd = b.endDate || b.date;
+      const blockDates = blockEnd > b.date ? eachYmd(b.date, blockEnd) : [b.date];
+
+      for (const dt of blockDates) {
+        if (!inRangeYmd(dt, from, to)) continue;
+
+        items.push({
+          kind: "block",
+          id: `block:${b.id}:${dt}`,
+          roomId: b.roomId,
+          roomName: rf.roomName,
+          floorId: rf.floorId,
+          date: dt,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          title: b.endDate ? "내부 대관" : "차단시간",
+          reason: b.reason
+        });
+      }
     }
   }
 

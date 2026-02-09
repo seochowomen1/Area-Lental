@@ -3,8 +3,7 @@ import Card from "@/components/ui/Card";
 
 import SettingsClient from "@/app/admin/settings/SettingsClient";
 
-import { rooms } from "@/lib/rooms";
-import { ROOMS, getCategoryLabel, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
+import { ROOMS, getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
@@ -35,7 +34,10 @@ export default async function AdminSettingsPage({
   const accent = categoryAccent(category);
 
   const db = getDatabase();
-  const allRooms = [{ id: "all", name: "전체" }, ...rooms];
+  const categoryRooms = getRoomsByCategory(category).map((r) => ({ id: r.id, name: r.name }));
+  const allRooms = categoryRooms.length > 1
+    ? [{ id: "all", name: "전체" }, ...categoryRooms]
+    : categoryRooms;
   const [schedules, blocks] = await Promise.all([db.getClassSchedules(), db.getBlocks()]);
 
   const feeGroups = (() => {
@@ -58,15 +60,27 @@ export default async function AdminSettingsPage({
           <h1 className={`text-lg font-bold ${accent.text}`}>{categoryLabel} 운영 설정</h1>
         </div>
         <p className="mt-1 ml-6 text-sm text-gray-600">
-          정규 수업시간 및 차단 시간을 관리합니다. 등록된 시간에는 대관 신청이 불가능합니다.
+          {category === "gallery"
+            ? "내부 대관 일정을 관리합니다. 등록된 기간에는 외부 대관 신청이 불가능합니다."
+            : "정규 수업시간 및 내부 대관 일정을 관리합니다. 등록된 시간에는 대관 신청이 불가능합니다."}
         </p>
       </div>
 
       <Notice title="안내" variant="info">
         <ul className="list-disc pl-5">
-          <li>정규 수업시간/수동 차단 시간을 등록하면 해당 시간에는 대관 신청이 불가능합니다.</li>
-          <li>시간은 운영시간 내에서만 선택되며, 30분 단위(00/30)로만 설정할 수 있습니다.</li>
-          <li>등록 시간이 기존 데이터와 겹치는 경우 저장되지 않으며, 화면에 안내가 표시됩니다.</li>
+          {category === "gallery" ? (
+            <>
+              <li>내부(강사·수강생) 대관 일정을 등록하면 해당 기간 동안 외부 대관 신청이 불가능합니다.</li>
+              <li>갤러리 차단은 일 단위(시작일~종료일)로 등록됩니다.</li>
+              <li>등록 기간이 기존 일정과 겹치는 경우 저장되지 않으며, 화면에 안내가 표시됩니다.</li>
+            </>
+          ) : (
+            <>
+              <li>정규 수업시간/내부 대관 일정을 등록하면 해당 시간에는 대관 신청이 불가능합니다.</li>
+              <li>시간은 운영시간 내에서만 선택되며, 30분 단위(00/30)로만 설정할 수 있습니다.</li>
+              <li>등록 시간이 기존 데이터와 겹치는 경우 저장되지 않으며, 화면에 안내가 표시됩니다.</li>
+            </>
+          )}
         </ul>
       </Notice>
 

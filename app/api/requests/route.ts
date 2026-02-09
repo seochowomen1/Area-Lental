@@ -274,7 +274,12 @@ export async function POST(req: Request) {
       }
 
       const blockConf = blocks
-        .filter((b) => (b.roomId === input.roomId || b.roomId === "all") && b.date === sess.date)
+        .filter((b) => {
+          if (b.roomId !== input.roomId && b.roomId !== "all") return false;
+          const bStart = b.date;
+          const bEnd = b.endDate || b.date;
+          return sess.date >= bStart && sess.date <= bEnd;
+        })
         .some((b) => overlaps(b.startTime, b.endTime, sess.startTime, sess.endTime));
       if (blockConf) {
         issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "BLOCKED", message: "해당 시간대는 센터 운영 사정으로 신청이 불가합니다." });

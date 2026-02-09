@@ -103,6 +103,8 @@ export type BlockTime = {
   id: string;
   roomId: string;
   date: string;
+  /** 갤러리 등 일 단위 차단 시 종료일 (YYYY-MM-DD) */
+  endDate?: string;
   startTime: string;
   endTime: string;
   reason: string;

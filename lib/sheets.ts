@@ -783,7 +783,7 @@ export async function getBlocks(): Promise<BlockTime[]> {
   const { sheets } = getGoogleClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_BLOCKS}!A:F`
+    range: `${SHEET_BLOCKS}!A:G`
   });
   const rows = (res.data.values ?? []) as string[][];
   if (rows.length <= 1) return [];
@@ -793,11 +793,14 @@ export async function getBlocks(): Promise<BlockTime[]> {
     ["id", "roomId", "date", "startTime", "endTime", "reason"],
     SHEET_BLOCKS
   );
+  // endDate 컬럼은 선택적 (기존 시트에 없을 수 있음)
+  const endDateIdx = header.indexOf("endDate");
 
   return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
     id: r[idx("id")],
     roomId: r[idx("roomId")],
     date: r[idx("date")],
+    ...(endDateIdx >= 0 && r[endDateIdx] ? { endDate: r[endDateIdx] } : {}),
     startTime: r[idx("startTime")],
     endTime: r[idx("endTime")],
     reason: r[idx("reason")] || ""
@@ -813,9 +816,9 @@ export async function addBlock(b: Omit<BlockTime, "id">): Promise<BlockTime> {
   const id = `BL-${Date.now()}`;
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_BLOCKS}!A:F`,
+    range: `${SHEET_BLOCKS}!A:G`,
     valueInputOption: "RAW",
-    requestBody: { values: [[id, b.roomId, b.date, b.startTime, b.endTime, b.reason]] }
+    requestBody: { values: [[id, b.roomId, b.date, b.startTime, b.endTime, b.reason, b.endDate || ""]] }
   });
 
   return { id, ...b };
