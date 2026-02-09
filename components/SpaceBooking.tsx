@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import LinkButton from "@/components/ui/LinkButton";
 import Button from "@/components/ui/Button";
 import Notice from "@/components/ui/Notice";
+import { cn } from "@/lib/cn";
 import { isTuesdayNightOverlap, operatingRangesForDate } from "@/lib/operating";
 import { getRoom } from "@/lib/space";
 import { CARD_BASE, FIELD_CONTROL_BASE, FIELD_HELP, FIELD_LABEL } from "@/components/ui/presets";
@@ -333,9 +334,8 @@ export default function SpaceBooking({
               const ymd = fmtYMD(d);
               const isCurrentMonth = d.getMonth() === month.getMonth();
               const isSelected = ymd === selectedDate;
-
-              const todayYmd = fmtYMD(new Date());
-              const isPast = ymd < todayYmd;
+              const isToday = ymd === fmtYMD(new Date());
+              const isPast = ymd < fmtYMD(new Date());
               const isSunday = d.getDay() === 0;
               const isDisabled = !isCurrentMonth || isPast || isSunday;
 
@@ -345,29 +345,27 @@ export default function SpaceBooking({
                   type="button"
                   disabled={isDisabled}
                   onClick={() => onSelectDate(ymd)}
-                  className={
-                    "relative h-20 border-b border-r p-2 text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] " +
-                    (isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400") +
-                    (isSelected ? " z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset" : "") +
-                    (isDisabled ? " cursor-not-allowed opacity-50" : "")
-                  }
+                  className={cn(
+                    "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
+                    !isCurrentMonth && "bg-gray-50 text-gray-300 cursor-default",
+                    isCurrentMonth && !isDisabled && !isSelected && "bg-white text-slate-900 hover:bg-slate-50",
+                    isCurrentMonth && isDisabled && !isSelected && "cursor-not-allowed bg-white opacity-50",
+                    isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
+                  )}
                 >
-                  <div className="font-medium">{d.getDate()}</div>
-                  {/* 간단 표시(데이터는 우측 기준) */}
-                  <div className="mt-2 flex items-center gap-1">
-                    <span
-                      className={
-                        "inline-block h-2.5 w-2.5 rounded-full " +
-                        (isSunday
-                          ? "bg-gray-300"
-                          : isPast
-                            ? "bg-gray-400"
-                            : "bg-orange-500")
-                      }
-                      title={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
-                      aria-label={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
-                    />
-                  </div>
+                  <span className={cn("font-medium", isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))]")}>{d.getDate()}</span>
+                  {isCurrentMonth && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "inline-block h-2.5 w-2.5 rounded-full",
+                          isSunday ? "bg-gray-300" : isPast ? "bg-gray-400" : "bg-orange-500"
+                        )}
+                        title={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
+                      />
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -389,10 +387,8 @@ export default function SpaceBooking({
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-gray-600">
-          ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다.
-          <br />
-          ※ 일요일은 휴관으로 대관이 불가하며, 지난 날짜는 선택할 수 없습니다.
+        <p className="mt-2 text-xs text-gray-500">
+          ※ 시간은 <b>30분 단위</b>로 선택 가능 · 일요일 휴관 · 지난 날짜 선택 불가
         </p>
 
       </div>

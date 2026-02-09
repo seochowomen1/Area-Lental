@@ -308,6 +308,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           <div className="grid grid-cols-7">
             {monthGrid.map((c, idx) => {
               const isSunday = c.inMonth && dayOfWeekLocal(c.ymd) === 0;
+              const isToday = c.inMonth && c.ymd === dateToYmdLocal(new Date());
               const isStart = c.inMonth && c.ymd === startDate;
               const isEnd = c.inMonth && c.ymd === endDate;
               const isBetween = c.inMonth && startDate && endDate ? inRange(c.ymd, startDate, endDate) : false;
@@ -321,7 +322,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   disabled={disabled}
                   onClick={() => c.inMonth ? onPickDay(c.ymd) : undefined}
                   className={cn(
-                    "relative flex h-20 flex-col items-center justify-center border-b border-r p-1 text-sm transition",
+                    "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
                     !c.inMonth && "bg-gray-50 text-gray-300 cursor-default",
                     c.inMonth && !disabled && !isSelected && !isBetween && "bg-white text-slate-900 hover:bg-slate-50",
@@ -331,7 +332,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   )}
                   aria-pressed={isSelected}
                 >
-                  <span className="font-medium">{c.day || ""}</span>
+                  <span className={cn("font-medium", isToday && "text-[rgb(var(--brand-primary))]")}>{c.day || ""}</span>
                   {c.inMonth && (
                     <div className="mt-1 flex items-center gap-1">
                       {isSunday ? (
@@ -368,9 +369,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-gray-600">
-          ※ 날짜를 클릭하여 시작일과 종료일을 선택합니다. (일요일은 선택 불가)
-          {startDate && !endDate ? <><br />※ 종료일을 선택해 주세요.</> : null}
+        <p className="mt-2 text-xs text-gray-500">
+          ※ 날짜를 클릭하여 시작일과 종료일을 선택 · 일요일 휴관 · 최대 30일
+          {startDate && !endDate ? <><br />※ <b>종료일</b>을 선택해 주세요.</> : null}
         </p>
       </div>
 
