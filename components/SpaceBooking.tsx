@@ -321,16 +321,8 @@ export default function SpaceBooking({
 
         <div className="overflow-hidden rounded-lg border bg-white">
           <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-xs font-semibold text-gray-700">
-            {[
-              "SUN",
-              "MON",
-              "TUE",
-              "WED",
-              "THU",
-              "FRI",
-              "SAT",
-            ].map((d) => (
-              <div key={d} className="py-2">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+              <div key={d} className={`py-2${d === "일" ? " text-rose-500" : d === "토" ? " text-blue-600" : ""}`}>
                 {d}
               </div>
             ))}

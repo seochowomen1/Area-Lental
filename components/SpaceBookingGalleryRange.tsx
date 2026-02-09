@@ -189,9 +189,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
     const cells: Array<{ ymd: string; day: number; inMonth: boolean }> = [];
 
-    // leading blanks
-    for (let i = 0; i < firstDow; i++) {
-      cells.push({ ymd: "", day: 0, inMonth: false });
+    // 이전 달 날짜로 첫 줄 채우기 (강의실 캘린더와 동일)
+    const prevMonthLast = new Date(year, m, 0).getDate();
+    for (let i = firstDow - 1; i >= 0; i--) {
+      const d = prevMonthLast - i;
+      const ymd = dateToYmdLocal(new Date(year, m - 1, d));
+      cells.push({ ymd, day: d, inMonth: false });
     }
 
     for (let d = 1; d <= lastDay; d++) {
@@ -199,9 +202,13 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       cells.push({ ymd, day: d, inMonth: true });
     }
 
-    // trailing to 6 rows
-    while (cells.length % 7 !== 0) cells.push({ ymd: "", day: 0, inMonth: false });
-    while (cells.length < 42) cells.push({ ymd: "", day: 0, inMonth: false });
+    // 다음 달 날짜로 마지막 줄 채우기
+    let nextDay = 1;
+    while (cells.length % 7 !== 0) {
+      const ymd = dateToYmdLocal(new Date(year, m + 1, nextDay));
+      cells.push({ ymd, day: nextDay, inMonth: false });
+      nextDay++;
+    }
 
     return cells;
   }, [month]);
@@ -239,50 +246,51 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       </div>
 
       <div className="mt-5">
-        <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div className="mb-3 flex items-center justify-between">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="text-sm font-semibold text-slate-900">전시 기간</span>
+            <div className="text-lg font-semibold">{getMonthLabel(month)}</div>
             <span className={cn(
-              "rounded-full px-3 py-1 text-xs font-bold",
-              startDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-500"
+              "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
+              startDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-400"
             )}>
               시작: {startDate || "-"}
             </span>
             <span className={cn(
-              "rounded-full px-3 py-1 text-xs font-bold",
-              endDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-500"
+              "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
+              endDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-400"
             )}>
               종료: {endDate || "-"}
             </span>
-            {startDate && !endDate ? (
-              <span className="text-xs text-slate-500">종료일을 선택해 주세요.</span>
-            ) : null}
-
             {startDate ? (
               <button
                 type="button"
                 onClick={clearRange}
-                className="ml-1 rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 hover:bg-slate-50"
+                className="rounded-md border bg-white px-2 py-1 text-xs text-slate-600 hover:bg-gray-50"
               >
-                기간 다시 선택
+                초기화
               </button>
             ) : null}
           </div>
-
           <div className="flex items-center gap-2">
             <button
               type="button"
               onClick={() => setMonth((prev) => addMonths(prev, -1))}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
               aria-label="이전 달"
             >
               ◀
             </button>
-            <div className="min-w-[90px] text-center text-sm font-semibold text-slate-900">{getMonthLabel(month)}</div>
+            <button
+              type="button"
+              onClick={() => setMonth(startOfMonth(new Date()))}
+              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
+            >
+              오늘
+            </button>
             <button
               type="button"
               onClick={() => setMonth((prev) => addMonths(prev, 1))}
-              className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm hover:bg-slate-50"
+              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
               aria-label="다음 달"
             >
               ▶
@@ -290,71 +298,80 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           </div>
         </div>
 
-        <div className="mt-3 rounded-2xl border border-slate-200 bg-white p-3">
-          <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-slate-500">
+        <div className="overflow-hidden rounded-lg border bg-white">
+          <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-xs font-semibold text-gray-700">
             {["일", "월", "화", "수", "목", "금", "토"].map((w) => (
-              <div key={w} className={cn(w === "일" ? "text-rose-500" : "", "py-1")}>{w}</div>
+              <div key={w} className={`py-2${w === "일" ? " text-rose-500" : w === "토" ? " text-blue-600" : ""}`}>{w}</div>
             ))}
           </div>
 
-          <div className="mt-1 grid grid-cols-7 gap-1">
+          <div className="grid grid-cols-7">
             {monthGrid.map((c, idx) => {
-              if (!c.inMonth) {
-                return <div key={idx} className="h-14" />;
-              }
-              const isSunday = dayOfWeekLocal(c.ymd) === 0;
-              const isStart = c.ymd === startDate;
-              const isEnd = c.ymd === endDate;
-              const isBetween = startDate && endDate ? inRange(c.ymd, startDate, endDate) : false;
-
-              const disabled = isCellDisabled(c.ymd);
+              const isSunday = c.inMonth && dayOfWeekLocal(c.ymd) === 0;
+              const isStart = c.inMonth && c.ymd === startDate;
+              const isEnd = c.inMonth && c.ymd === endDate;
+              const isBetween = c.inMonth && startDate && endDate ? inRange(c.ymd, startDate, endDate) : false;
+              const disabled = !c.inMonth || isCellDisabled(c.ymd);
               const isSelected = isStart || isEnd;
-
-              let cellStyle = "border-slate-200 bg-white text-slate-900 hover:bg-slate-50";
-              if (disabled) {
-                cellStyle = "cursor-not-allowed border-slate-100 bg-slate-50 text-slate-300";
-              } else if (isSelected) {
-                cellStyle = "border-orange-500 bg-orange-500 text-white shadow-md ring-2 ring-orange-200";
-              } else if (isBetween) {
-                cellStyle = "border-blue-200 bg-blue-50 text-blue-900";
-              }
 
               return (
                 <button
-                  key={c.ymd}
+                  key={`${c.ymd || idx}`}
                   type="button"
                   disabled={disabled}
-                  onClick={() => onPickDay(c.ymd)}
+                  onClick={() => c.inMonth ? onPickDay(c.ymd) : undefined}
                   className={cn(
-                    "relative flex h-14 flex-col items-center justify-center rounded-xl border text-sm font-bold transition",
-                    "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400",
-                    cellStyle
+                    "relative flex h-20 flex-col items-center justify-center border-b border-r p-1 text-sm transition",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
+                    !c.inMonth && "bg-gray-50 text-gray-300 cursor-default",
+                    c.inMonth && !disabled && !isSelected && !isBetween && "bg-white text-slate-900 hover:bg-slate-50",
+                    c.inMonth && disabled && !isSelected && "cursor-not-allowed bg-white opacity-50",
+                    isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
+                    isBetween && !isSelected && "bg-blue-50",
                   )}
                   aria-pressed={isSelected}
                 >
-                  <span className={cn("text-base", isSelected && !disabled ? "text-white" : "")}>
-                    {c.day}
-                  </span>
-                  {isSunday ? (
-                    <span className="text-[9px] font-medium text-slate-300">
-                      휴관
-                    </span>
-                  ) : null}
-                  {isStart && !disabled ? (
-                    <span className="text-[9px] font-bold text-orange-100">시작</span>
-                  ) : null}
-                  {isEnd && !disabled && !isStart ? (
-                    <span className="text-[9px] font-bold text-orange-100">종료</span>
-                  ) : null}
+                  <span className="font-medium">{c.day || ""}</span>
+                  {c.inMonth && (
+                    <div className="mt-1 flex items-center gap-1">
+                      {isSunday ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" title="휴관" />
+                      ) : isStart ? (
+                        <span className="text-[9px] font-bold text-orange-600">시작</span>
+                      ) : isEnd && !isStart ? (
+                        <span className="text-[9px] font-bold text-orange-600">종료</span>
+                      ) : isBetween ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
+                      ) : (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
+                      )}
+                    </div>
+                  )}
                 </button>
               );
             })}
           </div>
+        </div>
 
-          <div className="mt-3 text-xs text-slate-500">
-            날짜를 클릭하여 시작일과 종료일을 선택합니다. 선택된 기간은 달력에서 함께 표시됩니다. (일요일은 선택 불가)
+        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-600">
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden />
+            <span>선택 가능</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" aria-hidden />
+            <span>선택 기간</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" aria-hidden />
+            <span>휴관</span>
           </div>
         </div>
+
+        <p className="mt-3 text-xs text-gray-600">
+          ※ 날짜를 클릭하여 시작일과 종료일을 선택합니다. (일요일은 선택 불가)
+          {startDate && !endDate ? <><br />※ 종료일을 선택해 주세요.</> : null}
+        </p>
       </div>
 
       <div className="mt-2">
