@@ -38,9 +38,21 @@ export const UPLOAD = {
  * MOCK_MODE=true 일 때는 Google/SMTP 없이도 로컬에서 “전체 흐름(신청→관리자목록→승인/반려→출력/엑셀)” 테스트가 가능하도록
  * 환경변수를 최소 요구로 낮춥니다.
  */
+/**
+ * ADMIN_PASSWORD: 최소 8자, 영문+숫자 포함 필수
+ * (운영 환경에서는 특수문자 포함 12자 이상 권장)
+ */
+const adminPasswordSchema = z
+  .string()
+  .min(8, "ADMIN_PASSWORD는 최소 8자 이상이어야 합니다.")
+  .regex(
+    /^(?=.*[A-Za-z])(?=.*\d).{8,}$/,
+    "ADMIN_PASSWORD는 영문과 숫자를 모두 포함해야 합니다."
+  );
+
 export const MockEnvSchema = z.object({
   MOCK_MODE: z.literal("true"),
-  ADMIN_PASSWORD: z.string().min(6),
+  ADMIN_PASSWORD: adminPasswordSchema,
   APP_BASE_URL: z.string().url()
 });
 
@@ -51,7 +63,7 @@ export const FullEnvSchema = z.object({
   GOOGLE_SHEET_ID: z.string().min(10),
   GOOGLE_DRIVE_FOLDER_ID: z.string().min(10),
 
-  ADMIN_PASSWORD: z.string().min(6),
+  ADMIN_PASSWORD: adminPasswordSchema,
 
   SMTP_HOST: z.string().min(3),
   SMTP_PORT: z.string().min(2),
