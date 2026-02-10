@@ -113,7 +113,7 @@ function filterByRoomAndFloor(
 function filterStatus(statusParam: string, r: RentalRequest): boolean {
   if (statusParam === "all") return true;
   if (statusParam === "active") {
-    const active: RequestStatus[] = ["접수", "검토중", "승인"];
+    const active: RequestStatus[] = ["접수", "승인"];
     return active.includes(r.status);
   }
   return r.status === (statusParam as RequestStatus);

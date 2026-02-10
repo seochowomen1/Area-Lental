@@ -10,12 +10,12 @@ export default async function AdminHomePage() {
   const db = getDatabase();
   const allRequests = await db.getAllRequests();
 
-  // 카테고리별 대기(접수/검토중) 건수
+  // 카테고리별 대기(접수) 건수
   const lectureRoomIds = new Set(getRoomsByCategory("lecture").map((r) => r.id));
   const studioRoomIds = new Set(getRoomsByCategory("studio").map((r) => r.id));
   const galleryRoomIds = new Set(getRoomsByCategory("gallery").map((r) => r.id));
 
-  const pending = allRequests.filter((r) => r.status === "접수" || r.status === "검토중");
+  const pending = allRequests.filter((r) => r.status === "접수");
   const lecturePending = pending.filter((r) => lectureRoomIds.has(r.roomId)).length;
   const studioPending = pending.filter((r) => studioRoomIds.has(r.roomId)).length;
   const galleryPending = pending.filter((r) => galleryRoomIds.has(r.roomId)).length;

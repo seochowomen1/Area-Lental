@@ -89,11 +89,9 @@ function StatusBadge({ status }: { status: string }) {
   let cls = "border-gray-200 bg-gray-50 text-gray-700";
 
   if (status === "접수") cls = "border-amber-200 bg-amber-50 text-amber-800";
-  else if (status === "검토중") cls = "border-sky-200 bg-sky-50 text-sky-800";
   else if (status === "승인") cls = "border-emerald-200 bg-emerald-50 text-emerald-700";
   else if (status === "반려") cls = "border-rose-200 bg-rose-50 text-rose-700";
   else if (status === "취소") cls = "border-gray-200 bg-gray-100 text-gray-600";
-  else if (status === "완료") cls = "border-slate-200 bg-slate-100 text-slate-700";
 
   return <span className={`${base} ${cls}`}>{label}</span>;
 }
@@ -267,7 +265,7 @@ export default async function AdminRequestsPage({
           <div>
             <label className="text-xs font-semibold text-gray-700">상태</label>
             <select name="status" defaultValue={status} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
-              {["all", "접수", "검토중", "승인", "반려", "취소", "완료"].map((s) => (
+              {["all", "접수", "승인", "반려", "취소"].map((s) => (
                 <option key={s} value={s}>
                   {s === "all" ? "전체" : statusLabel(s as any)}
                 </option>

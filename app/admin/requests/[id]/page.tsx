@@ -522,7 +522,7 @@ export default async function AdminRequestDetail({
                     현재 상태 메일 발송
                   </button>
                   <p className="mt-2 text-xs text-gray-600">
-                    * 회차별 진행 상황(승인/반려/검토중)을 신청자에게 안내합니다. (승인된 회차가 있으면 요금 포함)
+                    * 회차별 진행 상황(승인/반려/접수)을 신청자에게 안내합니다. (승인된 회차가 있으면 요금 포함)
                   </p>
                 </form>
               </div>
@@ -537,11 +537,9 @@ export default async function AdminRequestDetail({
                   className="mt-2 w-full rounded-lg border border-gray-200 bg-white p-3 text-sm outline-none focus:border-gray-400"
                 >
                   <option value="접수">접수</option>
-                  <option value="검토중">검토중</option>
                   <option value="승인">승인</option>
                   <option value="반려">반려</option>
                   <option value="취소">취소</option>
-                  <option value="완료">완료</option>
                 </select>
               </div>
 

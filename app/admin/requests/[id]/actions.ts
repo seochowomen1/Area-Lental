@@ -12,7 +12,7 @@ function sortSessions(list: RentalRequest[]) {
   return (Array.isArray(list) ? list : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
 }
 
-/** 단일 처리(승인/반려/취소/완료 등) */
+/** 단일 처리(승인/반려/취소 등) */
 export async function decideSingleAction(requestId: string, formData: FormData) {
   const db = getDatabase();
   const current = await db.getRequestById(requestId);

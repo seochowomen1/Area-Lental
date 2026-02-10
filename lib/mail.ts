@@ -29,7 +29,7 @@ function summarizeStatus(list: RentalRequest[]) {
   if (statuses.size === 1) return list[0].status;
   // 혼합 상태인 경우(부분 처리)
   if ([...statuses].includes("반려")) return "반려";
-  if ([...statuses].includes("승인")) return "검토중";
+  if ([...statuses].includes("승인")) return "접수";
   return "접수";
 }
 
@@ -256,10 +256,10 @@ export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
   const rejectedList = list.filter((r) => r.status === "반려");
   const pendingCount = list.length - approvedList.length - rejectedList.length;
 
-  let displayStatus = "검토중";
+  let displayStatus = "접수";
   if (approvedList.length === list.length) displayStatus = "승인";
   else if (rejectedList.length === list.length) displayStatus = "반려";
-  else if (pendingCount > 0) displayStatus = "검토중";
+  else if (pendingCount > 0) displayStatus = "접수";
   else displayStatus = "부분처리";
 
   const subject = isGallery(first)

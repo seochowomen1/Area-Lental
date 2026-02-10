@@ -35,12 +35,11 @@ function approvalLabel(status: string, decidedBy?: string) {
     if ((decidedBy ?? "").includes("사용자")) return "사용자취소";
     return "예약취소";
   }
-  if (status === "완료") return "승인완료";
   return "승인대기";
 }
 
 function paymentLabel(status: string) {
-  return status === "완료" ? "결제완료" : "미결제";
+  return status === "승인" ? "결제대기" : "미결제";
 }
 
 function reservationLabel() {
@@ -116,9 +115,9 @@ export async function POST(req: Request) {
   const payableFeeKRW = feeAvailable ? fee.finalFeeKRW : estimateFee.finalFeeKRW;
 
   // 사용자 취소 가능 여부
-  // - 이미 취소/완료된 건이 포함되면 불가
+  // - 이미 취소된 건이 포함되면 불가
   // - 묶음이면 전체 기준으로 판단
-  const cancelable = sessions.every((s) => !["취소", "완료"].includes(s.status));
+  const cancelable = sessions.every((s) => s.status !== "취소");
 
   return NextResponse.json({
     ok: true,
@@ -151,7 +150,7 @@ export async function POST(req: Request) {
     statusKind: isBatch ? bundle!.kind : "single",
     approvedCount: isBatch ? bundle!.approvedCount : (representative.status === "승인" ? 1 : 0),
     rejectedCount: isBatch ? bundle!.rejectedCount : (representative.status === "반려" ? 1 : 0),
-    pendingCount: isBatch ? bundle!.pendingCount : (["접수", "검토중"].includes(representative.status) ? 1 : 0),
+    pendingCount: isBatch ? bundle!.pendingCount : (representative.status === "접수" ? 1 : 0),
     feeAvailable,
     feeBasis: feeAvailable ? (usingApprovedBasis ? "approved" : "all") : "none",
     sessions: sessions.map((s) => ({

@@ -1,9 +1,8 @@
 import Notice from "@/components/ui/Notice";
-import Card from "@/components/ui/Card";
 
 import SettingsClient from "@/app/admin/settings/SettingsClient";
 
-import { ROOMS, getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
+import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
 
 export const dynamic = "force-dynamic";
@@ -40,17 +39,6 @@ export default async function AdminSettingsPage({
     : categoryRooms;
   const [schedules, blocks] = await Promise.all([db.getClassSchedules(), db.getBlocks()]);
 
-  const feeGroups = (() => {
-    const map = new Map<number, string[]>();
-    for (const r of ROOMS) {
-      const key = r.feeKRW ?? 0;
-      const list = map.get(key) ?? [];
-      list.push(r.name);
-      map.set(key, list);
-    }
-    return Array.from(map.entries()).sort(([a], [b]) => b - a);
-  })();
-
   return (
     <div className="mx-auto max-w-5xl pb-16 pt-2">
       {/* 카테고리 헤더 */}
@@ -83,32 +71,6 @@ export default async function AdminSettingsPage({
           )}
         </ul>
       </Notice>
-
-      <div className="mt-6">
-        <Card pad="md">
-          <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-slate-900">대관료 안내(시간당)</div>
-            <div className="text-xs text-slate-500">※ 기자재 사용료 별도</div>
-          </div>
-
-          <div className="mt-4 grid gap-2">
-            {feeGroups.map(([fee, names]) => (
-              <div key={fee} className="flex flex-col gap-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm font-semibold text-slate-900">
-                  {fee > 0 ? `${fee.toLocaleString()}원` : "별도 협의"}
-                </div>
-                <div className="text-sm text-slate-700 sm:text-right">
-                  {names.join(" · ")}
-                </div>
-              </div>
-            ))}
-          </div>
-
-          <p className="mt-3 text-xs text-slate-600">
-            ※ 실제 청구 금액은 신청서 기준으로 산정되며, 장비·부대비용이 추가될 수 있습니다.
-          </p>
-        </Card>
-      </div>
 
       <div className="mt-6">
         <SettingsClient rooms={allRooms} dayOptions={DAY_OPTIONS} initialSchedules={schedules} initialBlocks={blocks} category={category} />

@@ -62,7 +62,7 @@ export async function GET(req: Request) {
       db.getClassSchedules()
     ]);
 
-    const conflictStatuses: RequestStatus[] = ["접수", "검토중", "승인"];
+    const conflictStatuses: RequestStatus[] = ["접수", "승인"];
 
     const sameRoomSameDate = requests.filter(
       (r) => r.roomId === roomId && r.date === date && conflictStatuses.includes(r.status)

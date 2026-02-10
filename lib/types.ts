@@ -1,4 +1,4 @@
-export type RequestStatus = "접수" | "검토중" | "승인" | "반려" | "취소" | "완료";
+export type RequestStatus = "접수" | "승인" | "반려" | "취소";
 
 export type RentalRequest = {
   requestId: string;

@@ -102,7 +102,7 @@ export async function GET(req: Request) {
             : `${rep.date} (일 단위)`)
         : `${rep.date} ${rep.startTime}-${rep.endTime}`;
       const past = sessions.every((s) => isPast(s, nowYmd, nowMin));
-      const cancelable = sessions.every((s) => !["취소", "완료"].includes(s.status));
+      const cancelable = sessions.every((s) => s.status !== "취소");
 
       return {
         key,

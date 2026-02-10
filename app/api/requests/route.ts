@@ -246,7 +246,7 @@ export async function POST(req: Request) {
 
     // 운영시간/충돌 검증은 회차별로 수행
     const all = await db.getAllRequests();
-    const conflictStatuses: RequestStatus[] = ["접수", "검토중", "승인"];
+    const conflictStatuses: RequestStatus[] = ["접수", "승인"];
     const schedules = await db.getClassSchedules();
     const blocks = await db.getBlocks();
 
