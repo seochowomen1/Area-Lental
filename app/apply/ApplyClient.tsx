@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequestInputSchema, type RequestInput } from "@/lib/schema";
-import { EQUIPMENT_FEE_KRW } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 import { operatingRangesForDate, isTuesdayNightOverlap } from "@/lib/operating";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import { FLOORS } from "@/lib/floors";
@@ -98,6 +98,12 @@ export default function ApplyClient() {
       laptop: false,
       projector: false,
       audio: false,
+      mirrorless: false,
+      camcorder: false,
+      wirelessMic: false,
+      pinMic: false,
+      rodeMic: false,
+      electronicBoard: false,
       privacyAgree: false,
       pledgeAgree: false,
     },
@@ -339,14 +345,22 @@ export default function ApplyClient() {
     }
   }, [prefillLocked, selectedDate, startOptions, allowedRanges, startTime, endTime, setValue]);
 
-  const equipment = watch(["laptop", "projector", "audio"]);
-  const equipmentFee =
-    (equipment[0] ? EQUIPMENT_FEE_KRW.laptop : 0) +
-    (equipment[1] ? EQUIPMENT_FEE_KRW.projector : 0) +
-    (equipment[2] ? EQUIPMENT_FEE_KRW.audio : 0);
-
   const roomMeta = useMemo(() => getRoom(roomId), [roomId]);
+  const isStudioRoom = roomMeta?.category === "studio";
   const hourlyFee = roomMeta?.feeKRW ?? 0;
+
+  const equipment = watch(["laptop", "projector", "audio"]);
+  const studioEquip = watch(["mirrorless", "camcorder", "wirelessMic", "pinMic", "rodeMic", "electronicBoard"]);
+  const equipmentFee = isStudioRoom
+    ? (studioEquip[0] ? STUDIO_EQUIPMENT_FEE_KRW.mirrorless : 0) +
+      (studioEquip[1] ? STUDIO_EQUIPMENT_FEE_KRW.camcorder : 0) +
+      (studioEquip[2] ? STUDIO_EQUIPMENT_FEE_KRW.wirelessMic : 0) +
+      (studioEquip[3] ? STUDIO_EQUIPMENT_FEE_KRW.pinMic : 0) +
+      (studioEquip[4] ? STUDIO_EQUIPMENT_FEE_KRW.rodeMic : 0) +
+      (studioEquip[5] ? STUDIO_EQUIPMENT_FEE_KRW.electronicBoard : 0)
+    : (equipment[0] ? EQUIPMENT_FEE_KRW.laptop : 0) +
+      (equipment[1] ? EQUIPMENT_FEE_KRW.projector : 0) +
+      (equipment[2] ? EQUIPMENT_FEE_KRW.audio : 0);
   const rentalFee = useMemo(() => {
     if (!hourlyFee || !durationMinutes) return 0;
     // 30분 단위이므로 (feeKRW * minutes / 60)은 사실상 정수로 떨어짐
@@ -616,16 +630,31 @@ export default function ApplyClient() {
 
             {/* 장비 사용 */}
             <Card pad="lg">
-              <h3 className={SECTION_TITLE}>장비 사용</h3>
+              <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용" : "장비 사용"}</h3>
               <div className="mt-3">
-                {confirmData.laptop || confirmData.projector || confirmData.audio ? (
-                  <div className="flex flex-wrap gap-2">
-                    {confirmData.laptop && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">노트북</span>}
-                    {confirmData.projector && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">프로젝터</span>}
-                    {confirmData.audio && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">음향</span>}
-                  </div>
+                {isStudioRoom ? (
+                  confirmData.mirrorless || confirmData.camcorder || confirmData.wirelessMic || confirmData.pinMic || confirmData.rodeMic || confirmData.electronicBoard ? (
+                    <div className="flex flex-wrap gap-2">
+                      {confirmData.mirrorless && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">미러리스</span>}
+                      {confirmData.camcorder && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">캠코더</span>}
+                      {confirmData.wirelessMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">무선 마이크</span>}
+                      {confirmData.pinMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">핀 마이크</span>}
+                      {confirmData.rodeMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">로데 마이크</span>}
+                      {confirmData.electronicBoard && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">전자칠판</span>}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">선택 없음</p>
+                  )
                 ) : (
-                  <p className="text-sm text-slate-400">선택 없음</p>
+                  confirmData.laptop || confirmData.projector || confirmData.audio ? (
+                    <div className="flex flex-wrap gap-2">
+                      {confirmData.laptop && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">노트북</span>}
+                      {confirmData.projector && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">프로젝터</span>}
+                      {confirmData.audio && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">음향</span>}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-slate-400">선택 없음</p>
+                  )
                 )}
               </div>
             </Card>
@@ -1012,22 +1041,73 @@ export default function ApplyClient() {
             </div>
           </Card>
 
+          {isStudioRoom && (
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>E-스튜디오 비치물품 안내</h3>
+              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-slate-50">
+                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">촬영장비</th>
+                      <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">사용료</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
+                      <tr key={key}>
+                        <td className="px-3 py-1.5 text-xs text-slate-700">{STUDIO_EQUIPMENT_LABELS[key]}</td>
+                        <td className="px-3 py-1.5 text-right text-xs font-semibold text-slate-900 tabular-nums">{STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <FieldHelp className="mt-2">
+                ※ 촬영장비는 대관 이용시간 중 1일 1회 과금됩니다. 아래 장비 사용 항목에서 필요한 장비를 선택해 주세요.
+              </FieldHelp>
+            </Card>
+          )}
+
           <Card pad="lg">
-            <h3 className={SECTION_TITLE}>장비 사용(선택)</h3>
-            <div className="mt-4 grid gap-3 md:grid-cols-3">
-              <Checkbox {...register("laptop")} label="노트북" />
-              <Checkbox {...register("projector")} label="프로젝터" />
-              <Checkbox {...register("audio")} label="음향" />
-            </div>
-            <FieldHelp className="mt-3">
-              * 장비 사용료 (회차당): <b>{equipmentFee.toLocaleString()}</b>원 (기준: 노트북 {EQUIPMENT_FEE_KRW.laptop.toLocaleString()}원 /
-              프로젝터 {EQUIPMENT_FEE_KRW.projector.toLocaleString()}원 / 음향 {EQUIPMENT_FEE_KRW.audio.toLocaleString()}원)
-              {bundle.sessionCount > 1 ? (
-                <>
-                  <br />* 장비 사용료 합계 (총 {bundle.sessionCount}회차): <b>{bundle.equipmentSum.toLocaleString()}</b>원
-                </>
-              ) : null}
-            </FieldHelp>
+            <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용(선택)" : "장비 사용(선택)"}</h3>
+            {isStudioRoom ? (
+              <>
+                <div className="mt-4 space-y-3">
+                  {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
+                    <Checkbox
+                      key={key}
+                      {...register(key)}
+                      label={`${STUDIO_EQUIPMENT_LABELS[key]} — ${STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원`}
+                    />
+                  ))}
+                </div>
+                <FieldHelp className="mt-3">
+                  * 촬영장비 사용료 (1일 1회 과금): <b>{equipmentFee.toLocaleString()}</b>원
+                  {bundle.sessionCount > 1 ? (
+                    <>
+                      <br />* 장비 사용료 합계 (총 {bundle.sessionCount}회차): <b>{bundle.equipmentSum.toLocaleString()}</b>원
+                    </>
+                  ) : null}
+                </FieldHelp>
+              </>
+            ) : (
+              <>
+                <div className="mt-4 grid gap-3 md:grid-cols-3">
+                  <Checkbox {...register("laptop")} label="노트북" />
+                  <Checkbox {...register("projector")} label="프로젝터" />
+                  <Checkbox {...register("audio")} label="음향" />
+                </div>
+                <FieldHelp className="mt-3">
+                  * 장비 사용료 (회차당): <b>{equipmentFee.toLocaleString()}</b>원 (기준: 노트북 {EQUIPMENT_FEE_KRW.laptop.toLocaleString()}원 /
+                  프로젝터 {EQUIPMENT_FEE_KRW.projector.toLocaleString()}원 / 음향 {EQUIPMENT_FEE_KRW.audio.toLocaleString()}원)
+                  {bundle.sessionCount > 1 ? (
+                    <>
+                      <br />* 장비 사용료 합계 (총 {bundle.sessionCount}회차): <b>{bundle.equipmentSum.toLocaleString()}</b>원
+                    </>
+                  ) : null}
+                </FieldHelp>
+              </>
+            )}
           </Card>
 
           <Card pad="lg">

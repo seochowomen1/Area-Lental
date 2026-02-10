@@ -38,6 +38,14 @@ export const RequestInputSchema = z.object({
   projector: CheckboxBoolean.default(false),
   audio: CheckboxBoolean.default(false),
 
+  /** E-스튜디오 촬영장비 */
+  mirrorless: CheckboxBoolean.default(false),
+  camcorder: CheckboxBoolean.default(false),
+  wirelessMic: CheckboxBoolean.default(false),
+  pinMic: CheckboxBoolean.default(false),
+  rodeMic: CheckboxBoolean.default(false),
+  electronicBoard: CheckboxBoolean.default(false),
+
   purpose: z.string().min(5).max(1000),
 
   privacyAgree: CheckboxBoolean,
@@ -107,6 +115,12 @@ export const GalleryRequestInputSchema = z
     laptop: CheckboxBoolean.default(false),
     projector: CheckboxBoolean.default(false),
     audio: CheckboxBoolean.default(false),
+    mirrorless: CheckboxBoolean.default(false),
+    camcorder: CheckboxBoolean.default(false),
+    wirelessMic: CheckboxBoolean.default(false),
+    pinMic: CheckboxBoolean.default(false),
+    rodeMic: CheckboxBoolean.default(false),
+    electronicBoard: CheckboxBoolean.default(false),
 
     // 갤러리 전용 필드는 서버 저장 확장 시 활용(현재는 추가 데이터로 전달 가능)
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "시작일 형식을 확인해 주세요."),

@@ -1,7 +1,7 @@
 import type { RentalRequest } from "@/lib/types";
 import { toMinutes } from "@/lib/datetime";
 import { ROOMS_BY_ID } from "@/lib/space";
-import { EQUIPMENT_FEE_KRW } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW } from "@/lib/config";
 
 export type FeeBreakdown = {
   durationHours: number;
@@ -54,10 +54,17 @@ export function computeBaseTotalKRW(
 
   const rentalFeeKRW = Math.round(hourlyFeeKRW * durationHours);
 
-  const equipmentFeeKRW =
-    (req.equipment?.laptop ? EQUIPMENT_FEE_KRW.laptop : 0) +
-    (req.equipment?.projector ? EQUIPMENT_FEE_KRW.projector : 0) +
-    (req.equipment?.audio ? EQUIPMENT_FEE_KRW.audio : 0);
+  const isStudio = room?.category === "studio";
+  const equipmentFeeKRW = isStudio
+    ? (req.equipment?.mirrorless ? STUDIO_EQUIPMENT_FEE_KRW.mirrorless : 0) +
+      (req.equipment?.camcorder ? STUDIO_EQUIPMENT_FEE_KRW.camcorder : 0) +
+      (req.equipment?.wirelessMic ? STUDIO_EQUIPMENT_FEE_KRW.wirelessMic : 0) +
+      (req.equipment?.pinMic ? STUDIO_EQUIPMENT_FEE_KRW.pinMic : 0) +
+      (req.equipment?.rodeMic ? STUDIO_EQUIPMENT_FEE_KRW.rodeMic : 0) +
+      (req.equipment?.electronicBoard ? STUDIO_EQUIPMENT_FEE_KRW.electronicBoard : 0)
+    : (req.equipment?.laptop ? EQUIPMENT_FEE_KRW.laptop : 0) +
+      (req.equipment?.projector ? EQUIPMENT_FEE_KRW.projector : 0) +
+      (req.equipment?.audio ? EQUIPMENT_FEE_KRW.audio : 0);
 
   const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
   return { durationHours, hourlyFeeKRW, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };

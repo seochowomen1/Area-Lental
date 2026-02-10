@@ -12,7 +12,7 @@ import {
   computeDurationHours,
   formatKRW,
 } from "@/lib/pricing";
-import { EQUIPMENT_FEE_KRW } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 import {
   getCategoryLabel,
   getRoom,
@@ -136,15 +136,13 @@ export default async function AdminRequestFormPage({
     { key: "audio" as const, label: "음향장비", fee: EQUIPMENT_FEE_KRW.audio },
   ];
 
-  /* ── studio equipment items (이미지 원문 기반) ── */
-  const studioEquipmentItems = [
-    { label: "미러리스 소니 알파 A6400 (배터리 NP-FW50 + 128G SD 메모리 + AC-UUD12충전기)", fee: 10000 },
-    { label: "캠코더 sony FDR-AX700", fee: 10000 },
-    { label: "보야 듀얼 채널 무선 마이크 5개", fee: 10000 },
-    { label: "보야 핀 마이크 1개", fee: 5000 },
-    { label: "로데 비디오 마이크 + 마이크 스탠드 로데 PSA1", fee: 10000 },
-    { label: "전자칠판(65인치) + 모니터링 모니터(43인치) + LG노트북", fee: 20000 },
-  ];
+  /* ── studio equipment items (config 기반) ── */
+  const studioEquipmentKeys = Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>;
+  const studioEquipmentItems = studioEquipmentKeys.map((key) => ({
+    key,
+    label: STUDIO_EQUIPMENT_LABELS[key],
+    fee: STUDIO_EQUIPMENT_FEE_KRW[key],
+  }));
 
   /* ── fee detail string ── */
   const baseFeeKRW = feeBasis.totalFeeKRW;
@@ -619,7 +617,7 @@ export default async function AdminRequestFormPage({
 
                 {/* 촬영장비 */}
                 {studioEquipmentItems.map((eq, idx) => (
-                  <tr key={idx}>
+                  <tr key={eq.key}>
                     {idx === 0 && (
                       <th className={TH} rowSpan={studioEquipmentItems.length} style={{ textAlign: "center", verticalAlign: "middle" }}>
                         2.
@@ -632,7 +630,9 @@ export default async function AdminRequestFormPage({
                     )}
                     <td className={TD}>{eq.label}</td>
                     <td className={TD_R}>{formatKRW(eq.fee)}</td>
-                    <td className={`${TD} text-center`}>□</td>
+                    <td className={`${TD} text-center`}>
+                      {req.equipment?.[eq.key] ? "■" : "□"}
+                    </td>
                   </tr>
                 ))}
               </tbody>

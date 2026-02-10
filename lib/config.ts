@@ -14,6 +14,26 @@ export const EQUIPMENT_FEE_KRW = {
   audio: 10000
 } as const;
 
+/** E-스튜디오 전용 촬영장비 사용료 (1일 1회 과금) */
+export const STUDIO_EQUIPMENT_FEE_KRW = {
+  mirrorless: 10000,
+  camcorder: 10000,
+  wirelessMic: 10000,
+  pinMic: 5000,
+  rodeMic: 10000,
+  electronicBoard: 20000,
+} as const;
+
+/** E-스튜디오 촬영장비 라벨 */
+export const STUDIO_EQUIPMENT_LABELS: Record<keyof typeof STUDIO_EQUIPMENT_FEE_KRW, string> = {
+  mirrorless: "미러리스 소니 알파 A6400 (배터리 NP-FW50 + 128G SD 메모리 + AC-UUD12충전기)",
+  camcorder: "캠코더 sony FDR-AX700",
+  wirelessMic: "보야 듀얼 채널 무선 마이크 5개",
+  pinMic: "보야 핀 마이크 1개",
+  rodeMic: "로데 비디오 마이크 + 마이크 스탠드 로데 PSA1",
+  electronicBoard: "전자칠판(65인치) + 모니터링 모니터(43인치) + LG노트북",
+} as const;
+
 export const OPERATING_RULES = {
   weekday: { start: "10:00", end: "17:00" },
   tuesdayNight: { start: "18:00", end: "20:00" },

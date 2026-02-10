@@ -88,6 +88,13 @@ export async function POST(req: Request) {
       projector: String(form.get("projector") ?? "false"),
       audio: String(form.get("audio") ?? "false"),
 
+      mirrorless: String(form.get("mirrorless") ?? "false"),
+      camcorder: String(form.get("camcorder") ?? "false"),
+      wirelessMic: String(form.get("wirelessMic") ?? "false"),
+      pinMic: String(form.get("pinMic") ?? "false"),
+      rodeMic: String(form.get("rodeMic") ?? "false"),
+      electronicBoard: String(form.get("electronicBoard") ?? "false"),
+
       // gallery 전용 필드(추가 데이터로 전달되며, 저장 확장은 추후 진행)
       startDate: String(form.get("startDate") ?? ""),
       endDate: String(form.get("endDate") ?? ""),
@@ -354,8 +361,12 @@ export async function POST(req: Request) {
 
     const batchId = sessions.length > 1 ? `BAT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
     const equipment = input.roomId === "gallery"
-      ? { laptop: false, projector: false, audio: false }
-      : { laptop: input.laptop, projector: input.projector, audio: input.audio };
+      ? { laptop: false, projector: false, audio: false, mirrorless: false, camcorder: false, wirelessMic: false, pinMic: false, rodeMic: false, electronicBoard: false }
+      : {
+          laptop: input.laptop, projector: input.projector, audio: input.audio,
+          mirrorless: input.mirrorless, camcorder: input.camcorder, wirelessMic: input.wirelessMic,
+          pinMic: input.pinMic, rodeMic: input.rodeMic, electronicBoard: input.electronicBoard,
+        };
 
     const isGallery = input.roomId === "gallery";
 

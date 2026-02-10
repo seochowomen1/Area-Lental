@@ -41,6 +41,14 @@ const REQUEST_OPTIONAL_HEADERS = [
   "awarenessPath",
   "specialNotes",
 
+  // E-스튜디오 촬영장비
+  "equipment_mirrorless",
+  "equipment_camcorder",
+  "equipment_wirelessMic",
+  "equipment_pinMic",
+  "equipment_rodeMic",
+  "equipment_electronicBoard",
+
   // 갤러리: 서버 생성(감사) 로그
   "galleryGeneratedAt",
   "galleryGenerationVersion",
@@ -184,6 +192,13 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   const iAwarenessPath = opt("awarenessPath");
   const iSpecialNotes = opt("specialNotes");
 
+  const iMirrorless = opt("equipment_mirrorless");
+  const iCamcorder = opt("equipment_camcorder");
+  const iWirelessMic = opt("equipment_wirelessMic");
+  const iPinMic = opt("equipment_pinMic");
+  const iRodeMic = opt("equipment_rodeMic");
+  const iElectronicBoard = opt("equipment_electronicBoard");
+
   const iGalleryGeneratedAt = opt("galleryGeneratedAt");
   const iGalleryGenerationVersion = opt("galleryGenerationVersion");
   const iGalleryWeekdayCount = opt("galleryWeekdayCount");
@@ -240,7 +255,13 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       equipment: {
         laptop: r[idx("equipment_laptop")] === "TRUE",
         projector: r[idx("equipment_projector")] === "TRUE",
-        audio: r[idx("equipment_audio")] === "TRUE"
+        audio: r[idx("equipment_audio")] === "TRUE",
+        mirrorless: iMirrorless >= 0 ? (String(r[iMirrorless] ?? "").trim().toUpperCase() === "TRUE") : false,
+        camcorder: iCamcorder >= 0 ? (String(r[iCamcorder] ?? "").trim().toUpperCase() === "TRUE") : false,
+        wirelessMic: iWirelessMic >= 0 ? (String(r[iWirelessMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        pinMic: iPinMic >= 0 ? (String(r[iPinMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        rodeMic: iRodeMic >= 0 ? (String(r[iRodeMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        electronicBoard: iElectronicBoard >= 0 ? (String(r[iElectronicBoard] ?? "").trim().toUpperCase() === "TRUE") : false,
       },
 
       purpose: r[idx("purpose")],
@@ -408,6 +429,12 @@ export async function appendRequest(
     record.genreContent ?? "",
     record.awarenessPath ?? "",
     record.specialNotes ?? "",
+    record.equipment.mirrorless ? "TRUE" : "FALSE",
+    record.equipment.camcorder ? "TRUE" : "FALSE",
+    record.equipment.wirelessMic ? "TRUE" : "FALSE",
+    record.equipment.pinMic ? "TRUE" : "FALSE",
+    record.equipment.rodeMic ? "TRUE" : "FALSE",
+    record.equipment.electronicBoard ? "TRUE" : "FALSE",
     record.galleryGeneratedAt ?? "",
     record.galleryGenerationVersion ?? "",
     String(record.galleryWeekdayCount ?? 0),
@@ -565,6 +592,12 @@ export async function appendRequestsBatch(
       record.genreContent ?? "",
       record.awarenessPath ?? "",
       record.specialNotes ?? "",
+      record.equipment.mirrorless ? "TRUE" : "FALSE",
+      record.equipment.camcorder ? "TRUE" : "FALSE",
+      record.equipment.wirelessMic ? "TRUE" : "FALSE",
+      record.equipment.pinMic ? "TRUE" : "FALSE",
+      record.equipment.rodeMic ? "TRUE" : "FALSE",
+      record.equipment.electronicBoard ? "TRUE" : "FALSE",
       record.galleryGeneratedAt ?? "",
       record.galleryGenerationVersion ?? "",
       String(record.galleryWeekdayCount ?? 0),

@@ -64,6 +64,13 @@ export type RentalRequest = {
     laptop: boolean;
     projector: boolean;
     audio: boolean;
+    /** E-스튜디오 촬영장비 */
+    mirrorless?: boolean;
+    camcorder?: boolean;
+    wirelessMic?: boolean;
+    pinMic?: boolean;
+    rodeMic?: boolean;
+    electronicBoard?: boolean;
   };
 
   purpose: string;
