@@ -204,14 +204,14 @@ export default async function AdminRequestDetail({
                 target="_blank"
                 className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
-                신청서
+                신청서 · 서약서
               </Link>
             )}
-            {!isGallery && (
+            {normalizedCategory === "studio" && (
               <Link
-                href={`/admin/requests/${encodeURIComponent(req.requestId)}/pledge?category=${encodeURIComponent(normalizedCategory)}`}
+                href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
                 target="_blank"
-                className="rounded-full border border-[rgb(var(--brand-primary))] bg-white px-4 py-2 text-sm font-semibold text-[rgb(var(--brand-primary))] shadow-sm hover:bg-[rgb(var(--brand-primary)/0.04)]"
+                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
                 서약서
               </Link>
