@@ -495,7 +495,7 @@ export default async function AdminRequestDetail({
                       선택 반려
                     </button>
                     <span className="text-xs text-gray-500">
-                      * 체크된 회차에만 적용됩니다. 전체 처리하려면 '전체 선택' 후 버튼을 누르세요.
+                      * 체크된 회차에만 적용됩니다. 전체 처리하려면 &lsquo;전체 선택&rsquo; 후 버튼을 누르세요.
                     </span>
                   </div>
                 </form>
