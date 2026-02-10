@@ -3,6 +3,10 @@ import { getGoogleClient } from "@/lib/google";
 import { requireGoogleEnv } from "@/lib/env";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 /**
  * POST /api/admin/init-sheets
  *

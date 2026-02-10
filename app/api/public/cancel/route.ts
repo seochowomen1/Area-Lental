@@ -11,6 +11,7 @@ function normalizeEmail(email: string) {
 }
 
 export async function POST(req: Request) {
+  try {
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
@@ -70,4 +71,8 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, message: "예약이 취소되었습니다." });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

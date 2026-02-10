@@ -20,6 +20,7 @@ function tokenFor(adminPassword: string) {
 }
 
 export async function POST(req: Request) {
+  try {
   // Rate limit 체크
   const ip = getClientIp(req);
   const rl = rateLimit("login", ip, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
@@ -72,6 +73,10 @@ export async function POST(req: Request) {
     path: "/",
   });
   return res;
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }
 
 export async function DELETE() {

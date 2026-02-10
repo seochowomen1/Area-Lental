@@ -132,6 +132,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const { searchParams } = new URL(req.url);
   const rawCategory = searchParams.get("category");
   const category = normalizeRoomCategory(rawCategory);
@@ -273,4 +274,8 @@ export async function GET(req: Request) {
   };
 
   return NextResponse.json(payload, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

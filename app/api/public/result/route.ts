@@ -52,6 +52,7 @@ function roomMeta(roomId: string) {
 }
 
 export async function POST(req: Request) {
+  try {
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
@@ -181,4 +182,8 @@ export async function POST(req: Request) {
     // 반려 사유(묶음은 대표/첫회차 기준)
     rejectReason: overallStatus === "반려" && approvedSessions.length === 0 ? (representative.rejectReason ?? "") : ""
   });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

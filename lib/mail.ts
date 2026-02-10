@@ -100,8 +100,8 @@ ${args.linkUrl}
 export async function sendAdminNewRequestEmail(req: RentalRequest) {
   const base = getBaseEnv();
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(req.requestId)}`;
-  const eq = (req as any).equipment ?? { laptop: false, projector: false, audio: false };
-  const atts = Array.isArray((req as any).attachments) ? (req as any).attachments : [];
+  const eq = req.equipment ?? { laptop: false, projector: false, audio: false };
+  const atts = Array.isArray(req.attachments) ? req.attachments : [];
 
   const subject = isGallery(req)
     ? `[대관신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.applicantName}`
@@ -131,7 +131,7 @@ export async function sendAdminNewRequestEmailBatch(reqs: RentalRequest[]) {
 
   const base = getBaseEnv();
   const first = list[0];
-  const eq = (first as any).equipment ?? { laptop: false, projector: false, audio: false };
+  const eq = first.equipment ?? { laptop: false, projector: false, audio: false };
 
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(first.requestId)}`;
 

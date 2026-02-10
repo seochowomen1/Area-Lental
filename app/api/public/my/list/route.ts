@@ -39,6 +39,7 @@ function roomMeta(roomId: string) {
 }
 
 export async function GET(req: Request) {
+  try {
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
 
@@ -121,4 +122,8 @@ export async function GET(req: Request) {
   const past = groups.filter((g) => g.past);
 
   return NextResponse.json({ ok: true, email, current, past });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

@@ -11,7 +11,7 @@ interface LogContext {
   userId?: string;
   requestId?: string;
   roomId?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 class Logger {
@@ -64,7 +64,7 @@ class Logger {
   /**
    * 민감 정보를 로그에서 제거
    */
-  sanitize(data: any): any {
+  sanitize(data: Record<string, unknown>): Record<string, unknown> {
     const sensitive = ['password', 'token', 'secret', 'birth', 'privateKey'];
     const sanitized = { ...data };
 

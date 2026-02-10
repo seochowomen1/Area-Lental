@@ -48,6 +48,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const url = new URL(req.url);
   const requestId = (url.searchParams.get("requestId") ?? "").trim();
   if (!requestId) {
@@ -68,8 +69,8 @@ export async function GET(req: Request) {
   // 갤러리 묶음의 경우 첫 회차가 준비일일 수 있으므로 대표 정보는 '전시일'을 우선 사용합니다.
   const repInfo = sessions.find((s) => !s.isPrepDay) ?? representative;
   const isGallery = repInfo.roomId === "gallery";
-  const eq = (repInfo as any).equipment ?? { laptop: false, projector: false, audio: false };
-  const atts = Array.isArray((repInfo as any).attachments) ? (repInfo as any).attachments : [];
+  const eq = repInfo.equipment ?? { laptop: false, projector: false, audio: false };
+  const atts = Array.isArray(repInfo.attachments) ? repInfo.attachments : [];
 
   const bundle = hasMultiple ? analyzeBundle(sessions) : null;
   const basisSessions = isBatchId ? pickFeeBasisSessions(sessions) : sessions;
@@ -337,4 +338,8 @@ export async function GET(req: Request) {
       "content-disposition": `attachment; filename=\"${filename}\"`
     }
   });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

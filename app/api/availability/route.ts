@@ -110,10 +110,11 @@ export async function GET(req: Request) {
     };
 
     return NextResponse.json(payload, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e instanceof Error ? e : new Error(String(e));
     logger.error("가용 시간 조회 중 오류 발생", {
-      error: e?.message ?? String(e),
-      stack: process.env.NODE_ENV === "development" ? e?.stack : undefined
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
 
     // UX: /space 화면에서 "서버 오류"로 끝나지 않도록 200 + 안내 메시지로 흡수

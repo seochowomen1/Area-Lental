@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
-import { GalleryRequestInputSchema, RequestInputSchema } from "@/lib/schema";
+import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { UPLOAD, ROOMS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps } from "@/lib/datetime";
@@ -124,10 +124,13 @@ export async function POST(req: Request) {
 
     let sessions: SessionInput[] = [];
 
-    if (input.roomId === "gallery") {
+    // 갤러리 입력일 경우 타입 안전하게 접근
+    const galleryInput = input.roomId === "gallery" ? (input as GalleryRequestInput) : null;
+
+    if (galleryInput) {
       // ✅ 보안: gallery는 client sessions를 무시하고 서버가 startDate~endDate로 회차를 재생성합니다.
-      const startDate = String((input as any).startDate ?? "").trim();
-      const endDate = String((input as any).endDate ?? "").trim();
+      const startDate = String(galleryInput.startDate ?? "").trim();
+      const endDate = String(galleryInput.endDate ?? "").trim();
 
       if (!isYmd(startDate) || !isYmd(endDate)) {
         return NextResponse.json(
@@ -372,8 +375,8 @@ export async function POST(req: Request) {
     const galleryPrepDate = isGallery ? (sessions.find((s) => s.isPrepDay)?.date || undefined) : undefined;
     const galleryAuditJson = isGallery
       ? JSON.stringify({
-          startDate: (input as any).startDate,
-          endDate: (input as any).endDate,
+          startDate: galleryInput?.startDate,
+          endDate: galleryInput?.endDate,
           prepDate: galleryPrepDate,
           weekdayCount: galleryWeekdayCount ?? 0,
           saturdayCount: gallerySaturdayCount ?? 0,
@@ -397,13 +400,13 @@ export async function POST(req: Request) {
       isPrepDay: isGallery ? (s.isPrepDay ? true : false) : undefined,
 
       // gallery: 기간/전시 정보 저장(회차별 row에 반복 저장)
-      startDate: isGallery ? (input as any).startDate : undefined,
-      endDate: isGallery ? (input as any).endDate : undefined,
-      exhibitionTitle: isGallery ? (input as any).exhibitionTitle : undefined,
-      exhibitionPurpose: isGallery ? (input as any).exhibitionPurpose : undefined,
-      genreContent: isGallery ? (input as any).genreContent : undefined,
-      awarenessPath: isGallery ? (input as any).awarenessPath : undefined,
-      specialNotes: isGallery ? (input as any).specialNotes : undefined,
+      startDate: galleryInput?.startDate,
+      endDate: galleryInput?.endDate,
+      exhibitionTitle: galleryInput?.exhibitionTitle,
+      exhibitionPurpose: galleryInput?.exhibitionPurpose,
+      genreContent: galleryInput?.genreContent,
+      awarenessPath: galleryInput?.awarenessPath,
+      specialNotes: galleryInput?.specialNotes,
 
       galleryGeneratedAt,
       galleryGenerationVersion,
@@ -461,37 +464,39 @@ export async function POST(req: Request) {
       },
       { status: 200 }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    const errWithCode = e as { code?: string };
     logger.error('대관 신청 처리 중 오류 발생', {
-      error: e.message,
-      code: e.code,
-      stack: process.env.NODE_ENV === 'development' ? e.stack : undefined
+      error: err.message,
+      code: errWithCode.code,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
-    
+
     // Google API 관련 에러
-    if (e.message?.includes('Google') || e.code === 'EAUTH') {
+    if (err.message?.includes('Google') || errWithCode.code === 'EAUTH') {
       return NextResponse.json(
         { ok: false, code: "GOOGLE_API_ERROR", message: "Google API 연동 오류가 발생했습니다." },
         { status: 503 }
       );
     }
-    
+
     // 네트워크 연결 에러
-    if (e.code === 'ECONNREFUSED' || e.code === 'ETIMEDOUT') {
+    if (errWithCode.code === 'ECONNREFUSED' || errWithCode.code === 'ETIMEDOUT') {
       return NextResponse.json(
         { ok: false, code: "NETWORK_ERROR", message: "네트워크 연결 오류가 발생했습니다." },
         { status: 503 }
       );
     }
-    
+
     // 개발 환경에서는 상세 에러 메시지 포함
     const isDev = process.env.NODE_ENV === 'development';
     return NextResponse.json(
-      { 
-        ok: false, 
-        code: "SERVER_ERROR", 
-        message: isDev ? `서버 오류: ${e.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        ...((isDev ? { stack: e.stack } : {}))
+      {
+        ok: false,
+        code: "SERVER_ERROR",
+        message: isDev ? `서버 오류: ${err.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        ...((isDev ? { stack: err.stack } : {}))
       },
       { status: 500 }
     );

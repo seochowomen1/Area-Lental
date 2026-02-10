@@ -154,8 +154,8 @@ export async function POST(req: Request) {
     const item = { roomId, date, startTime, endTime, reason };
     const result = await db.addBlock(item);
     return NextResponse.json({ ok: true, created: result });
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "요청 처리 중 오류가 발생했습니다.";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return jsonError(msg, 500, "SERVER_ERROR");
   }
 }
@@ -171,8 +171,8 @@ export async function DELETE(req: Request) {
     const db = getDatabase();
     await db.deleteBlock(id);
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "요청 처리 중 오류가 발생했습니다.";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return jsonError(msg, 500, "SERVER_ERROR");
   }
 }
