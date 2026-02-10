@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
-import { PLEDGE_FOOTER, PLEDGE_SECTIONS, GALLERY_PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
+import { PLEDGE_FOOTER, PLEDGE_INTRO, PLEDGE_SECTIONS, GALLERY_PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
 import { operatingNoticeText } from "@/lib/operating";
 
 type Props = {
@@ -58,7 +58,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
 
         <div id="pledge-modal-desc" className="max-h-[60vh] overflow-auto px-5 py-4">
           <p className="text-sm text-gray-700">
-            서초여성가족플라자 서초센터 시설을 대관하여 이용함에 있어 아래 규정을 확인하고 준수합니다.
+            {PLEDGE_INTRO}
           </p>
 
           <p className="mt-2 text-sm text-gray-700">

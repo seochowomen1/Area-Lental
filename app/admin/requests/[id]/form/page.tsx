@@ -74,9 +74,17 @@ export default async function AdminRequestFormPage({
     );
   }
   const normalizedCategory = normalizeRoomCategory(rawCategory);
-  const isGallery = normalizedCategory === "gallery";
-  const isStudio = normalizedCategory === "studio";
+
+  // 대관 신청서는 강의실 전용
+  if (normalizedCategory !== "lecture") {
+    redirect(
+      `/admin/requests/${encodeURIComponent(req.requestId)}?category=${encodeURIComponent(normalizedCategory)}`
+    );
+  }
+
   const categoryLabel = getCategoryLabel(normalizedCategory);
+  const isGallery = req.roomId === "gallery";
+  const isStudio = (room?.category ?? "lecture") === "studio";
 
   /* ── batch / session ── */
   const batchList = req.batchId ? await db.getRequestsByBatchId(req.batchId) : [];
@@ -151,6 +159,17 @@ export default async function AdminRequestFormPage({
 
   const now = new Date();
   const printDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}`;
+
+  // 전자 동의 일시
+  const consentDate = req.createdAt
+    ? new Date(req.createdAt).toLocaleDateString("ko-KR", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+      })
+    : printDate;
 
   return (
     <>
@@ -513,16 +532,27 @@ export default async function AdminRequestFormPage({
           </div>
         </div>
 
-        {/* ═══ 6. 서명란 ═══ */}
-        <div className="mt-6 text-center text-sm text-gray-900">
+        {/* ═══ 6. 전자 동의 확인란 ═══ */}
+        <div className="mt-5 rounded-lg border border-gray-300 bg-gray-50 px-4 py-3">
+          <h4 className="text-xs font-bold text-gray-700">[전자 동의 확인]</h4>
+          <p className="mt-1 text-[10px] text-gray-500 leading-relaxed">
+            본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
+            신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+          </p>
+          <div className="mt-2 flex flex-wrap gap-x-8 gap-y-1 text-xs text-gray-800">
+            <span>신청 일시: {consentDate}</span>
+            <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
+            <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
+          </div>
+        </div>
+
+        <div className="mt-5 text-center text-sm text-gray-900">
           <p>
             위와 같이 서초여성가족플라자 서초센터 {categoryLabel} 대관을 신청합니다.
           </p>
+          <p className="mt-4">{printDate}</p>
           <p className="mt-4">
-            {printDate}
-          </p>
-          <p className="mt-4">
-            신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (서명 또는 인)
+            신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
           </p>
         </div>
 

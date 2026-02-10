@@ -198,13 +198,24 @@ export default async function AdminRequestDetail({
             <Link href={backToListHref} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
               ← 목록
             </Link>
-            <Link
-              href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
-              target="_blank"
-              className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
-            >
-              신청서 보기
-            </Link>
+            {normalizedCategory === "lecture" && (
+              <Link
+                href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
+                target="_blank"
+                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+              >
+                신청서
+              </Link>
+            )}
+            {!isGallery && (
+              <Link
+                href={`/admin/requests/${encodeURIComponent(req.requestId)}/pledge?category=${encodeURIComponent(normalizedCategory)}`}
+                target="_blank"
+                className="rounded-full border border-[rgb(var(--brand-primary))] bg-white px-4 py-2 text-sm font-semibold text-[rgb(var(--brand-primary))] shadow-sm hover:bg-[rgb(var(--brand-primary)/0.04)]"
+              >
+                서약서
+              </Link>
+            )}
             <Link
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
