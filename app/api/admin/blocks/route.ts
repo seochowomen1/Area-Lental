@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
+import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, overlaps } from "@/lib/datetime";
 import { validateOperatingHours } from "@/lib/operating";
 import type { ClassSchedule } from "@/lib/types";
@@ -48,6 +49,8 @@ function galleryHoursForDate(date: string) {
 
 
 export async function GET() {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const db = getDatabase();
     const blocks = await db.getBlocks();
@@ -58,6 +61,8 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const body = (await req.json()) as Partial<Block>;
     const roomId = String(body.roomId ?? "").trim();
@@ -156,6 +161,8 @@ export async function POST(req: Request) {
 }
 
 export async function DELETE(req: Request) {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");

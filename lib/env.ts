@@ -29,10 +29,11 @@ export function getBaseEnv(): BaseEnv {
     );
   }
 
-  // APP_BASE_URL은 로컬 기본값 제공
+  // APP_BASE_URL: Vercel 배포 시 VERCEL_URL 자동 사용, 로컬 fallback
+  const vercelUrl = process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : undefined;
   return {
     ...parsed.data,
-    APP_BASE_URL: parsed.data.APP_BASE_URL ?? "http://localhost:3000"
+    APP_BASE_URL: parsed.data.APP_BASE_URL ?? vercelUrl ?? "http://localhost:3000"
   };
 }
 

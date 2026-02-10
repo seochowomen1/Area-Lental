@@ -49,9 +49,11 @@ export async function POST(req: Request) {
 
   const token = tokenFor(adminPw);
   const res = NextResponse.json({ ok: true, redirect: nextPath });
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookies.set(ADMIN_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: isProduction,
     path: "/",
   });
   return res;

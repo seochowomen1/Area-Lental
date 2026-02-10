@@ -16,11 +16,19 @@ async function tokenFor(adminPassword: string) {
   return toHex(digest);
 }
 
+function withSecurityHeaders(res: NextResponse) {
+  res.headers.set("X-Frame-Options", "DENY");
+  res.headers.set("X-Content-Type-Options", "nosniff");
+  res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.headers.set("X-XSS-Protection", "1; mode=block");
+  return res;
+}
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  if (!pathname.startsWith("/admin")) return NextResponse.next();
-  if (pathname.startsWith("/admin/login")) return NextResponse.next();
+  if (!pathname.startsWith("/admin")) return withSecurityHeaders(NextResponse.next());
+  if (pathname.startsWith("/admin/login")) return withSecurityHeaders(NextResponse.next());
 
   const adminPw = process.env.ADMIN_PASSWORD;
   // 환경변수 미설정이면 로그인 페이지로 유도(에러 표시용 쿼리)
@@ -35,7 +43,7 @@ export async function middleware(req: NextRequest) {
   const cookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
   const expected = await tokenFor(adminPw);
 
-  if (cookie && cookie === expected) return NextResponse.next();
+  if (cookie && cookie === expected) return withSecurityHeaders(NextResponse.next());
 
   const url = req.nextUrl.clone();
   url.pathname = "/admin/login";

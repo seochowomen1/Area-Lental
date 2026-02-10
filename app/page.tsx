@@ -1,6 +1,6 @@
 import SiteHeader from "@/components/SiteHeader";
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
-import { IconGallery, IconLecture, IconStudio } from "@/components/home/Icons";
+import { IconGallery, IconLecture, IconMyReservation, IconStudio } from "@/components/home/Icons";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -32,6 +32,19 @@ export default function Home() {
             icon={<IconGallery />}
             href="/space?category=gallery"
           />
+        </div>
+
+        {/* 예약 확인 */}
+        <div className="mt-8">
+          <div className="mx-auto max-w-md">
+            <HomeCategoryCard
+              title="예약 확인"
+              description="이메일 주소로 내 대관 신청 현황을 조회합니다"
+              icon={<IconMyReservation />}
+              href="/my"
+              ctaLabel="예약 확인하기"
+            />
+          </div>
         </div>
       </main>
     </div>

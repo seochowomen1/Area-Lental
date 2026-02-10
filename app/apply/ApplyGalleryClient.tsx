@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -226,11 +226,31 @@ export default function ApplyGalleryClient() {
   const endDate = watch("endDate");
   const privacyAgree = watch("privacyAgree");
   const pledgeAgree = watch("pledgeAgree");
+  const applicantName = watch("applicantName");
+  const pledgeName = watch("pledgeName");
   const exhibitionTitle = watch("exhibitionTitle");
   const exhibitionPurpose = watch("exhibitionPurpose");
   const genreContent = watch("genreContent");
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
+
+  // 편의: 신청자 성명 → 서약자 성명 자동 채움
+  const pledgeAutoFillRef = useRef<boolean>(true);
+  const prevApplicantNameRef = useRef<string>("");
+
+  useEffect(() => {
+    const prev = prevApplicantNameRef.current;
+    prevApplicantNameRef.current = applicantName || "";
+    if (!applicantName) return;
+    if (!pledgeName) {
+      pledgeAutoFillRef.current = true;
+      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
+      return;
+    }
+    if (pledgeAutoFillRef.current && prev && pledgeName === prev && applicantName !== prev) {
+      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [applicantName, pledgeName, setValue]);
 
   // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
   useEffect(() => {
@@ -786,7 +806,14 @@ export default function ApplyGalleryClient() {
 
               <div>
                 <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
-                <Input id="pledgeName" {...register("pledgeName")} />
+                <Input
+                  id="pledgeName"
+                  {...register("pledgeName", {
+                    onChange: (e) => {
+                      pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
+                    },
+                  })}
+                />
                 {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
               </div>
             </div>

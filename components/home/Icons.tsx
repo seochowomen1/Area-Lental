@@ -96,6 +96,37 @@ export function IconStudio() {
   );
 }
 
+export function IconMyReservation() {
+  return (
+    <Wrap>
+      <svg viewBox="0 0 140 140" className={HOME_ICON_SVG} aria-hidden="true">
+        {/* clipboard body */}
+        <rect x="32" y="28" width="76" height="96" rx="12" fill={C.blueSoft} {...OUT} />
+        {/* clipboard clip */}
+        <rect x="52" y="18" width="36" height="18" rx="9" fill={C.gray} {...OUT} />
+        <rect x="60" y="22" width="20" height="10" rx="5" fill="#ffffff" />
+        {/* paper area */}
+        <rect x="42" y="48" width="56" height="68" rx="8" fill="#ffffff" />
+        {/* check lines */}
+        <circle cx="54" cy="62" r="5" fill={C.green} opacity={0.9} />
+        <path d="M51 62 L53 64.5 L57.5 59" stroke="#ffffff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M64 62 H88" stroke={C.graySoft} strokeWidth={SW} strokeLinecap="round" />
+        <circle cx="54" cy="80" r="5" fill={C.green} opacity={0.9} />
+        <path d="M51 80 L53 82.5 L57.5 77" stroke="#ffffff" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M64 80 H82" stroke={C.graySoft} strokeWidth={SW} strokeLinecap="round" />
+        <circle cx="54" cy="98" r="5" fill={C.orange} opacity={0.85} />
+        <path d="M52 96 L56 100" stroke="#ffffff" strokeWidth={2} strokeLinecap="round" />
+        <path d="M56 96 L52 100" stroke="#ffffff" strokeWidth={2} strokeLinecap="round" />
+        <path d="M64 98 H90" stroke={C.graySoft} strokeWidth={SW} strokeLinecap="round" />
+        {/* magnifier */}
+        <circle cx="106" cy="108" r="14" fill={C.mintSoft} {...OUT} />
+        <circle cx="106" cy="108" r="7" fill="#ffffff" {...OUT} />
+        <path d="M116 118 L126 128" stroke={C.outline} strokeWidth={4} strokeLinecap="round" opacity={0.8} />
+      </svg>
+    </Wrap>
+  );
+}
+
 export function IconGallery() {
   return (
     <Wrap>
