@@ -199,10 +199,17 @@ export default async function AdminRequestDetail({
               ← 목록
             </Link>
             <Link
+              href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
+              target="_blank"
+              className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+            >
+              신청서 보기
+            </Link>
+            <Link
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             >
-              신청서 Excel
+              Excel
             </Link>
           </div>
         </div>
