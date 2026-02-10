@@ -34,7 +34,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
         )}
 
         <span className="absolute left-3 top-3 rounded-full bg-[rgb(var(--brand-primary))] px-3 py-1 text-xs font-semibold text-white shadow">
-          신청예약 필수
+          대관신청 필수
         </span>
       </div>
 
@@ -54,13 +54,13 @@ function RoomCard({ room }: { room: SpaceRoom }) {
             )}
           </div>
           <div className="flex items-center justify-between">
-            <span>이용금액</span>
+            <span>대관료</span>
             <span className="font-medium text-slate-900">
               {room.category === "gallery" ? "평일 20,000원/일 · 토 10,000원/일" : room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span>장소위치</span>
+            <span>위치</span>
             <span className="font-medium text-slate-900">{room.floor}층</span>
           </div>
         </div>

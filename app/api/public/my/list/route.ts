@@ -42,13 +42,25 @@ export async function GET(req: Request) {
   try {
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
+  const emailParam = (searchParams.get("email") ?? "").toString().trim().toLowerCase();
 
-  const verified = verifyApplicantLinkToken(token);
-  if (!verified.ok) {
-    return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
+  let email = "";
+
+  // 토큰 인증 또는 이메일 직접 조회
+  if (token) {
+    const verified = verifyApplicantLinkToken(token);
+    if (!verified.ok) {
+      return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
+    }
+    email = verified.email;
+  } else if (emailParam && emailParam.includes("@")) {
+    email = emailParam;
+  } else {
+    return NextResponse.json(
+      { ok: false, message: "토큰 또는 이메일이 필요합니다." },
+      { status: 400 }
+    );
   }
-
-  const email = verified.email;
   const db = getDatabase();
   const all = await db.getAllRequests();
   const mine = all.filter((r) => (r.email ?? "").toLowerCase() === email);

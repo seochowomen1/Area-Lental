@@ -28,16 +28,16 @@ export default async function AdminHomePage() {
   return (
     <div className="space-y-4">
       <div className="rounded-xl bg-white p-5 shadow">
-        <h1 className="text-lg font-semibold text-gray-900">공간별 예약 조회</h1>
+        <h1 className="text-lg font-semibold text-gray-900">공간별 대관신청 관리</h1>
         <p className="mt-1 text-sm text-gray-600">
-          조회할 공간을 선택해 목록/캘린더에서 예약 현황을 확인합니다.
+          공간을 선택하여 신청 현황을 목록 또는 캘린더로 확인하세요.
         </p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <HomeCategoryCard
           title="강의실"
-          description={`강의실 예약 현황(신청/승인/취소) 목록 및 캘린더 조회${badge(lecturePending)}`}
+          description={`강의실 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회${badge(lecturePending)}`}
           icon={<IconLecture />}
           href="/admin/requests?category=lecture"
           ctaLabel="조회하기"
@@ -45,7 +45,7 @@ export default async function AdminHomePage() {
 
         <HomeCategoryCard
           title="E-스튜디오"
-          description={`E-스튜디오 예약 현황 목록 및 캘린더 조회${badge(studioPending)}`}
+          description={`E-스튜디오 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회${badge(studioPending)}`}
           icon={<IconStudio />}
           href="/admin/requests?category=studio"
           ctaLabel="조회하기"
@@ -53,7 +53,7 @@ export default async function AdminHomePage() {
 
         <HomeCategoryCard
           title="우리동네 갤러리"
-          description={`전시 공간 대관 신청/승인 현황 관리${badge(galleryPending)}`}
+          description={`갤러리 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회${badge(galleryPending)}`}
           icon={<IconGallery />}
           href="/admin/requests?category=gallery"
           ctaLabel="조회하기"

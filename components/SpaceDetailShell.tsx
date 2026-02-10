@@ -208,11 +208,11 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
               <span className="font-medium">최소 1시간</span>
             </div>
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">이용금액</span>
+              <span className="text-gray-500">대관료</span>
               <span className="font-medium">{room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}</span>
             </div>
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">장소위치</span>
+              <span className="text-gray-500">위치</span>
               <span className="font-medium">{room.floor}층</span>
             </div>
           </div>
