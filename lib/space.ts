@@ -75,7 +75,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "북카페", 
     capacity: 20, 
     durationLimitHours: 6, 
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 70000, 
     contactName: "관리자", 
     contactPhone: "02-0000-0000",
@@ -100,7 +100,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "모두의교실", 
     capacity: 30, 
     durationLimitHours: 6, 
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 100000, 
     contactName: "관리자", 
     contactPhone: "02-0000-0000",
@@ -166,7 +166,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "상상교실 1",
     capacity: 20,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -181,7 +181,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "상상교실 2",
     capacity: 20,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 50000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -196,7 +196,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "상상교실 3",
     capacity: 20,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -212,7 +212,7 @@ export const ROOMS: SpaceRoom[] = [
     category: "studio",
     capacity: 12,
     durationLimitHours: 6,
-    // 시간당 대관 이용료 (기본 인원 2명)
+    // 시간당 대관료 (기본 인원 2명)
     feeKRW: 20000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -236,7 +236,7 @@ export const ROOMS: SpaceRoom[] = [
           "이용시간 인접 시 추가금액: 시간당 5,000원 (기본 2인 초과)",
           "유료장비는 대관이용시간 기간 중 1일 1회만 과금",
           "대관신청 신청서 접수하면 매월로 접수되며, 담당자 확인하여 변동사항 및 비용 안내",
-          "대관비용 결제 후 확인이 되어야 예약 확정 (준비해야 할 사항이 있으면 사전 안내)",
+          "대관료 결제 후 확인이 되어야 예약 확정 (준비해야 할 사항이 있으면 사전 안내)",
           "촬영장은 저장형 카메라용 SD카드 또는 여장하드를 반드시 준비",
         ],
       },
@@ -248,7 +248,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "IT강의실",
     capacity: 18,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -265,7 +265,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "아트실",
     capacity: 20,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -281,7 +281,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "힐링강의실",
     capacity: 20,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
@@ -296,7 +296,7 @@ export const ROOMS: SpaceRoom[] = [
     name: "마루강의실",
     capacity: 25,
     durationLimitHours: 6,
-    // 시간당 대관 이용료
+    // 시간당 대관료
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",

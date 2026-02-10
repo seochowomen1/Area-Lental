@@ -92,7 +92,7 @@ export default function MyClient({ token }: { token: string }) {
 
   return (
     <div>
-      <SiteHeader title="내 예약 조회" backHref="/" backLabel="처음으로" />
+      <SiteHeader title="내 신청 조회" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
         {!hasToken ? (

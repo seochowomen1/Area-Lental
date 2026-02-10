@@ -208,7 +208,7 @@ export default function ResultClient() {
 
   return (
     <div>
-      <SiteHeader title="예약 내역 조회" backHref="/" backLabel="홈" />
+      <SiteHeader title="신청 결과 조회" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
         <Card pad="lg" className="space-y-5">
@@ -306,7 +306,7 @@ export default function ResultClient() {
 
                 <div className="flex items-center justify-end px-3 py-6">
                   <div className="text-lg font-bold text-slate-900">
-                    결제하실 금액 : {formatKRW(data.payableFeeKRW)}
+                    최종 금액 : {formatKRW(data.payableFeeKRW)}
                   </div>
                 </div>
               </div>
@@ -319,22 +319,22 @@ export default function ResultClient() {
 
               {rejectedOnly && <Notice variant="danger">반려 사유: {data.rejectReason || "-"}</Notice>}
 
-              {/* 예약정보 */}
+              {/* 신청 정보 */}
               <section>
                 <div className="mb-4 flex items-center gap-2">
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">⏰</span>
-                  <h3 className="text-lg font-bold text-slate-900">예약정보</h3>
+                  <h3 className="text-lg font-bold text-slate-900">신청 정보</h3>
                 </div>
                 <div className="overflow-x-auto border-t-2 border-slate-900">
                   <table className="w-full text-sm">
                     <tbody>
-                      <Row label="예약번호" value={data.requestId} />
-                      <Row label="예약등록일시" value={data.createdAt || "-"} />
-                      <Row label="사업명" value={data.orgName || "-"} />
-                      <Row label="신청자 이름" value={data.applicantName || "-"} />
+                      <Row label="신청번호" value={data.requestId} />
+                      <Row label="신청일시" value={data.createdAt || "-"} />
+                      <Row label="단체명" value={data.orgName || "-"} />
+                      <Row label="성명" value={data.applicantName || "-"} />
                       <Row label="연락처" value={data.phone || "-"} />
-                      <Row label="인원수" value={Number.isFinite(data.headcount) ? `${data.headcount}명` : "-"} />
-                      <Row label="요청사항" value={data.purpose || ""} />
+                      <Row label="인원" value={Number.isFinite(data.headcount) ? `${data.headcount}명` : "-"} />
+                      <Row label="사용 목적" value={data.purpose || ""} />
                     </tbody>
                   </table>
                 </div>

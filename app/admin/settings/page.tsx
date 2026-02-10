@@ -87,7 +87,7 @@ export default async function AdminSettingsPage({
       <div className="mt-6">
         <Card pad="md">
           <div className="flex items-center justify-between gap-3">
-            <div className="text-sm font-semibold text-slate-900">대관 이용료 안내(시간당)</div>
+            <div className="text-sm font-semibold text-slate-900">대관료 안내(시간당)</div>
             <div className="text-xs text-slate-500">※ 기자재 사용료 별도</div>
           </div>
 

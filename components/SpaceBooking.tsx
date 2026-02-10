@@ -497,7 +497,7 @@ export default function SpaceBooking({
               <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
                   <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 대관 이용료</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
                 </div>
                 {hourlyFee > 0 ? (
                   <div className="px-4 py-3">
@@ -520,7 +520,7 @@ export default function SpaceBooking({
                 ) : (
                   <div className="px-4 py-3">
                     <p className="text-sm text-slate-700">
-                      선택하신 이용시간 기준 <b>대관 이용료는 별도 협의</b> 대상입니다.
+                      선택하신 이용시간 기준 <b>대관료는 별도 협의</b> 대상입니다.
                     </p>
                     <p className="mt-2 text-[11px] text-slate-400">※ 기자재 사용료 별도</p>
                   </div>

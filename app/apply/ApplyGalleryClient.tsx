@@ -348,7 +348,7 @@ export default function ApplyGalleryClient() {
 
   const sessionCount = sessionsBundle.sessions.length;
 
-  // 대관비 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
     if (!sessionsBundle.sessions.length) return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
     let weekdays = 0;
@@ -485,9 +485,9 @@ export default function ApplyGalleryClient() {
               </div>
             </Card>
 
-            {/* 예상 대관비 */}
+            {/* 예상 대관료 */}
             <Card pad="lg">
-              <h3 className={SECTION_TITLE}>예상 대관비</h3>
+              <h3 className={SECTION_TITLE}>예상 대관료</h3>
               <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="px-4 py-3 space-y-2">
                   {feeBreakdown.weekdays > 0 && (
@@ -612,12 +612,12 @@ export default function ApplyGalleryClient() {
               ) : null}
             </div>
 
-            {/* 대관비 자동 계산 */}
+            {/* 대관료 자동 계산 */}
             {sessionCount > 0 && (
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
                   <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 대관비</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="space-y-2">
@@ -922,9 +922,9 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
 
-          {/* 대관비 */}
+          {/* 대관료 */}
           <div>
-            <h4 className="font-semibold mb-2">대관비 기준 (1일 기준)</h4>
+            <h4 className="font-semibold mb-2">대관료 기준 (1일 기준)</h4>
             <div className="overflow-hidden rounded-md border">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">

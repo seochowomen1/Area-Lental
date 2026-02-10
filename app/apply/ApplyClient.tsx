@@ -628,7 +628,7 @@ export default function ApplyClient() {
               <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>대관 이용료{bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}</span>
+                    <span>대관료{bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}</span>
                     <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
                   </div>
                   <div className="flex items-center justify-between text-sm text-slate-600">
@@ -879,7 +879,7 @@ export default function ApplyClient() {
               <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
                   <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 대관 이용료</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="space-y-2">
@@ -945,7 +945,7 @@ export default function ApplyClient() {
                 <Input
                   id="address"
                   {...register("address")}
-                  placeholder="서울특별시 서운로26길 3, 4층"
+                  placeholder="서울특별시 서초구 서운로26길 3, 4층"
                 />
                 {errors.address ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
               </div>
@@ -1027,16 +1027,16 @@ export default function ApplyClient() {
             <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
               <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
                 <span className="text-base">💰</span>
-                <span className="text-sm font-bold text-slate-800">대관 이용료 및 장비 사용료</span>
+                <span className="text-sm font-bold text-slate-800">대관료 및 장비 사용료</span>
               </div>
               <div className="px-4 py-3">
                 <div className="space-y-2">
                   <div className="flex items-center justify-between text-sm text-slate-600">
                     <span>
                       {bundle.sessionCount > 1 ? (
-                        <>대관 이용료 ({bundle.sessionCount}회차 · {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"})</>
+                        <>대관료 ({bundle.sessionCount}회차 · {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"})</>
                       ) : (
-                        <>대관 이용료 {durationMinutes ? `(${fmtDuration(durationMinutes)})` : ""}</>
+                        <>대관료 {durationMinutes ? `(${fmtDuration(durationMinutes)})` : ""}</>
                       )}
                     </span>
                     <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>

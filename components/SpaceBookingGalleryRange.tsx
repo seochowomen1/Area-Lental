@@ -66,7 +66,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     return diffDaysInclusive(startDate, endDate);
   }, [startDate, endDate]);
 
-  // 대관비 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) {
       return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
@@ -380,12 +380,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         {!error && days > 0 ? <FieldHelp>선택 기간: {days}일 (일요일 제외/준비일 포함은 서버에서 자동 계산됩니다)</FieldHelp> : null}
       </div>
 
-      {/* 대관비 자동 계산 */}
+      {/* 대관료 자동 계산 */}
       {!error && days > 0 && (feeBreakdown.weekdays > 0 || feeBreakdown.saturdays > 0) && (
         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
           <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
             <span className="text-base">💰</span>
-            <span className="text-sm font-bold text-slate-800">예상 대관비</span>
+            <span className="text-sm font-bold text-slate-800">예상 대관료</span>
           </div>
           <div className="px-4 py-3">
             <div className="space-y-2">
