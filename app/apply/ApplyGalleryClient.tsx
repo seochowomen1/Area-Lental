@@ -334,10 +334,18 @@ export default function ApplyGalleryClient() {
       const requestId = data?.requestId;
       const batchId = String(data?.batchId ?? "");
       const count = Number(data?.count ?? 1);
+      const token = String(data?.token ?? "");
+
+      // localStorage에 토큰 저장 (이메일 인증 없이 내 신청 조회 가능)
+      if (token) {
+        try { localStorage.setItem("applicantToken", token); } catch {}
+      }
+
       const qp = new URLSearchParams();
       if (requestId) qp.set("requestId", requestId);
       if (batchId) qp.set("batchId", batchId);
       if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
+      if (token) qp.set("token", token);
       router.push(qp.toString() ? `/success?${qp.toString()}` : "/success");
     } catch (e: any) {
       setError(e?.message ?? "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");

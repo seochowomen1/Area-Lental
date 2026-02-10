@@ -15,6 +15,7 @@ import {
   sendApplicantReceivedEmailBatch
 } from "@/lib/mail";
 import { logger } from "@/lib/logger";
+import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import type { RequestStatus } from "@/lib/types";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
@@ -454,13 +455,25 @@ export async function POST(req: Request) {
       date: (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
     });
 
+    // 신청 직후 결과 확인용 토큰 발급 (7일 유효)
+    let applicantToken = "";
+    try {
+      applicantToken = createApplicantLinkToken({
+        email: input.email,
+        ttlSeconds: 7 * 24 * 60 * 60,
+      });
+    } catch {
+      // 토큰 발급 실패해도 신청 자체는 성공 처리
+    }
+
     return NextResponse.json(
       {
         ok: true,
         requestId: savedList[0]?.requestId,
         batchId: batchId ?? "",
         count: savedList.length,
-        requestIds: savedList.map((r) => r.requestId)
+        requestIds: savedList.map((r) => r.requestId),
+        token: applicantToken,
       },
       { status: 200 }
     );

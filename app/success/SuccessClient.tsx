@@ -12,6 +12,14 @@ export default function SuccessClient() {
   const requestId = sp.get("requestId");
   const batchId = sp.get("batchId");
   const count = Number(sp.get("count") ?? "1");
+  const token = sp.get("token") ?? "";
+
+  // 결과 확인 링크 생성 (토큰이 있으면 토큰으로, 없으면 수동 입력 페이지)
+  const resultHref = token && requestId
+    ? `/result?requestId=${encodeURIComponent(requestId)}&token=${encodeURIComponent(token)}`
+    : `/result${requestId ? `?requestId=${encodeURIComponent(requestId)}` : ""}`;
+
+  const myHref = token ? `/my?token=${encodeURIComponent(token)}` : "/my";
 
   return (
     <div>
@@ -60,16 +68,21 @@ export default function SuccessClient() {
             <ul className="list-disc space-y-1.5 pl-5 text-sm">
               <li>담당자가 신청 내용을 확인한 후 <b>승인 또는 반려</b> 결과를 이메일로 알려드립니다.</li>
               <li>승인 후 <b>대관료를 납부</b>하시면 예약이 최종 확정됩니다.</li>
-              <li>신청 내역은 이메일 주소로 조회할 수 있습니다.</li>
+              <li>아래 버튼으로 바로 신청 결과를 확인할 수 있습니다.</li>
             </ul>
           </Notice>
 
           {/* 버튼 그룹 */}
           <div className="flex flex-col gap-3 sm:flex-row">
-            <LinkButton href="/my" variant="outline" className="flex-1 justify-center py-3">
+            {token && requestId ? (
+              <LinkButton href={resultHref} variant="primary" className="flex-1 justify-center py-3">
+                신청 결과 바로 확인
+              </LinkButton>
+            ) : null}
+            <LinkButton href={myHref} variant={token ? "outline" : "primary"} className="flex-1 justify-center py-3">
               내 신청 조회
             </LinkButton>
-            <LinkButton href="/" variant="primary" className="flex-1 justify-center py-3">
+            <LinkButton href="/" variant="outline" className="flex-1 justify-center py-3">
               홈으로 돌아가기
             </LinkButton>
           </div>

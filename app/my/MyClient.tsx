@@ -37,7 +37,17 @@ type ApiResp =
   | { ok: false; message: string }
   | { ok: true; email: string; current: MyListGroup[]; past: MyListGroup[] };
 
-export default function MyClient({ token }: { token: string }) {
+const STORAGE_KEY = "applicantToken";
+
+function getSavedToken(): string {
+  try { return localStorage.getItem(STORAGE_KEY) ?? ""; } catch { return ""; }
+}
+
+function clearSavedToken() {
+  try { localStorage.removeItem(STORAGE_KEY); } catch {}
+}
+
+export default function MyClient({ token: urlToken }: { token: string }) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [sending, setSending] = useState(false);
@@ -46,17 +56,42 @@ export default function MyClient({ token }: { token: string }) {
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<ApiResp | null>(null);
 
-  const hasToken = !!token;
+  // URL 토큰 우선, 없으면 localStorage 토큰 사용
+  const [activeToken, setActiveToken] = useState(urlToken);
 
   useEffect(() => {
-    if (!hasToken) return;
+    if (urlToken) {
+      setActiveToken(urlToken);
+      return;
+    }
+    const saved = getSavedToken();
+    if (saved) setActiveToken(saved);
+  }, [urlToken]);
+
+  const hasToken = !!activeToken;
+
+  useEffect(() => {
+    if (!activeToken) return;
     setLoading(true);
-    fetch(`/api/public/my/list?token=${encodeURIComponent(token)}`)
+    fetch(`/api/public/my/list?token=${encodeURIComponent(activeToken)}`)
       .then((r) => r.json())
-      .then((j) => setResp(j))
-      .catch(() => setResp({ ok: false, message: "조회 중 오류가 발생했습니다." }))
+      .then((j: ApiResp) => {
+        setResp(j);
+        // 토큰 인증 실패 시 localStorage 정리
+        if (!j.ok && !urlToken) {
+          clearSavedToken();
+          setActiveToken("");
+        }
+      })
+      .catch(() => {
+        setResp({ ok: false, message: "조회 중 오류가 발생했습니다." });
+        if (!urlToken) {
+          clearSavedToken();
+          setActiveToken("");
+        }
+      })
       .finally(() => setLoading(false));
-  }, [hasToken, token]);
+  }, [activeToken, urlToken]);
 
   const view = useMemo(() => {
     if (!resp) return null;
@@ -86,8 +121,8 @@ export default function MyClient({ token }: { token: string }) {
   }
 
   function openResult(requestId: string) {
-    // 토큰으로 인증하고 /result에서 조회하도록 이동
-    router.push(`/result?requestId=${encodeURIComponent(requestId)}&token=${encodeURIComponent(token)}`);
+    const t = activeToken || urlToken;
+    router.push(`/result?requestId=${encodeURIComponent(requestId)}&token=${encodeURIComponent(t)}`);
   }
 
   return (
