@@ -1041,33 +1041,6 @@ export default function ApplyClient() {
             </div>
           </Card>
 
-          {isStudioRoom && (
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>E-스튜디오 비치물품 안내</h3>
-              <div className="mt-3 overflow-hidden rounded-xl border border-slate-200">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50">
-                      <th className="px-3 py-2 text-left text-xs font-semibold text-slate-700">촬영장비</th>
-                      <th className="px-3 py-2 text-right text-xs font-semibold text-slate-700">사용료</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
-                      <tr key={key}>
-                        <td className="px-3 py-1.5 text-xs text-slate-700">{STUDIO_EQUIPMENT_LABELS[key]}</td>
-                        <td className="px-3 py-1.5 text-right text-xs font-semibold text-slate-900 tabular-nums">{STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <FieldHelp className="mt-2">
-                ※ 촬영장비는 대관 이용시간 중 1일 1회 과금됩니다. 아래 장비 사용 항목에서 필요한 장비를 선택해 주세요.
-              </FieldHelp>
-            </Card>
-          )}
-
           <Card pad="lg">
             <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용(선택)" : "장비 사용(선택)"}</h3>
             {isStudioRoom ? (
