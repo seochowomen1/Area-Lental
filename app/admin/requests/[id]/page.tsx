@@ -213,7 +213,7 @@ export default async function AdminRequestDetail({
                 target="_blank"
                 className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
-                서약서
+                신청서 · 서약서
               </Link>
             )}
             <Link

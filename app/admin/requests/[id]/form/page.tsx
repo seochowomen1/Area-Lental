@@ -136,6 +136,16 @@ export default async function AdminRequestFormPage({
     { key: "audio" as const, label: "음향장비", fee: EQUIPMENT_FEE_KRW.audio },
   ];
 
+  /* ── studio equipment items (이미지 원문 기반) ── */
+  const studioEquipmentItems = [
+    { label: "미러리스 소니 알파 A6400 (배터리 NP-FW50 + 128G SD 메모리 + AC-UUD12충전기)", fee: 10000 },
+    { label: "캠코더 sony FDR-AX700", fee: 10000 },
+    { label: "보야 듀얼 채널 무선 마이크 5개", fee: 10000 },
+    { label: "보야 핀 마이크 1개", fee: 5000 },
+    { label: "로데 비디오 마이크 + 마이크 스탠드 로데 PSA1", fee: 10000 },
+    { label: "전자칠판(65인치) + 모니터링 모니터(43인치) + LG노트북", fee: 20000 },
+  ];
+
   /* ── fee detail string ── */
   const baseFeeKRW = feeBasis.totalFeeKRW;
   const discountStr =
@@ -548,16 +558,292 @@ export default async function AdminRequestFormPage({
           </div>
         )}
 
+        {/* ════════════════════════════════════════════════════ */}
+        {/* ═══ PAGE 1-B: E-스튜디오 대관 신청서 (스튜디오 전용) ═══ */}
+        {/* ════════════════════════════════════════════════════ */}
+        {!isLecture && (
+          <div className="page-section">
+            {/* ── 문서 헤더 ── */}
+            <div className="text-center">
+              <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
+                서초여성가족플라자 서초센터
+              </h1>
+              <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+                E-스튜디오 대관 신청서
+              </h2>
+            </div>
+
+            {/* ── 1. 신청자 정보 ── */}
+            <table className="mt-3 w-full border-collapse print:mt-2">
+              <tbody>
+                <tr>
+                  <th className={TH} rowSpan={2} style={{ width: "14%", textAlign: "center", verticalAlign: "middle" }}>
+                    신청지방
+                    <br />
+                    <span className="font-normal text-gray-500 print:text-[7px]">(입금지방)</span>
+                  </th>
+                  <td className={TD} rowSpan={2} style={{ width: "36%", verticalAlign: "middle" }}>
+                    {req.applicantName}
+                  </td>
+                  <th className={TH} style={{ width: "14%" }}>연락처</th>
+                  <td className={TD} style={{ width: "36%" }}>{req.phone}</td>
+                </tr>
+                <tr>
+                  <th className={TH}>E-mail</th>
+                  <td className={TD}>{req.email}</td>
+                </tr>
+                <tr>
+                  <th className={TH} style={{ textAlign: "center" }}>주소</th>
+                  <td className={TD} colSpan={3}>{req.address || "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* ── 신청내역 헤더 ── */}
+            <div className="mt-2 border border-gray-400 bg-blue-50 px-3 py-1 text-center text-[11px] font-bold text-blue-900 print:mt-1.5 print:text-[9px]">
+              신청내역
+            </div>
+
+            {/* ── 2. E-스튜디오 대관 + 촬영장비 ── */}
+            <table className="w-full border-collapse">
+              <tbody>
+                {/* 대관 기본 */}
+                <tr>
+                  <th className={TH} style={{ width: "6%", textAlign: "center", verticalAlign: "middle" }}>1.</th>
+                  <td className={TD} colSpan={2}>
+                    E-스튜디오 대관 (기본 인원 2명 / 1시간)
+                  </td>
+                  <td className={TD_R} style={{ width: "14%" }}>20,000원</td>
+                  <td className={`${TD} text-center`} style={{ width: "8%" }}>■</td>
+                </tr>
+
+                {/* 촬영장비 */}
+                {studioEquipmentItems.map((eq, idx) => (
+                  <tr key={idx}>
+                    {idx === 0 && (
+                      <th className={TH} rowSpan={studioEquipmentItems.length} style={{ textAlign: "center", verticalAlign: "middle" }}>
+                        2.
+                      </th>
+                    )}
+                    {idx === 0 && (
+                      <td className={TH} rowSpan={studioEquipmentItems.length} style={{ textAlign: "center", verticalAlign: "middle", width: "12%" }}>
+                        촬영장비
+                      </td>
+                    )}
+                    <td className={TD}>{eq.label}</td>
+                    <td className={TD_R}>{formatKRW(eq.fee)}</td>
+                    <td className={`${TD} text-center`}>□</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* ── 2-1. 장비 사용 동의 ── */}
+            <div className="border border-t-0 border-gray-400 px-3 py-1.5 text-[10px] leading-snug text-gray-800 print:text-[8px]">
+              <b>2-1.</b> E-스튜디오 장비 및 시설 사용목록(별지 제2호 서식) 내용을 확인하였으며
+              이용규칙을 준수하여 시설 내 장비를 사용할 것을 동의합니다.
+            </div>
+
+            {/* ── 3. 이용목적 / 이용인원 / 대관일시 / 참여비용 ── */}
+            <table className="mt-2 w-full border-collapse print:mt-1.5">
+              <tbody>
+                <tr>
+                  <th className={TH} style={{ width: "18%" }}>
+                    이용목적
+                    <br />
+                    <span className="font-normal text-gray-500 print:text-[7px]">(촬영내용)</span>
+                  </th>
+                  <td className={TD} colSpan={3}>
+                    {req.purpose || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>이용인원</th>
+                  <td className={TD} colSpan={3}>{req.headcount}명</td>
+                </tr>
+                <tr>
+                  <th className={TH}>
+                    대관일시
+                    <br />
+                    <span className="font-normal text-gray-500 print:text-[7px]">(일자/시간)</span>
+                  </th>
+                  <td className={TD} colSpan={3}>
+                    {isBatch ? (
+                      <span className="print:text-[8px]">
+                        {sessions.map((s, i) => (
+                          <span key={s.requestId}>
+                            {i > 0 && " / "}
+                            {i + 1}회 {s.date} {s.startTime}~{s.endTime}(
+                            {computeDurationHours(s.startTime, s.endTime)}h)
+                          </span>
+                        ))}
+                      </span>
+                    ) : (
+                      <span>
+                        {req.date} &nbsp; {req.startTime} ~ {req.endTime} (
+                        {computeDurationHours(req.startTime, req.endTime)}시간)
+                      </span>
+                    )}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>참여비용</th>
+                  <td className={TD} colSpan={3}>
+                    <span className="font-semibold">
+                      {formatKRW(baseFeeKRW)}
+                    </span>
+                    {feeBasis.discountAmountKRW > 0 && (
+                      <>
+                        {" → "}
+                        <span className="font-extrabold">
+                          {formatKRW(feeBasis.finalFeeKRW)}
+                        </span>
+                        <span className="text-[10px] text-gray-600 print:text-[8px]">
+                          {" "}({discountStr})
+                        </span>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* ── 4. 배치 회차 상세 (다회차) ── */}
+            {isBatch && (
+              <table className="mt-2 w-full border-collapse print:mt-1.5">
+                <thead>
+                  <tr>
+                    <th className={TH}>회차</th>
+                    <th className={TH}>일자</th>
+                    <th className={TH}>시간</th>
+                    <th className={TH}>상태</th>
+                    <th className={TH} style={{ textAlign: "right" }}>이용료</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s, i) => {
+                    const base = computeBaseTotalKRW(s);
+                    return (
+                      <tr key={s.requestId}>
+                        <td className={`${TD} text-center`}>{i + 1}</td>
+                        <td className={TD}>{s.date}</td>
+                        <td className={TD}>{s.startTime}~{s.endTime}</td>
+                        <td className={`${TD} text-center`}>{s.status}</td>
+                        <td className={TD_R}>{formatKRW(base.totalFeeKRW)}</td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <th className={TH} colSpan={4} style={{ textAlign: "right" }}>합계</th>
+                    <td className={`${TD_R} font-bold`}>{formatKRW(baseFeeKRW)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+
+            {/* ── 5. 개인정보 수집·이용 안내 (E-스튜디오) ── */}
+            <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
+              <h3 className="text-center text-[11px] font-bold text-blue-900 print:text-[9px]">
+                개인정보 수집 · 이용에 관한 안내
+              </h3>
+              <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      개인정보의 수집이용 목적
+                    </th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      수집이용하려는 개인정보 항목
+                    </th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      개인정보 이용기간 및 보유기간
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      E-스튜디오 대관 신청업무 처리 및
+                      <br />
+                      본인 식별, 의사소통, 수수료 등
+                      <br />
+                      관련 업무
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      이름, 연락처, E-mail, 주소
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      E-스튜디오 이용완료 일 해당
+                      <br />
+                      1년
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+                ※ 위의 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다.
+                다만 위 제공사항은 이용신청에 반드시 필요한 사항으로 거부하실 경우 이용에 일부 제한이 있습니다.
+              </p>
+              <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
+                <span className="font-bold text-gray-900">[필수]</span>
+                <span>
+                  위와 같이 개인정보의 수집 및 이용에 동의합니까?
+                </span>
+                <span className="ml-auto flex items-center gap-2">
+                  <span>{req.privacyAgree ? "■" : "□"} 동의함</span>
+                  <span>{req.privacyAgree ? "□" : "■"} 동의하지 않음</span>
+                </span>
+              </div>
+            </div>
+
+            {/* ── 6. 전자 동의 확인 ── */}
+            <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+                [전자 동의 확인]
+              </h4>
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
+                <span>신청 일시: {consentDate}</span>
+                <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
+                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
+              </div>
+              <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
+                본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
+                신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+              </p>
+            </div>
+
+            {/* ── 서명란 ── */}
+            <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+              <p>
+                위와 같이 서초여성가족플라자 서초센터 E-스튜디오 대관을 신청합니다.
+              </p>
+              <p className="mt-2">{printDate}</p>
+              <p className="mt-2">
+                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+              </p>
+            </div>
+
+            {/* ── 푸터 ── */}
+            <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
+              <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
+              <p>*대관규정 서약서 별도 첨부</p>
+              {req.requestId && (
+                <p className="mt-0.5 text-gray-400">
+                  신청번호: {req.requestId} | 출력일: {printDate}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
         {/* ════════════════════════════════════════════ */}
         {/* ═══ PAGE 2: 대관규정 서약서 ═══ */}
         {/* ════════════════════════════════════════════ */}
-        <div className={isLecture ? "page-section mt-10 print:mt-0" : ""}>
+        <div className="page-section mt-10 print:mt-0">
           {/* 화면에서 신청서와 서약서 사이 구분선 (인쇄 시 숨김) */}
-          {isLecture && (
-            <div className="no-print mb-6 border-t-4 border-dashed border-gray-300 pt-4 text-center text-xs text-gray-400">
-              ─── 서약서 (인쇄 시 2페이지) ───
-            </div>
-          )}
+          <div className="no-print mb-6 border-t-4 border-dashed border-gray-300 pt-4 text-center text-xs text-gray-400">
+            ─── 서약서 (인쇄 시 2페이지) ───
+          </div>
 
           {/* ── 문서 헤더 ── */}
           <div className="text-center">
