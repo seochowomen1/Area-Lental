@@ -19,7 +19,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
       )}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
-        {/* 이미지 추가 방법: public/rooms/... 에 넣고 room.image를 "/rooms/파일명.jpg" 로 설정 */}
+        {/* 이미지 추가 방법: public/room/... 에 넣고 room.image를 "/room/파일명.jpg" 로 설정 */}
         {room.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

@@ -79,7 +79,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
-    image: "/rooms/bookcafe.png",
+    image: "/room/bookcafe.jpg",
     note: "조용한 독서 및 소규모 모임에 적합한 공간입니다.",
     equipment: [
       {
@@ -105,7 +105,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
-    image: "/rooms/classroom_all.png",
+    image: "/room/classroom_all.jpg",
     note: "다양한 활동이 가능한 다목적 공간입니다.",
     equipment: [
       {
@@ -172,6 +172,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/sangsang1.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["현장 운영 상황에 따라 비치물품은 변동될 수 있습니다."] },
@@ -187,6 +188,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 50000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/sangsang2.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["현장 운영 상황에 따라 비치물품은 변동될 수 있습니다."] },
@@ -202,6 +204,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/sangsang3.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["현장 운영 상황에 따라 비치물품은 변동될 수 있습니다."] },
@@ -254,6 +257,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/it.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "기자재(운영 상황에 따라 제공)", items: ["PC/주변기기 제공 여부는 운영 상황에 따라 달라질 수 있습니다."] },
@@ -271,6 +275,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 70000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/art.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["미술 재료(물감/접착제 등) 사용 시 오염 방지를 위한 보호 조치를 부탁드립니다.", "이용 종료 후 원상복구 및 정리정돈을 완료해 주시기 바랍니다."] },
@@ -287,6 +292,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/healing.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블(운영 형태에 따라 상이)", "의자", "전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["프로그램 성격상 조용한 이용을 부탁드립니다.", "현장 운영 상황에 따라 좌석/배치 형태는 변경될 수 있습니다."] },
@@ -302,6 +308,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 100000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/maru.jpg",
     equipment: [
       { title: "기본 비치", items: ["전원(콘센트)", "냉·난방", "조명"] },
       { title: "이용 유의", items: ["마루 바닥 보호를 위해 실내화 착용 등 센터 안내에 따라 이용해 주시기 바랍니다."] },
