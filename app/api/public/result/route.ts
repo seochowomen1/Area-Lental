@@ -43,7 +43,12 @@ function paymentLabel(status: string) {
   return status === "승인" ? "결제대기" : "미결제";
 }
 
-function reservationLabel() {
+function reservationLabel(status: string, decidedBy?: string) {
+  if (status === "취소") {
+    if ((decidedBy ?? "").includes("사용자")) return "사용자취소";
+    return "예약취소";
+  }
+  if (status === "반려") return "반려";
   return "신청완료";
 }
 
@@ -110,7 +115,7 @@ export async function POST(req: Request) {
   const meta = roomMeta(representative.roomId);
 
   const approvalStatusText = approvalLabel(overallStatus, overallDecidedBy);
-  const reservationStatusText = reservationLabel();
+  const reservationStatusText = reservationLabel(overallStatus, overallDecidedBy);
   const paymentStatusText = paymentLabel(overallStatus);
 
   const payableFeeKRW = feeAvailable ? fee.finalFeeKRW : estimateFee.finalFeeKRW;
@@ -118,7 +123,7 @@ export async function POST(req: Request) {
   // 사용자 취소 가능 여부
   // - 이미 취소된 건이 포함되면 불가
   // - 묶음이면 전체 기준으로 판단
-  const cancelable = sessions.every((s) => s.status !== "취소");
+  const cancelable = !["취소", "반려"].includes(overallStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
   return NextResponse.json({
     ok: true,

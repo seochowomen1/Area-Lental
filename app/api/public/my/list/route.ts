@@ -102,7 +102,7 @@ export async function GET(req: Request) {
             : `${rep.date} (일 단위)`)
         : `${rep.date} ${rep.startTime}-${rep.endTime}`;
       const past = sessions.every((s) => isPast(s, nowYmd, nowMin));
-      const cancelable = sessions.every((s) => s.status !== "취소");
+      const cancelable = !["취소", "반려"].includes(displayStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
       return {
         key,
@@ -130,10 +130,11 @@ export async function GET(req: Request) {
     })
     .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
 
-  const current = groups.filter((g) => !g.past);
-  const past = groups.filter((g) => g.past);
+  const current = groups.filter((g) => !g.past && !["취소", "반려"].includes(g.status));
+  const past = groups.filter((g) => g.past && !["취소", "반려"].includes(g.status));
+  const cancelled = groups.filter((g) => ["취소", "반려"].includes(g.status));
 
-  return NextResponse.json({ ok: true, email, current, past });
+  return NextResponse.json({ ok: true, email, current, past, cancelled });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return NextResponse.json({ ok: false, message }, { status: 500 });

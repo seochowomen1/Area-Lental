@@ -263,7 +263,6 @@ export default function ResultClient() {
                         <th className="px-3 py-4">예약일시</th>
                         <th className="px-3 py-4">승인상태</th>
                         <th className="px-3 py-4">예약상태</th>
-                        <th className="px-3 py-4">결제상태</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -300,9 +299,6 @@ export default function ResultClient() {
                         </td>
                         <td className="px-3 py-5">
                           <OutlinedBadge variant={badgeVariant(data.reservationStatusText)}>{data.reservationStatusText}</OutlinedBadge>
-                        </td>
-                        <td className="px-3 py-5">
-                          <OutlinedBadge variant={badgeVariant(data.paymentStatusText)}>{data.paymentStatusText}</OutlinedBadge>
                         </td>
                       </tr>
                     </tbody>
@@ -359,7 +355,16 @@ export default function ResultClient() {
                           <th className="w-48 bg-slate-50 px-4 py-4 text-left font-semibold">예약상태</th>
                           <td className="px-4 py-4">
                             <span className="text-red-600">
-                              ※ 예약이 {(data.decidedBy || "").includes("사용자") ? "사용자취소" : "취소"} 되었습니다.
+                              ※ 예약이 {(data.decidedBy || "").includes("사용자") ? "사용자에 의해 취소" : "취소"} 되었습니다.
+                            </span>
+                          </td>
+                        </tr>
+                      ) : data.status === "반려" ? (
+                        <tr className="border-b border-slate-200">
+                          <th className="w-48 bg-slate-50 px-4 py-4 text-left font-semibold">예약상태</th>
+                          <td className="px-4 py-4">
+                            <span className="text-red-600">
+                              ※ 신청이 반려 되었습니다.
                             </span>
                           </td>
                         </tr>

@@ -34,7 +34,7 @@ type MyListGroup = {
 
 type ApiResp =
   | { ok: false; message: string }
-  | { ok: true; email: string; current: MyListGroup[]; past: MyListGroup[] };
+  | { ok: true; email: string; current: MyListGroup[]; past: MyListGroup[]; cancelled: MyListGroup[] };
 
 const STORAGE_KEY = "applicantToken";
 
@@ -267,7 +267,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                 </section>
 
                 <section>
-                  <h2 className="text-lg font-bold text-slate-900">지난 신청 / 취소</h2>
+                  <h2 className="text-lg font-bold text-slate-900">지난 신청</h2>
                   <div className="mt-4 grid gap-3">
                     {view.past.length === 0 ? (
                       <div className="text-sm text-slate-600">내역이 없습니다.</div>
@@ -298,6 +298,42 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                     )}
                   </div>
                 </section>
+
+                {view.cancelled.length > 0 && (
+                  <section>
+                    <h2 className="text-lg font-bold text-slate-900">취소 · 반려</h2>
+                    <div className="mt-4 grid gap-3">
+                      {view.cancelled.map((g) => (
+                        <Card key={g.key} className="p-0 opacity-70">
+                          <div className="p-4">
+                            <div className="flex flex-wrap items-start justify-between gap-3">
+                              <div>
+                                <div className="text-sm font-semibold text-slate-900">{g.roomName}</div>
+                                <div className="mt-1 text-xs text-slate-600">{g.roomFloor ? `${g.roomFloor}층 · ` : ""}{g.dateTime}</div>
+                                <div className="mt-2 text-xs">
+                                  <span className={cn(
+                                    "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
+                                    g.status === "반려" ? "border-red-300 text-red-700 bg-red-50" : "border-orange-300 text-orange-700 bg-orange-50"
+                                  )}>
+                                    {g.status}
+                                  </span>
+                                </div>
+                              </div>
+
+                              <button
+                                type="button"
+                                onClick={() => openResult(g.requestId)}
+                                className={cn(BUTTON_BASE, BUTTON_VARIANT.outline, "rounded-full px-4 py-2 text-sm")}
+                              >
+                                상세조회
+                              </button>
+                            </div>
+                          </div>
+                        </Card>
+                      ))}
+                    </div>
+                  </section>
+                )}
               </div>
             ) : null}
           </div>
