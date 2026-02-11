@@ -103,6 +103,7 @@ export async function POST(req: Request) {
       genreContent: String(form.get("genreContent") ?? ""),
       awarenessPath: String(form.get("awarenessPath") ?? ""),
       specialNotes: String(form.get("specialNotes") ?? ""),
+      galleryRemovalTime: String(form.get("galleryRemovalTime") ?? ""),
 
       purpose: String(form.get("purpose") ?? ""),
 
