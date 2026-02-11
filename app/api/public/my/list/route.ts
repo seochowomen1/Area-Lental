@@ -96,12 +96,16 @@ export async function GET(req: Request) {
 
       const meta = roomMeta(rep.roomId);
       const isGallery = rep.roomId === "gallery";
+      const galleryDays = isGallery ? (rep.galleryExhibitionDayCount ?? sessions.length) : 0;
       const firstDateTime = isGallery
-        ? (isBatch && sessions.length > 0 && rep.startDate && rep.endDate
-            ? `${rep.startDate} ~ ${rep.endDate} (일 단위)`
+        ? (rep.startDate && rep.endDate
+            ? `${rep.startDate} ~ ${rep.endDate} (${galleryDays}일)`
             : `${rep.date} (일 단위)`)
         : `${rep.date} ${rep.startTime}-${rep.endTime}`;
-      const past = sessions.every((s) => isPast(s, nowYmd, nowMin));
+      // 갤러리 1행 형식: endDate 기준으로 과거 판단
+      const past = isGallery && !isBatch && rep.endDate
+        ? rep.endDate < nowYmd
+        : sessions.every((s) => isPast(s, nowYmd, nowMin));
       const cancelable = !["취소", "반려"].includes(displayStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
       return {

@@ -193,7 +193,17 @@ export async function POST(req: Request) {
     cancelable,
 
     // 반려 사유(묶음은 대표/첫회차 기준)
-    rejectReason: overallStatus === "반려" && approvedSessions.length === 0 ? (representative.rejectReason ?? "") : ""
+    rejectReason: overallStatus === "반려" && approvedSessions.length === 0 ? (representative.rejectReason ?? "") : "",
+
+    // 갤러리 전시 기간 정보
+    ...(representative.roomId === "gallery" ? {
+      startDate: representative.startDate ?? "",
+      endDate: representative.endDate ?? "",
+      galleryExhibitionDayCount: representative.galleryExhibitionDayCount ?? 0,
+      galleryWeekdayCount: representative.galleryWeekdayCount ?? 0,
+      gallerySaturdayCount: representative.gallerySaturdayCount ?? 0,
+      galleryPrepDate: representative.galleryPrepDate ?? "",
+    } : {}),
   });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";

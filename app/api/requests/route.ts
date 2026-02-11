@@ -265,10 +265,23 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const sameRoomSameDate = all.filter(
-        (r) => r.roomId === input.roomId && r.date === sess.date && conflictStatuses.includes(r.status)
-      );
-      const hasRequestConflict = sameRoomSameDate.some((r) => overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime));
+      const sameRoomSameDate = all.filter((r) => {
+        if (r.roomId !== input.roomId) return false;
+        if (!conflictStatuses.includes(r.status)) return false;
+        // 갤러리 1행 형식: 날짜 범위로 충돌 판정
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+          if (sess.date >= r.startDate && sess.date <= r.endDate && dayOfWeek(sess.date) !== 0) return true;
+          if (r.galleryPrepDate && sess.date === r.galleryPrepDate) return true;
+          return false;
+        }
+        // 기존 형식: 개별 날짜 매칭
+        return r.date === sess.date;
+      });
+      const hasRequestConflict = sameRoomSameDate.some((r) => {
+        // 갤러리 1행 형식은 시간대 겹침이 아니라 날짜 범위 겹침으로 이미 판정됨
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
+        return overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime);
+      });
       if (hasRequestConflict) {
         issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "CONFLICT", message: conflictMessage(input.roomId, sess.date, sess.startTime, sess.endTime) });
         continue;
@@ -359,8 +372,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const batchId = sessions.length > 1 ? `BAT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
-    const equipment = input.roomId === "gallery"
+    const isGallery = input.roomId === "gallery";
+    const equipment = isGallery
       ? { laptop: false, projector: false, audio: false, mirrorless: false, camcorder: false, wirelessMic: false, pinMic: false, rodeMic: false, electronicBoard: false }
       : {
           laptop: input.laptop, projector: input.projector, audio: input.audio,
@@ -368,17 +381,12 @@ export async function POST(req: Request) {
           pinMic: input.pinMic, rodeMic: input.rodeMic, electronicBoard: input.electronicBoard,
         };
 
-    const isGallery = input.roomId === "gallery";
-
-    // ✅ 갤러리(B안) 감사 로그: 서버가 생성한 결과를 기록(조작 방지/추적용)
+    // ✅ 갤러리: 감사 로그 + 일수 통계
     const galleryGeneratedAt = isGallery ? nowIsoSeoul() : undefined;
-    const galleryGenerationVersion = isGallery ? "gallery-gen-v1" : undefined;
+    const galleryGenerationVersion = isGallery ? "gallery-gen-v2" : undefined;
     const exhibitionSessions = isGallery ? sessions.filter((s) => !s.isPrepDay) : [];
     const galleryWeekdayCount = isGallery
-      ? exhibitionSessions.filter((s) => {
-          const dow = dayOfWeek(s.date);
-          return dow >= 1 && dow <= 5;
-        }).length
+      ? exhibitionSessions.filter((s) => { const dow = dayOfWeek(s.date); return dow >= 1 && dow <= 5; }).length
       : undefined;
     const gallerySaturdayCount = isGallery
       ? exhibitionSessions.filter((s) => dayOfWeek(s.date) === 6).length
@@ -398,57 +406,80 @@ export async function POST(req: Request) {
         })
       : undefined;
 
-    const appendInputs = sessions.map((s, i) => ({
-      roomId: input.roomId,
-      date: s.date,
-      startTime: s.startTime,
-      endTime: s.endTime,
+    let savedList: Awaited<ReturnType<typeof db.appendRequestsBatch>>;
+    let batchId: string | undefined;
 
-      batchId,
-      batchSeq: batchId ? i + 1 : undefined,
-      batchSize: batchId ? sessions.length : undefined,
+    if (isGallery) {
+      // ✅ 갤러리: 1행으로 저장 (startDate~endDate + 일수 통계)
+      const firstExhibition = exhibitionSessions[0] ?? sessions[0];
+      const singleRow = await db.appendRequest({
+        roomId: input.roomId,
+        date: galleryInput!.startDate,                  // 대표 날짜 = 전시 시작일
+        startTime: firstExhibition.startTime,           // 대표 시간
+        endTime: firstExhibition.endTime,
 
-      // gallery: prep day 표시
-      isPrepDay: isGallery ? (s.isPrepDay ? true : false) : undefined,
+        // batchId 없음 (1행 형식)
+        startDate: galleryInput!.startDate,
+        endDate: galleryInput!.endDate,
+        exhibitionTitle: galleryInput!.exhibitionTitle,
+        exhibitionPurpose: galleryInput!.exhibitionPurpose,
+        genreContent: galleryInput!.genreContent,
+        awarenessPath: galleryInput!.awarenessPath,
+        specialNotes: galleryInput!.specialNotes,
 
-      // gallery: 기간/전시 정보 저장(회차별 row에 반복 저장)
-      startDate: galleryInput?.startDate,
-      endDate: galleryInput?.endDate,
-      exhibitionTitle: galleryInput?.exhibitionTitle,
-      exhibitionPurpose: galleryInput?.exhibitionPurpose,
-      genreContent: galleryInput?.genreContent,
-      awarenessPath: galleryInput?.awarenessPath,
-      specialNotes: galleryInput?.specialNotes,
+        galleryGeneratedAt,
+        galleryGenerationVersion,
+        galleryWeekdayCount,
+        gallerySaturdayCount,
+        galleryExhibitionDayCount,
+        galleryPrepDate,
+        galleryAuditJson,
 
-      galleryGeneratedAt,
-      galleryGenerationVersion,
-      galleryWeekdayCount,
-      gallerySaturdayCount,
-      galleryExhibitionDayCount,
-      galleryPrepDate,
-      galleryAuditJson,
+        applicantName: input.applicantName,
+        birth: input.birth,
+        address: input.address,
+        phone: input.phone,
+        email: input.email,
+        orgName: input.orgName,
+        headcount: input.headcount,
+        equipment,
+        purpose: input.purpose,
+        attachments: uploadedUrls,
+        privacyAgree: input.privacyAgree,
+        pledgeAgree: input.pledgeAgree,
+        pledgeDate: input.pledgeDate,
+        pledgeName: input.pledgeName,
+      });
+      savedList = [singleRow];
+    } else {
+      // ✅ 강의실/스튜디오: 기존 묶음 저장
+      batchId = sessions.length > 1 ? `BAT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
 
-      applicantName: input.applicantName,
-      birth: input.birth,
-      address: input.address,
-      phone: input.phone,
-      email: input.email,
-
-      orgName: input.orgName,
-      headcount: input.headcount,
-
-      equipment,
-
-      purpose: input.purpose,
-      attachments: uploadedUrls,
-
-      privacyAgree: input.privacyAgree,
-      pledgeAgree: input.pledgeAgree,
-      pledgeDate: input.pledgeDate,
-      pledgeName: input.pledgeName
-    }));
-
-    const savedList = await db.appendRequestsBatch(appendInputs);
+      const appendInputs = sessions.map((s, i) => ({
+        roomId: input.roomId,
+        date: s.date,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        batchId,
+        batchSeq: batchId ? i + 1 : undefined,
+        batchSize: batchId ? sessions.length : undefined,
+        applicantName: input.applicantName,
+        birth: input.birth,
+        address: input.address,
+        phone: input.phone,
+        email: input.email,
+        orgName: input.orgName,
+        headcount: input.headcount,
+        equipment,
+        purpose: input.purpose,
+        attachments: uploadedUrls,
+        privacyAgree: input.privacyAgree,
+        pledgeAgree: input.pledgeAgree,
+        pledgeDate: input.pledgeDate,
+        pledgeName: input.pledgeName,
+      }));
+      savedList = await db.appendRequestsBatch(appendInputs);
+    }
 
     if (savedList.length > 1) {
       await sendAdminNewRequestEmailBatch(savedList);
@@ -463,10 +494,9 @@ export async function POST(req: Request) {
       batchId,
       count: savedList.length,
       roomId: input.roomId,
-      date: (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
+      date: isGallery ? galleryInput?.startDate : (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
     });
 
-    // 신청 직후 결과 확인용 토큰 발급 (7일 유효)
     let applicantToken = "";
     try {
       applicantToken = createApplicantLinkToken({

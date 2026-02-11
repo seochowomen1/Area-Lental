@@ -1,5 +1,6 @@
 import { dayOfWeek } from "@/lib/datetime";
 import { computeBaseTotalKRW, computeFeesForRequest, computeFeesForBundle, normalizeDiscount } from "@/lib/pricing";
+import { computeGalleryStats } from "@/lib/gallery";
 import type { RentalRequest } from "@/lib/types";
 
 // ─── dayOfWeek (타임존 안전 테스트) ───
@@ -147,6 +148,70 @@ describe("갤러리 묶음 요금 (computeFeesForBundle)", () => {
     expect(fee.totalFeeKRW).toBe(70000);
     expect(fee.finalFeeKRW).toBe(70000);
     expect(fee.discountAmountKRW).toBe(0);
+  });
+});
+
+// ─── 갤러리 1행 형식 요금 계산 ───
+
+describe("갤러리 1행 형식 요금 (computeBaseTotalKRW)", () => {
+  test("평일 3일 + 토 1일 = 70,000원 (단건 계산)", () => {
+    const result = computeBaseTotalKRW({
+      roomId: "gallery",
+      date: "2026-02-16",           // startDate
+      startTime: "09:00",
+      endTime: "18:00",
+      startDate: "2026-02-16",
+      endDate: "2026-02-21",
+      galleryWeekdayCount: 3,
+      gallerySaturdayCount: 1,
+      galleryExhibitionDayCount: 4,
+      equipment: {},
+    });
+    expect(result.rentalFeeKRW).toBe(70000);
+    expect(result.totalFeeKRW).toBe(70000);
+  });
+
+  test("batchId가 있으면 기존 다행 형식 (1일분)", () => {
+    const result = computeBaseTotalKRW({
+      roomId: "gallery",
+      date: "2026-02-16",           // 월요일
+      startTime: "09:00",
+      endTime: "18:00",
+      batchId: "BAT-old",
+      startDate: "2026-02-16",
+      endDate: "2026-02-21",
+      galleryWeekdayCount: 3,
+      gallerySaturdayCount: 1,
+      galleryExhibitionDayCount: 4,
+      isPrepDay: false,
+      equipment: {},
+    });
+    // batchId가 있으므로 기존 로직 적용 → 월요일 1일 = 20,000원
+    expect(result.rentalFeeKRW).toBe(20000);
+  });
+});
+
+// ─── computeGalleryStats ───
+
+describe("computeGalleryStats", () => {
+  test("2026-02-16(월) ~ 2026-02-21(토) → 평일4 + 토1 = 90,000원", () => {
+    // 월,화,수,목 = 평일4, 금 = 평일5? 아니 2/16=월~2/21=토
+    // 2/16(월), 2/17(화), 2/18(수), 2/19(목), 2/20(금), 2/21(토)
+    // 평일 5일 + 토 1일
+    const stats = computeGalleryStats("2026-02-16", "2026-02-21");
+    expect(stats.weekdayCount).toBe(5);
+    expect(stats.saturdayCount).toBe(1);
+    expect(stats.exhibitionDayCount).toBe(6);
+    expect(stats.totalFeeKRW).toBe(110000); // 5*20000 + 1*10000
+    expect(stats.prepDate).toBe("2026-02-14"); // 토요일 (시작일-1 = 2/15=일 → 2/14=토)
+  });
+
+  test("일요일은 자동 제외", () => {
+    // 2026-02-14(토) ~ 2026-02-16(월) → 토 + 월 (일요일 제외)
+    const stats = computeGalleryStats("2026-02-14", "2026-02-16");
+    expect(stats.exhibitionDayCount).toBe(2); // 토, 월
+    expect(stats.saturdayCount).toBe(1);
+    expect(stats.weekdayCount).toBe(1);
   });
 });
 

@@ -10,7 +10,7 @@ import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { getDatabase } from "@/lib/database";
 import { REQUEST_ID_LABEL } from "@/lib/labels";
 import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
-import { dayOfWeek } from "@/lib/datetime";
+
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
 
@@ -125,14 +125,11 @@ export default async function AdminRequestDetail({
   const sessions = req.batchId ? sortSessions(batchList.length ? batchList : [req]) : [req];
   const isBatch = !!req.batchId;
 
-  /* ── 갤러리 통계 ── */
-  const galleryExhibitionSessions = isGallery ? sessions.filter((s) => !s.isPrepDay) : [];
-  const galleryWeekdayCount = isGallery
-    ? galleryExhibitionSessions.filter((s) => { const dow = dayOfWeek(s.date); return dow >= 1 && dow <= 5; }).length
-    : 0;
-  const gallerySaturdayCount = isGallery ? galleryExhibitionSessions.filter((s) => dayOfWeek(s.date) === 6).length : 0;
-  const galleryExhibitionDayCount = isGallery ? galleryExhibitionSessions.length : 0;
-  const galleryPrepDate = isGallery ? (sessions.find((s) => s.isPrepDay)?.date || "") : "";
+  /* ── 갤러리 통계 (저장된 값 사용 — 1행/다행 형식 모두 호환) ── */
+  const galleryWeekdayCount = isGallery ? (req.galleryWeekdayCount ?? 0) : 0;
+  const gallerySaturdayCount = isGallery ? (req.gallerySaturdayCount ?? 0) : 0;
+  const galleryExhibitionDayCount = isGallery ? (req.galleryExhibitionDayCount ?? 0) : 0;
+  const galleryPrepDate = isGallery ? (req.galleryPrepDate ?? "") : "";
 
   /* ── 상태/요금 ── */
   const bundle = isBatch ? analyzeBundle(sessions) : null;
@@ -189,9 +186,19 @@ export default async function AdminRequestDetail({
               <span className={`text-xs font-semibold ${accent.text}`}>{categoryLabel}</span>
               <h1 className="text-lg font-bold text-gray-900">
                 {REQUEST_ID_LABEL} {req.requestId}
-                {isBatch && (
+                {isGallery && !isBatch && galleryExhibitionDayCount > 0 && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">
+                    전시 {galleryExhibitionDayCount}일
+                  </span>
+                )}
+                {isBatch && !isGallery && (
                   <span className="ml-2 text-sm font-normal text-gray-500">
                     묶음 · {sessions.length}회
+                  </span>
+                )}
+                {isBatch && isGallery && (
+                  <span className="ml-2 text-sm font-normal text-gray-500">
+                    묶음 · {sessions.length}일
                   </span>
                 )}
               </h1>
@@ -279,8 +286,8 @@ export default async function AdminRequestDetail({
             {isGallery ? (
               <>
                 <InfoRow label="전시 기간">
-                  {req.startDate || sessions.find((s) => !s.isPrepDay)?.date} ~ {req.endDate || sessions.slice().reverse().find((s) => !s.isPrepDay)?.date}
-                  {sessions.some((s) => s.isPrepDay) && <span className="ml-1 text-xs text-gray-500">(준비일 1일 포함)</span>}
+                  {req.startDate ?? req.date} ~ {req.endDate ?? req.date}
+                  {galleryPrepDate && <span className="ml-1 text-xs text-gray-500">(준비일 1일 포함)</span>}
                 </InfoRow>
                 <InfoRow label="전시일수">
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)

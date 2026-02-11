@@ -75,9 +75,13 @@ function formatPeriod(items: RentalRequest[]) {
       ? `${first.startTime}-${first.endTime}`
       : "시간 다양";
 
-  const countPart = s.length > 1
-    ? `${s.length}${isGallery ? "일" : "회"}`
-    : "";
+  // 갤러리 1행 형식: galleryExhibitionDayCount 사용, 다행 형식: 행 수
+  const galleryDayCount = isGallery && !first.batchId && (first.galleryExhibitionDayCount ?? 0) > 0
+    ? first.galleryExhibitionDayCount!
+    : s.length;
+  const countPart = isGallery
+    ? (galleryDayCount > 0 ? `${galleryDayCount}일` : "")
+    : s.length > 1 ? `${s.length}회` : "";
 
   return { datePart, timePart, countPart };
 }
@@ -171,7 +175,15 @@ export default async function AdminRequestsPage({
       return g.representative.roomId === roomId;
     })
     .filter((g) => (status === "all" ? true : g.groupStatus === (status as any)))
-    .filter((g) => (date ? g.items.some((r) => r.date === date) : true))
+    .filter((g) => {
+      if (!date) return true;
+      // 갤러리 1행 형식: 날짜 범위 내 포함 여부 확인
+      const rep = g.representative;
+      if (rep.roomId === "gallery" && !rep.batchId && rep.startDate && rep.endDate) {
+        return date >= rep.startDate && date <= rep.endDate;
+      }
+      return g.items.some((r) => r.date === date);
+    })
     .filter((g) => {
       if (!qLower) return true;
       const hay = [
@@ -372,7 +384,9 @@ export default async function AdminRequestsPage({
                       <td className="px-4 py-3">{r.roomName}</td>
                       <td className="px-4 py-3">
                         {r.roomId === "gallery"
-                          ? `${r.date} (${r.isPrepDay ? "준비일" : "전시일"})`
+                          ? (r.startDate && r.endDate && !r.batchId
+                              ? `${r.startDate} ~ ${r.endDate} (${r.galleryExhibitionDayCount ?? 0}일)`
+                              : `${r.date} (${r.isPrepDay ? "준비일" : "전시일"})`)
                           : `${r.date} ${r.startTime}-${r.endTime}`}
                       </td>
                       <td className="px-4 py-3 font-medium">{r.applicantName}</td>

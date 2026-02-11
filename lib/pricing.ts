@@ -29,6 +29,7 @@ export function computeDurationHours(startTime: string, endTime: string): number
 
 export function computeBaseTotalKRW(
   req: Pick<RentalRequest, "roomId" | "startTime" | "endTime" | "equipment" | "date" | "isPrepDay">
+    & Partial<Pick<RentalRequest, "batchId" | "startDate" | "endDate" | "galleryWeekdayCount" | "gallerySaturdayCount" | "galleryExhibitionDayCount">>
 ): {
   durationHours: number;
   hourlyFeeKRW: number;
@@ -37,12 +38,21 @@ export function computeBaseTotalKRW(
   totalFeeKRW: number;
 } {
   if (req.roomId === "gallery") {
-    // 우리동네 갤러리: 일 단위 과금 (타임존 안전한 dayOfWeek 사용)
+    // ── 갤러리 단건(1행) 형식: 저장된 일수 통계로 전체 요금 계산 ──
+    // batchId 없이 startDate/endDate + 일수 통계가 있으면 새 1행 형식
+    if (
+      !req.batchId &&
+      req.startDate && req.endDate &&
+      ((req.galleryWeekdayCount ?? 0) > 0 || (req.gallerySaturdayCount ?? 0) > 0 || (req.galleryExhibitionDayCount ?? 0) > 0)
+    ) {
+      const rentalFeeKRW = (req.galleryWeekdayCount ?? 0) * 20000 + (req.gallerySaturdayCount ?? 0) * 10000;
+      return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW: 0, totalFeeKRW: rentalFeeKRW };
+    }
+    // ── 기존 다행(배치) 형식: 개별 일자로 1일분 요금 ──
     const dow = dayOfWeek(req.date);
     const isSaturday = dow === 6;
     const isSunday = dow === 0;
     const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? 10000 : 20000;
-    // 갤러리는 장비/할인 불가 → 장비비 0 고정
     const equipmentFeeKRW = 0;
     const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
     return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };

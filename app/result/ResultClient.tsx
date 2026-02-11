@@ -75,6 +75,14 @@ type ResultPayload =
       decidedBy: string;
       rejectReason: string;
       cancelable: boolean;
+
+      // 갤러리 전시 기간 정보
+      startDate?: string;
+      endDate?: string;
+      galleryExhibitionDayCount?: number;
+      galleryWeekdayCount?: number;
+      gallerySaturdayCount?: number;
+      galleryPrepDate?: string;
     }
   | { ok: false; message: string };
 
@@ -194,7 +202,16 @@ export default function ResultClient() {
 
   const dateLabel = useMemo(() => {
     if (!data || !data.ok) return "";
-    if (!isBatch) return isGallery ? `${data.date} (일 단위)` : `${data.date} ${data.startTime}-${data.endTime}`;
+
+    // 갤러리: startDate ~ endDate (N일)
+    if (isGallery) {
+      const sd = data.startDate || data.date;
+      const ed = data.endDate || data.date;
+      const days = data.galleryExhibitionDayCount ?? (sessions.length || 1);
+      return sd === ed ? `${sd} (${days}일)` : `${sd} ~ ${ed} (${days}일)`;
+    }
+
+    if (!isBatch) return `${data.date} ${data.startTime}-${data.endTime}`;
 
     const list = sessions.length
       ? sessions
@@ -204,11 +221,11 @@ export default function ResultClient() {
     const last = list[list.length - 1];
 
     if (list.length === 1) {
-      return isGallery ? `${first.date} (총 1일)` : `${first.date} ${first.startTime}-${first.endTime} (총 1회)`;
+      return `${first.date} ${first.startTime}-${first.endTime} (총 1회)`;
     }
 
     const range = first.date === last.date ? first.date : `${first.date} ~ ${last.date}`;
-    return `${range} (총 ${list.length}${isGallery ? "일" : "회"})`;
+    return `${range} (총 ${list.length}회)`;
   }, [data, isBatch, sessions, isGallery]);
 
   return (
@@ -272,9 +289,14 @@ export default function ResultClient() {
                             <div className="h-14 w-20 flex-none rounded border border-slate-200 bg-slate-100" aria-hidden="true" />
                             <div className="text-left">
                               <div className="font-semibold text-slate-900">{data.spaceCategoryText || "-"}</div>
-                              {isBatch && (
+                              {isGallery && (data.galleryExhibitionDayCount ?? 0) > 0 && (
                                 <div className="mt-1 text-xs text-slate-600">
-                                  묶음 {sessions.length || data.batchSize || 1}{isGallery ? "일" : "회"}
+                                  전시 {data.galleryExhibitionDayCount}일
+                                </div>
+                              )}
+                              {!isGallery && isBatch && (
+                                <div className="mt-1 text-xs text-slate-600">
+                                  묶음 {sessions.length || data.batchSize || 1}회
                                 </div>
                               )}
                             </div>
@@ -284,14 +306,17 @@ export default function ResultClient() {
                           <div className="font-semibold text-slate-900">{data.roomName}</div>
                         </td>
                         <td className="px-3 py-5">
-                          <div className="font-semibold text-slate-900">{isBatch && sessions.length > 1 ? dateLabel : data.date}</div>
-                          {!isBatch && !isGallery && (
+                          <div className="font-semibold text-slate-900">{dateLabel}</div>
+                          {isGallery && (data.galleryWeekdayCount ?? 0) + (data.gallerySaturdayCount ?? 0) > 0 && (
+                            <div className="mt-1 text-xs text-slate-600">
+                              평일 {data.galleryWeekdayCount ?? 0}일 · 토 {data.gallerySaturdayCount ?? 0}일
+                              {data.galleryPrepDate ? ` · 준비일 1일` : ""}
+                            </div>
+                          )}
+                          {!isGallery && !isBatch && (
                             <div className="mt-1 text-slate-700">
                               {data.startTime} ~ {data.endTime}
                             </div>
-                          )}
-                          {!isBatch && isGallery && (
-                            <div className="mt-1 text-xs text-slate-600">일 단위(하루 전체)</div>
                           )}
                         </td>
                         <td className="px-3 py-5">
@@ -447,8 +472,8 @@ export default function ResultClient() {
                 </div>
               </section>
 
-              {/* 묶음 회차 목록 */}
-              {isBatch && sessions.length > 1 && (
+              {/* 묶음 회차 목록 (갤러리 1행 형식에서는 표시 안함) */}
+              {isBatch && !isGallery && sessions.length > 1 && (
                 <section>
                   <div className="mb-2 text-base font-semibold text-slate-900">회차 목록</div>
                   <div className="overflow-x-auto rounded-xl border border-slate-200">

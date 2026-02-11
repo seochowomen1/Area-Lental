@@ -82,3 +82,38 @@ export function buildGallerySessionsFromPeriod(startDate: string, endDate: strin
 
   return sessions;
 }
+
+/**
+ * 갤러리 전시 기간의 통계(일수, 요금)를 한번에 계산합니다.
+ * - 준비일, 평일, 토요일 카운트
+ * - 총 대관료 계산 (평일 20,000원/일, 토 10,000원/일, 준비일 무료)
+ */
+export function computeGalleryStats(startDate: string, endDate: string): {
+  prepDate: string | null;
+  weekdayCount: number;
+  saturdayCount: number;
+  exhibitionDayCount: number;
+  totalFeeKRW: number;
+} {
+  const sessions = buildGallerySessionsFromPeriod(startDate, endDate);
+  const prep = sessions.find((s) => s.isPrepDay);
+  const exhibition = sessions.filter((s) => !s.isPrepDay);
+
+  let weekdayCount = 0;
+  let saturdayCount = 0;
+  for (const s of exhibition) {
+    const dow = dayOfWeek(s.date);
+    if (dow === 6) saturdayCount++;
+    else if (dow >= 1 && dow <= 5) weekdayCount++;
+  }
+
+  const totalFeeKRW = weekdayCount * 20000 + saturdayCount * 10000;
+
+  return {
+    prepDate: prep?.date ?? null,
+    weekdayCount,
+    saturdayCount,
+    exhibitionDayCount: exhibition.length,
+    totalFeeKRW,
+  };
+}
