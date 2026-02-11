@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
-import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
+import { computeFeesForBundle, computeFeesForRequest, getSelectedEquipmentDetails } from "@/lib/pricing";
+import { normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
@@ -164,6 +165,12 @@ export async function POST(req: Request) {
       decidedAt: s.decidedAt ?? "",
       rejectReason: s.rejectReason ?? ""
     })),
+
+    // 장비 정보
+    equipmentDetails: getSelectedEquipmentDetails(
+      representative.equipment,
+      normalizeRoomCategory(meta?.category)
+    ),
 
     // 금액/할인/최종
     rentalFeeKRW: fee.rentalFeeKRW,

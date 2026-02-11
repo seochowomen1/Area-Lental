@@ -1,7 +1,7 @@
 import type { RentalRequest } from "@/lib/types";
 import { toMinutes } from "@/lib/datetime";
 import { ROOMS_BY_ID } from "@/lib/space";
-import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, LECTURE_EQUIPMENT_LABELS, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 
 export type FeeBreakdown = {
   durationHours: number;
@@ -68,6 +68,46 @@ export function computeBaseTotalKRW(
 
   const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
   return { durationHours, hourlyFeeKRW, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };
+}
+
+/**
+ * 선택된 장비 상세 목록 (라벨 + 개별 요금)
+ */
+export function getSelectedEquipmentDetails(
+  equipment: RentalRequest["equipment"],
+  roomCategory?: "lecture" | "studio" | "gallery"
+): { key: string; label: string; feeKRW: number }[] {
+  if (!equipment) return [];
+  const cat = roomCategory ?? "lecture";
+  if (cat === "gallery") return [];
+
+  const result: { key: string; label: string; feeKRW: number }[] = [];
+
+  if (cat === "studio") {
+    for (const [key, fee] of Object.entries(STUDIO_EQUIPMENT_FEE_KRW)) {
+      if ((equipment as Record<string, boolean | undefined>)[key]) {
+        result.push({ key, label: STUDIO_EQUIPMENT_LABELS[key as keyof typeof STUDIO_EQUIPMENT_LABELS], feeKRW: fee });
+      }
+    }
+  } else {
+    for (const [key, fee] of Object.entries(EQUIPMENT_FEE_KRW)) {
+      if ((equipment as Record<string, boolean | undefined>)[key]) {
+        result.push({ key, label: LECTURE_EQUIPMENT_LABELS[key as keyof typeof LECTURE_EQUIPMENT_LABELS], feeKRW: fee });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 선택된 장비 라벨 목록 (요금 없이 이름만)
+ */
+export function getSelectedEquipmentLabels(
+  equipment: RentalRequest["equipment"],
+  roomCategory?: "lecture" | "studio" | "gallery"
+): string[] {
+  return getSelectedEquipmentDetails(equipment, roomCategory).map((e) => e.label);
 }
 
 export function clamp(n: number, min: number, max: number) {

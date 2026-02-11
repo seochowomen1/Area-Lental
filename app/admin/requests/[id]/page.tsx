@@ -9,7 +9,7 @@ import { assertAdminAuth } from "@/lib/adminAuth";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { getDatabase } from "@/lib/database";
 import { REQUEST_ID_LABEL } from "@/lib/labels";
-import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
+import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { dayOfWeek } from "@/lib/datetime";
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
@@ -171,6 +171,9 @@ export default async function AdminRequestDetail({
         .join("\n")
     : req.rejectReason ?? "";
 
+  const roomCategory = isGallery ? "gallery" as const : isStudio ? "studio" as const : "lecture" as const;
+  const equipmentDetails = getSelectedEquipmentDetails(req.equipment, roomCategory);
+
   const accent = categoryAccent(normalizedCategory);
   const categoryLabel = getCategoryLabel(normalizedCategory);
 
@@ -304,6 +307,27 @@ export default async function AdminRequestDetail({
                 )}
                 {!isStudio && <InfoRow label="사용 목적">{req.purpose}</InfoRow>}
               </>
+            )}
+
+            {/* 장비 정보 (강의실/E-스튜디오) */}
+            {!isGallery && equipmentDetails.length > 0 && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="text-xs font-semibold text-gray-500 mb-2">{isStudio ? "촬영장비" : "기자재"}</div>
+                <div className="space-y-1">
+                  {equipmentDetails.map((eq) => (
+                    <div key={eq.key} className="flex items-center justify-between text-sm">
+                      <span className="text-gray-700">{eq.label}</span>
+                      <span className="tabular-nums text-gray-600">{formatKRW(eq.feeKRW)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {!isGallery && equipmentDetails.length === 0 && (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="text-xs font-semibold text-gray-500 mb-1">{isStudio ? "촬영장비" : "기자재"}</div>
+                <div className="text-sm text-gray-400">선택 없음</div>
+              </div>
             )}
           </dl>
 

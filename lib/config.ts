@@ -14,6 +14,13 @@ export const EQUIPMENT_FEE_KRW = {
   audio: 10000
 } as const;
 
+/** 강의실 기자재 라벨 */
+export const LECTURE_EQUIPMENT_LABELS: Record<keyof typeof EQUIPMENT_FEE_KRW, string> = {
+  laptop: "노트북",
+  projector: "빔프로젝터",
+  audio: "음향",
+} as const;
+
 /** E-스튜디오 전용 촬영장비 사용료 (1일 1회 과금) */
 export const STUDIO_EQUIPMENT_FEE_KRW = {
   mirrorless: 10000,

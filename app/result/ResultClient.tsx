@@ -51,6 +51,9 @@ type ResultPayload =
       batchSize?: number;
       sessions?: SessionInfo[];
 
+      // 장비 정보
+      equipmentDetails?: { key: string; label: string; feeKRW: number }[];
+
       // 금액/할인
       rentalFeeKRW: number;
       equipmentFeeKRW: number;
@@ -389,6 +392,28 @@ export default function ResultClient() {
                   </table>
                 </div>
               </section>
+
+              {/* 장비 사용 */}
+              {data.equipmentDetails && data.equipmentDetails.length > 0 && (
+                <section>
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">🎬</span>
+                    <h3 className="text-lg font-bold text-slate-900">{isGallery ? "장비" : data.roomId === "media" ? "촬영장비" : "기자재"}</h3>
+                  </div>
+                  <div className="overflow-x-auto border-t-2 border-slate-900">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {data.equipmentDetails.map((eq) => (
+                          <tr key={eq.key} className="border-b border-slate-200">
+                            <th className="w-48 bg-slate-50 px-4 py-3 text-left font-semibold">{eq.label}</th>
+                            <td className="px-4 py-3 text-slate-900 tabular-nums">{formatKRW(eq.feeKRW)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
 
               {/* 금액 상세 */}
               <section className="space-y-2">
