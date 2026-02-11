@@ -1,5 +1,5 @@
 import type { RentalRequest } from "@/lib/types";
-import { toMinutes } from "@/lib/datetime";
+import { toMinutes, dayOfWeek } from "@/lib/datetime";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, LECTURE_EQUIPMENT_LABELS, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 
@@ -37,8 +37,8 @@ export function computeBaseTotalKRW(
   totalFeeKRW: number;
 } {
   if (req.roomId === "gallery") {
-    // 우리동네 갤러리: 일 단위 과금
-    const dow = new Date(`${req.date}T00:00:00+09:00`).getDay();
+    // 우리동네 갤러리: 일 단위 과금 (타임존 안전한 dayOfWeek 사용)
+    const dow = dayOfWeek(req.date);
     const isSaturday = dow === 6;
     const isSunday = dow === 0;
     const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? 10000 : 20000;

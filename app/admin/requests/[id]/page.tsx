@@ -543,74 +543,138 @@ export default async function AdminRequestDetail({
                 </p>
               </form>
 
-              {/* ── 회차별 승인/반려 ── */}
-              <div className="border-t border-gray-100 pt-6">
-                <h3 className="text-sm font-bold text-gray-800">회차별 승인 / 반려</h3>
+              {isGallery ? (
+                <>
+                  {/* ── 갤러리: 전체 일괄 승인/반려 ── */}
+                  <div className="border-t border-gray-100 pt-6">
+                    <h3 className="text-sm font-bold text-gray-800">전체 승인 / 반려</h3>
+                    <p className="mt-1 text-xs text-gray-500">전시 기간 전체({sessions.length}일)를 일괄 처리합니다.</p>
 
-                <form action={decideSelectedSessions} className="mt-4 space-y-4">
-                  <BatchSessionSelector sessions={sessionSelectorRows} />
+                    <form action={decideSelectedSessions} className="mt-4 space-y-4">
+                      {/* 전체 세션을 hidden으로 전송 */}
+                      {sessionSelectorRows.map((s) => (
+                        <input key={s.requestId} type="hidden" name="selectedIds" value={s.requestId} />
+                      ))}
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700">반려 사유 (선택 반려 시 적용)</label>
-                      <textarea
-                        name="rejectReason"
-                        defaultValue=""
-                        className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                        rows={2}
-                        placeholder="예: 신청 목적 확인 불가, 운영시간 외 신청 등"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-semibold text-gray-700">관리 메모 (선택 회차에 적용, 미입력 시 기존 유지)</label>
-                      <textarea
-                        name="adminMemo"
-                        defaultValue=""
-                        className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                        rows={2}
-                        placeholder="예: 전화로 내용 확인 완료"
-                      />
-                    </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700">반려 사유 (반려 시 필수)</label>
+                        <textarea
+                          name="rejectReason"
+                          defaultValue=""
+                          className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                          rows={2}
+                          placeholder="예: 전시 일정 충돌, 신청 내용 확인 불가 등"
+                        />
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="submit"
+                          name="actionStatus"
+                          value="승인"
+                          className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                        >
+                          전체 승인
+                        </button>
+                        <button
+                          type="submit"
+                          name="actionStatus"
+                          value="반려"
+                          className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          전체 반려
+                        </button>
+                      </div>
+                    </form>
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-3">
-                    <button
-                      type="submit"
-                      name="actionStatus"
-                      value="승인"
-                      className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-                    >
-                      선택 승인
-                    </button>
-                    <button
-                      type="submit"
-                      name="actionStatus"
-                      value="반려"
-                      className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
-                    >
-                      선택 반려
-                    </button>
-                    <span className="text-xs text-gray-500">
-                      * 체크된 회차에만 적용됩니다. 전체 처리하려면 &lsquo;전체 선택&rsquo; 후 버튼을 누르세요.
-                    </span>
+                  {/* ── 현재 상태 메일 발송 ── */}
+                  <div className="border-t border-gray-100 pt-6">
+                    <form action={sendCurrentStatusEmail} className="flex flex-wrap items-center gap-4">
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                      >
+                        결정 메일 발송
+                      </button>
+                      <p className="text-xs text-gray-500">
+                        승인/반려 결과를 신청자에게 안내합니다.
+                      </p>
+                    </form>
                   </div>
-                </form>
-              </div>
+                </>
+              ) : (
+                <>
+                  {/* ── 강의실/스튜디오: 회차별 승인/반려 ── */}
+                  <div className="border-t border-gray-100 pt-6">
+                    <h3 className="text-sm font-bold text-gray-800">회차별 승인 / 반려</h3>
 
-              {/* ── 현재 상태 메일 발송 ── */}
-              <div className="border-t border-gray-100 pt-6">
-                <form action={sendCurrentStatusEmail} className="flex flex-wrap items-center gap-4">
-                  <button
-                    type="submit"
-                    className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                  >
-                    현재 상태 메일 발송
-                  </button>
-                  <p className="text-xs text-gray-500">
-                    회차별 진행 상황(승인/반려/접수)을 신청자에게 안내합니다.
-                  </p>
-                </form>
-              </div>
+                    <form action={decideSelectedSessions} className="mt-4 space-y-4">
+                      <BatchSessionSelector sessions={sessionSelectorRows} />
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700">반려 사유 (선택 반려 시 적용)</label>
+                          <textarea
+                            name="rejectReason"
+                            defaultValue=""
+                            className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                            rows={2}
+                            placeholder="예: 신청 목적 확인 불가, 운영시간 외 신청 등"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-sm font-semibold text-gray-700">관리 메모 (선택 회차에 적용, 미입력 시 기존 유지)</label>
+                          <textarea
+                            name="adminMemo"
+                            defaultValue=""
+                            className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                            rows={2}
+                            placeholder="예: 전화로 내용 확인 완료"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-3">
+                        <button
+                          type="submit"
+                          name="actionStatus"
+                          value="승인"
+                          className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
+                        >
+                          선택 승인
+                        </button>
+                        <button
+                          type="submit"
+                          name="actionStatus"
+                          value="반려"
+                          className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
+                        >
+                          선택 반려
+                        </button>
+                        <span className="text-xs text-gray-500">
+                          * 체크된 회차에만 적용됩니다. 전체 처리하려면 &lsquo;전체 선택&rsquo; 후 버튼을 누르세요.
+                        </span>
+                      </div>
+                    </form>
+                  </div>
+
+                  {/* ── 현재 상태 메일 발송 ── */}
+                  <div className="border-t border-gray-100 pt-6">
+                    <form action={sendCurrentStatusEmail} className="flex flex-wrap items-center gap-4">
+                      <button
+                        type="submit"
+                        className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
+                      >
+                        현재 상태 메일 발송
+                      </button>
+                      <p className="text-xs text-gray-500">
+                        회차별 진행 상황(승인/반려/접수)을 신청자에게 안내합니다.
+                      </p>
+                    </form>
+                  </div>
+                </>
+              )}
             </div>
           ) : (
             /* ── 단일 건 처리 ── */

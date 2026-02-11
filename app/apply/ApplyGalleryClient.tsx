@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -166,6 +166,13 @@ export default function ApplyGalleryClient() {
   const [galleryInfoOpen, setGalleryInfoOpen] = useState(false);
   const [confirmData, setConfirmData] = useState<GalleryApplyValues | null>(null);
 
+  // 생년월일 3칸 입력
+  const [birthYear, setBirthYear] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const birthMonthRef = useRef<HTMLInputElement>(null);
+  const birthDayRef = useRef<HTMLInputElement>(null);
+
   const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
 
   const qpStart = searchParams.get("startDate") ?? "";
@@ -212,6 +219,15 @@ export default function ApplyGalleryClient() {
     }
   });
 
+  // 생년월일 수동 입력 → RHF 동기화
+  const handleBirthSync = useCallback((y: string, m: string, d: string) => {
+    if (y.length === 4 && m.length >= 1 && d.length >= 1) {
+      const mm = m.padStart(2, "0");
+      const dd = d.padStart(2, "0");
+      setValue("birth", `${y}-${mm}-${dd}`, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [setValue]);
+
   // roomId는 항상 gallery로 고정
   useEffect(() => {
     setValue("roomId", "gallery", { shouldValidate: true, shouldDirty: true });
@@ -227,30 +243,22 @@ export default function ApplyGalleryClient() {
   const privacyAgree = watch("privacyAgree");
   const pledgeAgree = watch("pledgeAgree");
   const applicantName = watch("applicantName");
-  const pledgeName = watch("pledgeName");
   const exhibitionTitle = watch("exhibitionTitle");
   const exhibitionPurpose = watch("exhibitionPurpose");
   const genreContent = watch("genreContent");
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
 
-  // 편의: 신청자 성명 → 서약자 성명 자동 채움
+  // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
+  // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
   const pledgeAutoFillRef = useRef<boolean>(true);
-  const prevApplicantNameRef = useRef<string>("");
 
   useEffect(() => {
-    const prev = prevApplicantNameRef.current;
-    prevApplicantNameRef.current = applicantName || "";
+    if (!pledgeAutoFillRef.current) return;
     if (!applicantName) return;
-    if (!pledgeName) {
-      pledgeAutoFillRef.current = true;
-      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
-      return;
-    }
-    if (pledgeAutoFillRef.current && prev && pledgeName === prev && applicantName !== prev) {
-      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [applicantName, pledgeName, setValue]);
+    setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicantName, setValue]);
 
   // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
   useEffect(() => {
@@ -674,8 +682,53 @@ export default function ApplyGalleryClient() {
               </div>
 
               <div>
-                <FieldLabel htmlFor="birth">생년월일 *</FieldLabel>
-                <Input id="birth" type="date" {...register("birth")} />
+                <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
+                <input type="hidden" {...register("birth")} />
+                <div className="flex items-center gap-1">
+                  <input
+                    id="birthYear"
+                    className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={4}
+                    placeholder="YYYY"
+                    inputMode="numeric"
+                    value={birthYear}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setBirthYear(v);
+                      if (v.length === 4) birthMonthRef.current?.focus();
+                      handleBirthSync(v, birthMonth, birthDay);
+                    }}
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input
+                    ref={birthMonthRef}
+                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={2}
+                    placeholder="MM"
+                    inputMode="numeric"
+                    value={birthMonth}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      setBirthMonth(v);
+                      if (v.length === 2) birthDayRef.current?.focus();
+                      handleBirthSync(birthYear, v, birthDay);
+                    }}
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input
+                    ref={birthDayRef}
+                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={2}
+                    placeholder="DD"
+                    inputMode="numeric"
+                    value={birthDay}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      setBirthDay(v);
+                      handleBirthSync(birthYear, birthMonth, v);
+                    }}
+                  />
+                </div>
                 {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
               </div>
 
