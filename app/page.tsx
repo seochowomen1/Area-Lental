@@ -45,10 +45,7 @@ export default function Home() {
       {/* 하단 푸터 */}
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-slate-400">
-              서초여성가족플라자 서초센터
-            </p>
+          <div className="flex items-center justify-end">
             <Link
               href="/admin"
               className="text-xs text-slate-400 hover:text-slate-600 transition-colors"

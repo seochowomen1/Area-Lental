@@ -202,7 +202,7 @@ export default async function AdminRequestDetail({
             <Link href={backToListHref} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
               ← 목록
             </Link>
-            {normalizedCategory === "lecture" && (
+            {(normalizedCategory === "lecture" || normalizedCategory === "studio") && (
               <Link
                 href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
                 target="_blank"
@@ -211,14 +211,10 @@ export default async function AdminRequestDetail({
                 신청서 · 서약서
               </Link>
             )}
-            {normalizedCategory === "studio" && (
-              <Link
-                href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
-                target="_blank"
-                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
-              >
-                신청서 · 서약서
-              </Link>
+            {normalizedCategory === "gallery" && (
+              <span className="rounded-full border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 cursor-default">
+                신청서 · 서약서 (준비 중)
+              </span>
             )}
             <Link
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
@@ -269,8 +265,8 @@ export default async function AdminRequestDetail({
             <InfoRow label="성명">{req.applicantName}</InfoRow>
             <InfoRow label="연락처">{req.phone}</InfoRow>
             <InfoRow label="이메일">{req.email}</InfoRow>
-            {req.orgName && req.orgName !== "-" && !isStudio && <InfoRow label="단체명">{req.orgName}</InfoRow>}
-            {!isGallery && !isStudio && <InfoRow label="인원">{req.headcount}명</InfoRow>}
+            {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}
+            {!isStudio && req.headcount && <InfoRow label="인원">{req.headcount}명</InfoRow>}
           </dl>
         </Section>
 
@@ -279,6 +275,7 @@ export default async function AdminRequestDetail({
           <dl>
             <InfoRow label="공간">{req.roomName}</InfoRow>
 
+            {/* 일정 정보 */}
             {isGallery ? (
               <>
                 <InfoRow label="전시 기간">
@@ -289,11 +286,6 @@ export default async function AdminRequestDetail({
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)
                   {galleryPrepDate ? <span className="ml-1 text-gray-500">/ 준비일 {galleryPrepDate}</span> : null}
                 </InfoRow>
-                <InfoRow label="전시명">{req.exhibitionTitle || "-"}</InfoRow>
-                {req.exhibitionPurpose && <InfoRow label="전시 목적">{req.exhibitionPurpose}</InfoRow>}
-                {req.genreContent && <InfoRow label="장르·내용">{req.genreContent}</InfoRow>}
-                {req.awarenessPath && <InfoRow label="인지 경로">{req.awarenessPath}</InfoRow>}
-                {req.specialNotes && <InfoRow label="특이사항">{req.specialNotes}</InfoRow>}
               </>
             ) : (
               <>
@@ -305,12 +297,57 @@ export default async function AdminRequestDetail({
                     {sessions[0].date} ~ {sessions[sessions.length - 1].date} ({sessions.length}회)
                   </InfoRow>
                 )}
-                {!isStudio && <InfoRow label="사용 목적">{req.purpose}</InfoRow>}
               </>
             )}
 
-            {/* 장비 정보 (강의실/E-스튜디오) */}
-            {!isGallery && equipmentDetails.length > 0 && (
+            {/* 사용 목적 / 전시 목적 */}
+            {isGallery ? (
+              <InfoRow label="전시명">{req.exhibitionTitle || "-"}</InfoRow>
+            ) : !isStudio ? (
+              <InfoRow label="사용 목적">{req.purpose}</InfoRow>
+            ) : null}
+
+            {/* 갤러리 전시 상세 / 강의실·스튜디오 장비 — 동일한 서브섹션 스타일 */}
+            {isGallery ? (
+              <div className="mt-3 border-t border-gray-100 pt-3">
+                <div className="text-xs font-semibold text-gray-500 mb-2">전시 상세</div>
+                <div className="space-y-1.5 text-sm">
+                  {req.exhibitionPurpose && (
+                    <div className="flex gap-3">
+                      <span className="w-16 shrink-0 text-xs text-gray-500">전시 목적</span>
+                      <span className="text-gray-700">{req.exhibitionPurpose}</span>
+                    </div>
+                  )}
+                  {req.genreContent && (
+                    <div className="flex gap-3">
+                      <span className="w-16 shrink-0 text-xs text-gray-500">장르·내용</span>
+                      <span className="text-gray-700">{req.genreContent}</span>
+                    </div>
+                  )}
+                  {req.awarenessPath && (
+                    <div className="flex gap-3">
+                      <span className="w-16 shrink-0 text-xs text-gray-500">인지 경로</span>
+                      <span className="text-gray-700">{req.awarenessPath}</span>
+                    </div>
+                  )}
+                  {req.specialNotes && (
+                    <div className="flex gap-3">
+                      <span className="w-16 shrink-0 text-xs text-gray-500">특이사항</span>
+                      <span className="text-gray-700">{req.specialNotes}</span>
+                    </div>
+                  )}
+                  {!req.exhibitionPurpose && !req.genreContent && !req.awarenessPath && !req.specialNotes && (
+                    <div className="text-sm text-gray-400">입력된 상세 정보 없음</div>
+                  )}
+                </div>
+                {req.galleryGeneratedAt && (
+                  <div className="mt-2 text-xs text-gray-400">
+                    서버 생성: {req.galleryGeneratedAt}
+                    {req.galleryGenerationVersion ? ` (${req.galleryGenerationVersion})` : ""}
+                  </div>
+                )}
+              </div>
+            ) : equipmentDetails.length > 0 ? (
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <div className="text-xs font-semibold text-gray-500 mb-2">{isStudio ? "촬영장비" : "기자재"}</div>
                 <div className="space-y-1">
@@ -322,21 +359,13 @@ export default async function AdminRequestDetail({
                   ))}
                 </div>
               </div>
-            )}
-            {!isGallery && equipmentDetails.length === 0 && (
+            ) : (
               <div className="mt-3 border-t border-gray-100 pt-3">
                 <div className="text-xs font-semibold text-gray-500 mb-1">{isStudio ? "촬영장비" : "기자재"}</div>
                 <div className="text-sm text-gray-400">선택 없음</div>
               </div>
             )}
           </dl>
-
-          {isGallery && req.galleryGeneratedAt && (
-            <div className="mt-2 text-xs text-gray-400">
-              서버 생성: {req.galleryGeneratedAt}
-              {req.galleryGenerationVersion ? ` (${req.galleryGenerationVersion})` : ""}
-            </div>
-          )}
         </Section>
       </div>
 
@@ -427,9 +456,15 @@ export default async function AdminRequestDetail({
           )}
 
           {isGallery ? (
-            <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
-              평일 20,000원/일 · 토 10,000원/일 · 준비(세팅)일 1일 무료 · 할인/바우처/장비 옵션 적용 불가
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">할인</span>
+                <span className="text-xs text-gray-400">적용 불가</span>
+              </div>
+              <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
+                평일 20,000원/일 · 토 10,000원/일 · 준비(세팅)일 1일 무료
+              </div>
+            </>
           ) : (
             <>
               <div className="flex items-center justify-between">
@@ -470,18 +505,21 @@ export default async function AdminRequestDetail({
               <form action={saveBundleMeta} className="space-y-4">
                 <h3 className="text-sm font-bold text-gray-800">할인 및 메모 (묶음 공통)</h3>
 
-                {isGallery ? (
-                  <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                    갤러리는 할인/바우처/장비 옵션을 적용할 수 없습니다.
-                  </div>
-                ) : (
-                  <AdminDiscountFields
-                    totalFeeKRW={feeAll!.totalFeeKRW}
-                    defaultRatePct={req.discountRatePct ?? 0}
-                    defaultAmountKRW={req.discountAmountKRW ?? 0}
-                    defaultReason={req.discountReason ?? ""}
-                  />
-                )}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">할인</label>
+                  {isGallery ? (
+                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                      갤러리는 할인/바우처 적용 대상이 아닙니다.
+                    </div>
+                  ) : (
+                    <AdminDiscountFields
+                      totalFeeKRW={feeAll!.totalFeeKRW}
+                      defaultRatePct={req.discountRatePct ?? 0}
+                      defaultAmountKRW={req.discountAmountKRW ?? 0}
+                      defaultReason={req.discountReason ?? ""}
+                    />
+                  )}
+                </div>
 
                 <div>
                   <label className="block text-sm font-semibold text-gray-700">관리 메모</label>
@@ -604,21 +642,21 @@ export default async function AdminRequestDetail({
                 </div>
               </div>
 
-              {isGallery ? (
-                <div className="rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-600">
-                  갤러리는 할인/바우처/장비 옵션을 적용할 수 없습니다.
-                </div>
-              ) : (
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">할인</label>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1.5">할인</label>
+                {isGallery ? (
+                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                    갤러리는 할인/바우처 적용 대상이 아닙니다.
+                  </div>
+                ) : (
                   <AdminDiscountFields
                     totalFeeKRW={feeBasis.totalFeeKRW}
                     defaultRatePct={req.discountRatePct ?? 0}
                     defaultAmountKRW={req.discountAmountKRW ?? 0}
                     defaultReason={req.discountReason ?? ""}
                   />
-                </div>
-              )}
+                )}
+              </div>
 
               <div>
                 <label className="block text-sm font-semibold text-gray-700">관리 메모</label>
