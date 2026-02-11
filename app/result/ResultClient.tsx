@@ -52,6 +52,8 @@ type ResultPayload =
       sessions?: SessionInfo[];
 
       // 금액/할인
+      rentalFeeKRW: number;
+      equipmentFeeKRW: number;
       totalFeeKRW: number;
       discountRatePct: number;
       discountAmountKRW: number;
@@ -393,8 +395,14 @@ export default function ResultClient() {
                 <div className="text-base font-semibold text-slate-900">금액 상세</div>
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-2">
                   <div>
-                    <span className="text-slate-600">총액</span>: <b>{formatKRW(data.totalFeeKRW)}</b>
+                    <span className="text-slate-600">대관료</span>: <b>{formatKRW(data.rentalFeeKRW ?? 0)}</b>
                     {data.feeBasis === "approved" && <div className="mt-1 text-xs text-slate-500">* 승인된 회차 기준 금액</div>}
+                  </div>
+                  <div>
+                    <span className="text-slate-600">장비 사용료</span>: <b>{(data.equipmentFeeKRW ?? 0) > 0 ? formatKRW(data.equipmentFeeKRW) : "-"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">총액</span>: <b>{formatKRW(data.totalFeeKRW)}</b>
                   </div>
                   <div>
                     <span className="text-slate-600">할인</span>: <b>{data.discountAmountKRW > 0 ? `${data.discountRatePct.toFixed(2)}% (${formatKRW(data.discountAmountKRW)})` : "-"}</b>

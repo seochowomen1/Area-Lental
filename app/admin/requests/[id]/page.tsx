@@ -361,23 +361,45 @@ export default async function AdminRequestDetail({
           {isBatch ? (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">기본 이용료 합계(전체 {sessions.length}회)</span>
+                <span className="text-gray-600">대관료 합계(전체 {sessions.length}회)</span>
+                <span className="tabular-nums font-semibold">{formatKRW(feeAll!.rentalFeeKRW)}</span>
+              </div>
+              {feeAll!.equipmentFeeKRW > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">장비 사용료</span>
+                  <span className="tabular-nums font-semibold">{formatKRW(feeAll!.equipmentFeeKRW)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">소계(전체 {sessions.length}회)</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeAll!.totalFeeKRW)}</span>
               </div>
               {usingApprovedBasis && (
                 <div className="flex items-center justify-between">
                   <span className="text-gray-600">
-                    기본 이용료 합계(승인 {approvedSessions.length}회)
+                    소계(승인 {approvedSessions.length}회)
                   </span>
                   <span className="tabular-nums font-semibold">{formatKRW(feeBasis.totalFeeKRW)}</span>
                 </div>
               )}
             </>
           ) : (
-            <div className="flex items-center justify-between">
-              <span className="text-gray-600">기본 이용료</span>
-              <span className="tabular-nums font-semibold">{formatKRW(feeBasis.totalFeeKRW)}</span>
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">대관료</span>
+                <span className="tabular-nums font-semibold">{formatKRW(feeBasis.rentalFeeKRW)}</span>
+              </div>
+              {feeBasis.equipmentFeeKRW > 0 && (
+                <div className="flex items-center justify-between">
+                  <span className="text-gray-600">장비 사용료</span>
+                  <span className="tabular-nums font-semibold">{formatKRW(feeBasis.equipmentFeeKRW)}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <span className="text-gray-600">소계</span>
+                <span className="tabular-nums font-semibold">{formatKRW(feeBasis.totalFeeKRW)}</span>
+              </div>
+            </>
           )}
 
           {isGallery ? (

@@ -166,6 +166,8 @@ export async function POST(req: Request) {
     })),
 
     // 금액/할인/최종
+    rentalFeeKRW: fee.rentalFeeKRW,
+    equipmentFeeKRW: fee.equipmentFeeKRW,
     totalFeeKRW: fee.totalFeeKRW,
     discountRatePct: fee.discountRatePct,
     discountAmountKRW: fee.discountAmountKRW,
