@@ -89,7 +89,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         <div className="grid gap-2 sm:grid-cols-2">
           <InfoRow label="공간명" value="우리동네 갤러리" />
           <InfoRow label="위치" value="서초센터 4층 (북카페 일대)" />
-          <InfoRow label="수용인원" value={room ? `최대 ${room.capacity}명` : "-"} />
+          <InfoRow label="전시 가능 작품 수" value="액자형태 최대 15점 (가로 60cm)" />
           <InfoRow label="문의" value={room ? `${room.contactName} (${room.contactPhone})` : "-"} />
         </div>
       </div>
