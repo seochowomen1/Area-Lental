@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
@@ -75,6 +75,13 @@ export default function ApplyClient() {
   const [addStartTime, setAddStartTime] = useState<string>("");
   const [addEndTime, setAddEndTime] = useState<string>("");
 
+  // 생년월일 수동 입력(년→월→일 자동 이동)
+  const [birthYear, setBirthYear] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const birthMonthRef = useRef<HTMLInputElement>(null);
+  const birthDayRef = useRef<HTMLInputElement>(null);
+
   const [floorId, setFloorId] = useState<"4" | "5" | "6" | "7">("4");
   const floor = useMemo(() => FLOORS.find((f) => f.id === floorId)!, [floorId]);
   const [roomId, setRoomId] = useState<string>(floor.rooms[0].id);
@@ -94,7 +101,9 @@ export default function ApplyClient() {
       date: "",
       startTime: "10:00",
       endTime: "12:00",
+      orgName: "",
       headcount: 10,
+      purpose: "",
       laptop: false,
       projector: false,
       audio: false,
@@ -108,6 +117,15 @@ export default function ApplyClient() {
       pledgeAgree: false,
     },
   });
+
+  // 생년월일 수동 입력 → RHF 동기화
+  const handleBirthSync = useCallback((y: string, m: string, d: string) => {
+    if (y.length === 4 && m.length >= 1 && d.length >= 1) {
+      const mm = m.padStart(2, "0");
+      const dd = d.padStart(2, "0");
+      setValue("birth", `${y}-${mm}-${dd}`, { shouldValidate: true, shouldDirty: true });
+    }
+  }, [setValue]);
 
   // 서약 일자는 신청 당일로 고정(사용자가 변경하지 않음)
   const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
@@ -151,6 +169,16 @@ export default function ApplyClient() {
   // room 변경 시 RHF와 동기화
   useEffect(() => {
     setValue("roomId", roomId, { shouldValidate: true, shouldDirty: true });
+  }, [roomId, setValue]);
+
+  // E-스튜디오 전환 시 단체/행사 정보 기본값 설정
+  useEffect(() => {
+    const meta = getRoom(roomId);
+    if (meta?.category === "studio") {
+      setValue("orgName", "-", { shouldDirty: true });
+      setValue("headcount", 1, { shouldDirty: true });
+      setValue("purpose", "E-스튜디오 대관", { shouldDirty: true });
+    }
   }, [roomId, setValue]);
 
   const selectedDate = watch("date") || null;
@@ -206,26 +234,13 @@ export default function ApplyClient() {
   // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
   // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
   const pledgeAutoFillRef = useRef<boolean>(true);
-  const prevApplicantNameRef = useRef<string>("");
 
   useEffect(() => {
-    const prev = prevApplicantNameRef.current;
-    prevApplicantNameRef.current = applicantName || "";
-
+    if (!pledgeAutoFillRef.current) return;
     if (!applicantName) return;
-
-    // 서약자 성명이 비어있으면 자동 채움
-    if (!pledgeName) {
-      pledgeAutoFillRef.current = true;
-      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
-      return;
-    }
-
-    // 이전에도 자동 채움 상태였고, 사용자가 수정하지 않은(=이전 성명과 동일) 경우에만 따라가게 함
-    if (pledgeAutoFillRef.current && prev && pledgeName === prev && applicantName !== prev) {
-      setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [applicantName, pledgeName, setValue]);
+    setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [applicantName, setValue]);
 
   const isTueNight = useMemo(() => {
     return isTuesdayNightOverlap(selectedDate, startTime, endTime);
@@ -609,24 +624,26 @@ export default function ApplyClient() {
               </div>
             </Card>
 
-            {/* 단체/행사 정보 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>단체/행사 정보</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">단체명</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmData.orgName}</span>
+            {/* 단체/행사 정보 (E-스튜디오 제외) */}
+            {confirmRoom?.category !== "studio" && (
+              <Card pad="lg">
+                <h3 className={SECTION_TITLE}>단체/행사 정보</h3>
+                <div className="mt-3 divide-y divide-slate-100">
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500">단체명</span>
+                    <span className="text-sm font-semibold text-slate-900">{confirmData.orgName}</span>
+                  </div>
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500">인원</span>
+                    <span className="text-sm font-semibold text-slate-900">{confirmData.headcount}명</span>
+                  </div>
+                  <div className="py-2.5">
+                    <span className="text-sm text-slate-500">사용 목적/행사 내용</span>
+                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.purpose}</p>
+                  </div>
                 </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">인원</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmData.headcount}명</span>
-                </div>
-                <div className="py-2.5">
-                  <span className="text-sm text-slate-500">사용 목적/행사 내용</span>
-                  <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.purpose}</p>
-                </div>
-              </div>
-            </Card>
+              </Card>
+            )}
 
             {/* 장비 사용 */}
             <Card pad="lg">
@@ -812,10 +829,9 @@ export default function ApplyClient() {
 
                 {/* 여러 회차(날짜/시간) 묶음 신청 */}
                 <div className="mt-3">
-                  <Button
+                  <button
                     type="button"
-                    variant="outline"
-                    className="h-10 w-full px-3 sm:w-auto"
+                    className="flex w-full items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-4 py-3 text-left transition-colors hover:border-[rgb(var(--brand-primary))] hover:bg-[rgb(var(--brand-primary)/0.03)] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!selectedDate}
                     onClick={() => {
                       if (!selectedDate) return;
@@ -824,47 +840,52 @@ export default function ApplyClient() {
                       setExtraOpen(true);
                     }}
                   >
-                    대관 일정 추가하기
-                  </Button>
+                    <div className="flex items-center gap-2.5">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgb(var(--brand-primary)/0.08)] text-[rgb(var(--brand-primary))]">
+                        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
+                      </span>
+                      <div>
+                        <div className="text-sm font-semibold text-slate-800">대관 일정 추가하기</div>
+                        <div className="text-[11px] text-slate-500">여러 날짜/시간을 한 번에 신청</div>
+                      </div>
+                    </div>
+                    {extraSessions.length > 0 && (
+                      <span className="rounded-full bg-[rgb(var(--brand-primary))] px-2.5 py-1 text-xs font-bold text-white">
+                        +{extraSessions.length}
+                      </span>
+                    )}
+                  </button>
 
                   {extraSessions.length > 0 ? (
-                    <div className="mt-3 overflow-hidden rounded-xl border border-slate-200 bg-white">
-                      <div className="divide-y divide-slate-100">
-                        {allSessions.map((s) => {
-                          const isBase = s.date === selectedDate && s.startTime === startTime && s.endTime === endTime;
-                          return (
-                            <div
-                              key={`${s.date}|${s.startTime}|${s.endTime}`}
-                              className="flex items-center justify-between gap-3 px-4 py-3 text-xs text-slate-700"
-                            >
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-slate-900">{s.date}</span>
-                                  <span className="text-slate-700">{s.startTime}~{s.endTime}</span>
-                                  {isBase ? (
-                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">
-                                      기본
-                                    </span>
-                                  ) : null}
-                                </div>
-                              </div>
-
-                              {!isBase ? (
-                                <button
-                                  type="button"
-                                  className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                                  onClick={() => removeExtraSession(s)}
-                                  aria-label={`회차 삭제: ${s.date} ${s.startTime}-${s.endTime}`}
-                                >
-                                  삭제
-                                </button>
-                              ) : (
-                                <span className="text-[10px] text-slate-400">삭제 불가</span>
-                              )}
+                    <div className="mt-3 space-y-1.5">
+                      {allSessions.map((s, idx) => {
+                        const isBase = s.date === selectedDate && s.startTime === startTime && s.endTime === endTime;
+                        return (
+                          <div
+                            key={`${s.date}|${s.startTime}|${s.endTime}`}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
+                                {idx + 1}
+                              </span>
+                              <span className="font-semibold text-slate-900">{s.date}</span>
+                              <span className="text-slate-600">{s.startTime}~{s.endTime}</span>
+                              {isBase && <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">기본</span>}
                             </div>
-                          );
-                        })}
-                      </div>
+                            {!isBase ? (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                onClick={() => removeExtraSession(s)}
+                                aria-label={`삭제: ${s.date}`}
+                              >
+                                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M9 3L3 9M3 3l6 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/></svg>
+                              </button>
+                            ) : null}
+                          </div>
+                        );
+                      })}
                     </div>
                   ) : null}
                 </div>
@@ -972,8 +993,53 @@ export default function ApplyClient() {
               </div>
 
               <div>
-                <FieldLabel htmlFor="birth">생년월일 *</FieldLabel>
-                <Input id="birth" type="date" {...register("birth")} />
+                <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
+                <input type="hidden" {...register("birth")} />
+                <div className="flex items-center gap-1">
+                  <input
+                    id="birthYear"
+                    className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={4}
+                    placeholder="YYYY"
+                    inputMode="numeric"
+                    value={birthYear}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                      setBirthYear(v);
+                      if (v.length === 4) birthMonthRef.current?.focus();
+                      handleBirthSync(v, birthMonth, birthDay);
+                    }}
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input
+                    ref={birthMonthRef}
+                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={2}
+                    placeholder="MM"
+                    inputMode="numeric"
+                    value={birthMonth}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      setBirthMonth(v);
+                      if (v.length === 2) birthDayRef.current?.focus();
+                      handleBirthSync(birthYear, v, birthDay);
+                    }}
+                  />
+                  <span className="text-slate-400">-</span>
+                  <input
+                    ref={birthDayRef}
+                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                    maxLength={2}
+                    placeholder="DD"
+                    inputMode="numeric"
+                    value={birthDay}
+                    onChange={(e) => {
+                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                      setBirthDay(v);
+                      handleBirthSync(birthYear, birthMonth, v);
+                    }}
+                  />
+                </div>
                 {errors.birth ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
               </div>
 
@@ -1012,34 +1078,43 @@ export default function ApplyClient() {
             </div>
           </Card>
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>단체/행사 정보</h3>
+          {isStudioRoom ? (
+            /* E-스튜디오: 단체/행사 정보 불필요 → 숨김 처리 */
+            <>
+              <input type="hidden" {...register("orgName")} value="-" />
+              <input type="hidden" {...register("headcount")} value="1" />
+              <input type="hidden" {...register("purpose")} value="E-스튜디오 대관" />
+            </>
+          ) : (
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>단체/행사 정보</h3>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
-                <Input id="orgName" {...register("orgName")} />
-                {errors.orgName ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
-              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
+                  <Input id="orgName" {...register("orgName")} />
+                  {errors.orgName ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
+                </div>
 
-              <div>
-                <FieldLabel htmlFor="headcount">인원 *</FieldLabel>
-                <Input
-                  id="headcount"
-                  type="number"
-                  min={1}
-                  {...register("headcount", { valueAsNumber: true })}
-                />
-                {errors.headcount ? <FieldHelp className="text-red-600">{errors.headcount.message}</FieldHelp> : null}
-              </div>
+                <div>
+                  <FieldLabel htmlFor="headcount">인원 *</FieldLabel>
+                  <Input
+                    id="headcount"
+                    type="number"
+                    min={1}
+                    {...register("headcount", { valueAsNumber: true })}
+                  />
+                  {errors.headcount ? <FieldHelp className="text-red-600">{errors.headcount.message}</FieldHelp> : null}
+                </div>
 
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="purpose">사용 목적/행사 내용 *</FieldLabel>
-                <Textarea id="purpose" {...register("purpose")} rows={4} />
-                {errors.purpose ? <FieldHelp className="text-red-600">{errors.purpose.message}</FieldHelp> : null}
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="purpose">사용 목적/행사 내용 *</FieldLabel>
+                  <Textarea id="purpose" {...register("purpose")} rows={4} />
+                  {errors.purpose ? <FieldHelp className="text-red-600">{errors.purpose.message}</FieldHelp> : null}
+                </div>
               </div>
-            </div>
-          </Card>
+            </Card>
+          )}
 
           <Card pad="lg">
             <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용(선택)" : "장비 사용(선택)"}</h3>
@@ -1197,191 +1272,163 @@ export default function ApplyClient() {
           </Button>
         </form>
 
-        {/* 추가 회차 모달 */}
+        {/* ── 추가 회차 모달 (리뉴얼) ── */}
         {extraOpen ? (
           <div
-            className="fixed inset-0 z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
             role="dialog"
             aria-modal="true"
             aria-labelledby="extra-session-modal-title"
           >
             <button
               type="button"
-              className="absolute inset-0 bg-black/40"
+              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
               aria-label="모달 닫기"
-              onClick={() => {
-                setExtraOpen(false);
-                setSessionError(null);
-              }}
+              onClick={() => { setExtraOpen(false); setSessionError(null); }}
               tabIndex={-1}
             />
 
-            <div className="relative w-full max-w-5xl overflow-hidden rounded-2xl bg-white shadow-xl">
-              <div className="flex items-center justify-between border-b px-5 py-4">
-                <h3 id="extra-session-modal-title" className="text-base font-semibold">대관 일정 추가</h3>
+            <div className="relative w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
+              {/* 헤더 */}
+              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+                <div>
+                  <h3 id="extra-session-modal-title" className="text-base font-bold text-slate-900">대관 일정 추가</h3>
+                  <p className="mt-0.5 text-xs text-slate-500">여러 회차를 한 번에 신청할 수 있습니다</p>
+                </div>
                 <button
                   type="button"
-                  onClick={() => {
-                    setExtraOpen(false);
-                    setSessionError(null);
-                  }}
-                  className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
-                  aria-label="모달 닫기"
+                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
+                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                  aria-label="닫기"
                 >
-                  닫기
+                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
                 </button>
               </div>
 
-              <div className="max-h-[70vh] overflow-auto px-5 py-4">
-                <p className="text-sm text-gray-700">날짜/시간이 다른 여러 회차를 한 번에 신청할 수 있습니다.</p>
-
+              <div className="max-h-[70vh] overflow-auto">
+                {/* 에러 */}
                 {sessionError ? (
-                  <div className="mt-4">
-                    <Notice variant="warn" title="일정 추가를 진행할 수 없습니다" pad="md">
-                      <div className="whitespace-pre-line text-sm">{sessionError}</div>
-                    </Notice>
+                  <div className="px-5 pt-4">
+                    <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
+                      {sessionError}
+                    </div>
                   </div>
                 ) : null}
 
-                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                  {/* 입력 */}
-                  <div className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="text-xs font-semibold text-slate-900">일정 추가</div>
-
-                    <div className="mt-2 grid gap-2">
-                      <div>
-                        <FieldLabel htmlFor="addDate" className="text-[11px]">날짜</FieldLabel>
-                        <Input
-                          id="addDate"
-                          type="date"
-                          value={addDate}
-                          min={todayYmdSeoul()}
-                          disabled={!selectedDate}
-                          onChange={(e) => setAddDate(e.target.value)}
-                        />
-                      </div>
-
-                      <div className="grid gap-2 sm:grid-cols-2">
-                        <div>
-                          <FieldLabel htmlFor="addStartTime" className="text-[11px]">시작</FieldLabel>
-                          <Select
-                            id="addStartTime"
-                            value={addStartTime}
-                            disabled={!selectedDate || !addDate}
-                            onChange={(e) => setAddStartTime(e.target.value)}
-                          >
-                            {addStartOptions.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-
-                        <div>
-                          <FieldLabel htmlFor="addEndTime" className="text-[11px]">종료</FieldLabel>
-                          <Select
-                            id="addEndTime"
-                            value={addEndTime}
-                            disabled={!selectedDate || !addDate}
-                            onChange={(e) => setAddEndTime(e.target.value)}
-                          >
-                            {addEndOptions.map((t) => (
-                              <option key={t} value={t}>
-                                {t}
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="mt-3 flex items-center justify-end">
-                      <Button
-                        variant="outline"
-                        className="h-10 px-3"
-                        disabled={!selectedDate || !addDate || !addStartTime || !addEndTime}
-                        onClick={addSession}
-                        type="button"
-                      >
-                        일정 추가
-                      </Button>
-                    </div>
-
-                    <FieldHelp className="mt-2">
-                      * “기본” 회차와 동일한 일정은 자동으로 중복 추가되지 않습니다.
-                    </FieldHelp>
+                {/* 입력 영역 */}
+                <div className="px-5 py-4 space-y-3">
+                  <div>
+                    <FieldLabel htmlFor="addDate" className="text-xs">날짜</FieldLabel>
+                    <Input
+                      id="addDate"
+                      type="date"
+                      value={addDate}
+                      min={todayYmdSeoul()}
+                      disabled={!selectedDate}
+                      onChange={(e) => setAddDate(e.target.value)}
+                    />
                   </div>
 
-                  {/* 목록 */}
-                  <div className="rounded-xl border border-slate-200 bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-xs font-semibold text-slate-900">선택된 일정</div>
-                      <div className="text-[11px] text-slate-500">
-                        총 <b>{allSessions.length}</b>회차
-                      </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <FieldLabel htmlFor="addStartTime" className="text-xs">시작 시간</FieldLabel>
+                      <Select
+                        id="addStartTime"
+                        value={addStartTime}
+                        disabled={!selectedDate || !addDate}
+                        onChange={(e) => setAddStartTime(e.target.value)}
+                      >
+                        {addStartOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </Select>
                     </div>
+                    <div>
+                      <FieldLabel htmlFor="addEndTime" className="text-xs">종료 시간</FieldLabel>
+                      <Select
+                        id="addEndTime"
+                        value={addEndTime}
+                        disabled={!selectedDate || !addDate}
+                        onChange={(e) => setAddEndTime(e.target.value)}
+                      >
+                        {addEndOptions.map((t) => <option key={t} value={t}>{t}</option>)}
+                      </Select>
+                    </div>
+                  </div>
 
-                    {allSessions.length > 0 ? (
-                      <div className="mt-2 overflow-hidden rounded-lg border border-slate-200 bg-white">
-                        {allSessions.map((s) => {
-                          const isBase = s.date === selectedDate && s.startTime === startTime && s.endTime === endTime;
-                          return (
-                            <div
-                              key={`${s.date}|${s.startTime}|${s.endTime}`}
-                              className="flex items-center justify-between gap-2 border-t border-slate-100 px-3 py-2 text-xs text-slate-700 first:border-t-0"
-                            >
-                              <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <span className="font-semibold text-slate-900">{s.date}</span>
-                                  <span className="text-slate-700">{s.startTime}~{s.endTime}</span>
-                                  {isBase ? (
-                                    <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] text-slate-600">
-                                      기본
-                                    </span>
-                                  ) : null}
-                                </div>
+                  <Button
+                    variant="outline"
+                    className="h-10 w-full"
+                    disabled={!selectedDate || !addDate || !addStartTime || !addEndTime}
+                    onClick={addSession}
+                    type="button"
+                  >
+                    + 일정 추가
+                  </Button>
+                </div>
+
+                {/* 구분선 + 일정 목록 */}
+                <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-xs font-bold text-slate-700">선택된 일정</span>
+                    <span className="rounded-full bg-[rgb(var(--brand-primary)/0.1)] px-2.5 py-0.5 text-xs font-bold text-[rgb(var(--brand-primary))]">
+                      {allSessions.length}회차
+                    </span>
+                  </div>
+
+                  {allSessions.length > 0 ? (
+                    <div className="space-y-2">
+                      {allSessions.map((s, idx) => {
+                        const isBase = s.date === selectedDate && s.startTime === startTime && s.endTime === endTime;
+                        return (
+                          <div
+                            key={`${s.date}|${s.startTime}|${s.endTime}`}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
+                          >
+                            <div className="flex items-center gap-2.5 min-w-0">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
+                                {idx + 1}
+                              </span>
+                              <div className="text-xs">
+                                <span className="font-semibold text-slate-900">{s.date}</span>
+                                <span className="ml-1.5 text-slate-600">{s.startTime} ~ {s.endTime}</span>
                               </div>
-
-                              {!isBase ? (
-                                <button
-                                  type="button"
-                                  className="shrink-0 rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] text-slate-600 hover:bg-slate-50"
-                                  onClick={() => removeExtraSession(s)}
-                                  aria-label={`회차 삭제: ${s.date} ${s.startTime}-${s.endTime}`}
-                                >
-                                  삭제
-                                </button>
-                              ) : (
-                                <span className="text-[10px] text-slate-400">삭제 불가</span>
+                              {isBase && (
+                                <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">기본</span>
                               )}
                             </div>
-                          );
-                        })}
-                      </div>
-                    ) : (
-                      <div className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
-                        추가 일정이 없습니다. 왼쪽에서 날짜/시간을 선택 후 “일정 추가”를 눌러주세요.
-                      </div>
-                    )}
 
-                    <FieldHelp className="mt-2">
-                      ※ “기본” 회차는 삭제할 수 없습니다. (기본 회차를 바꾸려면 바깥 화면에서 날짜/시간을 변경하세요.)
-                    </FieldHelp>
-                  </div>
+                            {!isBase ? (
+                              <button
+                                type="button"
+                                className="shrink-0 rounded-md border border-slate-200 bg-white p-1 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                                onClick={() => removeExtraSession(s)}
+                                aria-label={`삭제: ${s.date}`}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5l-7 7M3.5 3.5l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
+                              </button>
+                            ) : (
+                              <span className="text-[10px] text-slate-400">기본</span>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 p-4 text-center text-xs text-slate-500">
+                      날짜와 시간을 선택 후<br />&ldquo;일정 추가&rdquo; 버튼을 눌러 주세요
+                    </div>
+                  )}
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 border-t bg-white px-5 py-4">
+              {/* 하단 완료 버튼 */}
+              <div className="border-t border-slate-100 px-5 py-3">
                 <Button
                   type="button"
                   variant="primary"
-                  onClick={() => {
-                    setExtraOpen(false);
-                    setSessionError(null);
-                  }}
+                  className="w-full py-2.5"
+                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
                 >
-                  완료
+                  완료 ({allSessions.length}회차)
                 </Button>
               </div>
             </div>

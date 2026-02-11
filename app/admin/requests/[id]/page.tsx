@@ -117,6 +117,7 @@ export default async function AdminRequestDetail({
   }
   const normalizedCategory = normalizeRoomCategory(rawCategory);
   const isGallery = req.roomId === "gallery" || normalizedCategory === "gallery";
+  const isStudio = normalizedCategory === "studio";
   const backToListHref = `/admin/requests?category=${encodeURIComponent(normalizedCategory)}`;
 
   /* ── 묶음(배치) ── */
@@ -265,8 +266,8 @@ export default async function AdminRequestDetail({
             <InfoRow label="성명">{req.applicantName}</InfoRow>
             <InfoRow label="연락처">{req.phone}</InfoRow>
             <InfoRow label="이메일">{req.email}</InfoRow>
-            {req.orgName && <InfoRow label="단체명">{req.orgName}</InfoRow>}
-            {!isGallery && <InfoRow label="인원">{req.headcount}명</InfoRow>}
+            {req.orgName && req.orgName !== "-" && !isStudio && <InfoRow label="단체명">{req.orgName}</InfoRow>}
+            {!isGallery && !isStudio && <InfoRow label="인원">{req.headcount}명</InfoRow>}
           </dl>
         </Section>
 
@@ -301,7 +302,7 @@ export default async function AdminRequestDetail({
                     {sessions[0].date} ~ {sessions[sessions.length - 1].date} ({sessions.length}회)
                   </InfoRow>
                 )}
-                <InfoRow label="사용 목적">{req.purpose}</InfoRow>
+                {!isStudio && <InfoRow label="사용 목적">{req.purpose}</InfoRow>}
               </>
             )}
           </dl>

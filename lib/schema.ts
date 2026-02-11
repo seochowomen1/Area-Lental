@@ -25,14 +25,14 @@ export const RequestInputSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
-  applicantName: z.string().min(2).max(30),
-  birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  address: z.string().min(2).max(200),
-  phone: z.string().min(9).max(20),
-  email: z.string().email(),
+  applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
+  birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+  address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
+  phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
+  email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
 
-  orgName: z.string().min(1).max(80),
-  headcount: z.coerce.number().int().min(1).max(500),
+  orgName: z.string().min(1, "단체명을 입력해 주세요.").max(80),
+  headcount: z.coerce.number({ invalid_type_error: "인원 수를 입력해 주세요." }).int().min(1, "인원은 1명 이상이어야 합니다.").max(500),
 
   laptop: CheckboxBoolean.default(false),
   projector: CheckboxBoolean.default(false),
@@ -46,12 +46,12 @@ export const RequestInputSchema = z.object({
   rodeMic: CheckboxBoolean.default(false),
   electronicBoard: CheckboxBoolean.default(false),
 
-  purpose: z.string().min(5).max(1000),
+  purpose: z.string().min(5, "사용 목적은 5자 이상 입력해 주세요.").max(1000),
 
   privacyAgree: CheckboxBoolean,
   pledgeAgree: CheckboxBoolean,
   pledgeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  pledgeName: z.string().min(2).max(30)
+  pledgeName: z.string().min(2, "서약자 성명은 2자 이상 입력해 주세요.").max(30)
 }).superRefine((v, ctx) => {
   if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
   if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "대관 규정 서약 동의는 필수입니다." });
@@ -102,14 +102,14 @@ export const GalleryRequestInputSchema = z
     startTime: z.string().regex(/^\d{2}:\d{2}$/),
     endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
-    applicantName: z.string().min(2).max(30),
-    birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    address: z.string().min(2).max(200),
-    phone: z.string().min(9).max(20),
-    email: z.string().email(),
+    applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
+    birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+    address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
+    phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
+    email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
 
-    orgName: z.string().min(1).max(80),
-    headcount: z.coerce.number().int().min(1).max(500),
+    orgName: z.string().min(1, "단체명을 입력해 주세요.").max(80),
+    headcount: z.coerce.number({ invalid_type_error: "인원 수를 입력해 주세요." }).int().min(1, "인원은 1명 이상이어야 합니다.").max(500),
 
     // 갤러리는 장비 옵션 불가(항상 false)
     laptop: CheckboxBoolean.default(false),
@@ -132,12 +132,12 @@ export const GalleryRequestInputSchema = z
     specialNotes: z.string().max(1000).optional(),
 
     // 호환: 관리자 확인용 텍스트(갤러리 전용 필드를 합쳐서 구성)
-    purpose: z.string().min(1).max(2000),
+    purpose: z.string().min(1, "사용 목적을 입력해 주세요.").max(2000),
 
     privacyAgree: CheckboxBoolean,
     pledgeAgree: CheckboxBoolean,
     pledgeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    pledgeName: z.string().min(2).max(30)
+    pledgeName: z.string().min(2, "서약자 성명은 2자 이상 입력해 주세요.").max(30)
   })
   .superRefine((v, ctx) => {
     if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
