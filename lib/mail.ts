@@ -3,6 +3,7 @@ import { getBaseEnv, getSmtpEnvOptional, isMockMode } from "@/lib/env";
 import type { RentalRequest } from "@/lib/types";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { ROOMS_BY_ID } from "@/lib/space";
+import { getTemplate, renderTemplate, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
 
 function isGallery(r: RentalRequest) {
   return r.roomId === "gallery";
@@ -235,12 +236,12 @@ ${sessions}
 export function generateDecisionEmailContent(req: RentalRequest): { to: string; subject: string; body: string } | null {
   if (!req.email) return null;
   const cat = spaceCategoryLabel(req);
-  const subject = `[${req.status}] ${cat} 대관 신청 결과 (${req.requestId})`;
+  const catId = getRoomCategory(req) as TemplateCategory;
+  const status = req.status as TemplateStatus;
   const base = getBaseEnv();
   const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(req.requestId)}`;
 
   const fee = computeFeesForRequest(req);
-  const eqText = !isGallery(req) ? `- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}\n` : "";
   const feeBlock =
 `[이용 요금]
 - 대관료: ${formatKRW(fee.rentalFeeKRW)}
@@ -248,26 +249,37 @@ export function generateDecisionEmailContent(req: RentalRequest): { to: string; 
 - 총 금액: ${formatKRW(fee.totalFeeKRW)}
 - 할인: ${fee.discountAmountKRW > 0 ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})` : "-"}
 - 할인 사유: ${fee.discountReason || "-"}
-- 최종금액: ${formatKRW(fee.finalFeeKRW)}
-`;
+- 최종금액: ${formatKRW(fee.finalFeeKRW)}`;
 
-  const header =
+  // 커스텀 템플릿 사용
+  if (["승인", "반려", "취소"].includes(status)) {
+    const template = getTemplate(catId, status);
+    const vars: Record<string, string> = {
+      "신청번호": req.requestId,
+      "공간": req.roomName,
+      "카테고리": cat,
+      "일시": formatWhenSingle(req),
+      "신청자": req.applicantName,
+      "상태": req.status,
+      "요금정보": req.status === "승인" ? feeBlock : "",
+      "반려사유": req.rejectReason || "(사유 미입력)",
+      "조회링크": resultUrl,
+    };
+    const rendered = renderTemplate(template, vars);
+    return { to: req.email, subject: rendered.subject, body: rendered.body };
+  }
+
+  // Fallback (접수 등)
+  const subject = `[${req.status}] ${cat} 대관 신청 결과 (${req.requestId})`;
+  const body =
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
 - 신청번호: ${req.requestId}
 - 공간(${cat}): ${req.roomName}
 - ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}
-${eqText}- 처리상태: ${req.status}
-`;
+- 처리상태: ${req.status}
 
-  const tail = req.status === "반려"
-    ? `\n반려 사유:\n${req.rejectReason || "(사유 미입력)"}\n`
-    : req.status === "취소"
-    ? `\n취소 처리되었습니다.\n`
-    : "\n";
-
-  const body = header + "\n" + (req.status === "승인" ? feeBlock + "\n" : "") + tail +
-`승인/반려 결과는 아래 페이지에서도 확인할 수 있습니다.
+승인/반려 결과는 아래 페이지에서도 확인할 수 있습니다.
 ${resultUrl}
 
 감사합니다.

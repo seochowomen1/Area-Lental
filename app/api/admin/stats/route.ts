@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { computeFeesForRequest, computeFeesForBundle } from "@/lib/pricing";
+import { dayOfWeek } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -138,6 +139,35 @@ export async function GET(req: Request) {
         data.galleryDays += days;
         data.galleryRevenue += revenue;
       }
+    }
+
+    // 갤러리 내부 대관(블록)도 실적에 포함
+    const blocks = await db.getBlocks();
+    const galleryBlocks = blocks.filter((b) => b.roomId === "gallery");
+
+    for (const block of galleryBlocks) {
+      const blockStart = block.date;
+      const blockEnd = block.endDate || block.date;
+      const month = getMonth(blockStart);
+      if (!month.startsWith(year)) continue;
+
+      const data = ensureMonth(month);
+
+      // 실인원: 내부 대관 1건 = 1회
+      if (!data.gallery.has(month)) data.gallery.set(month, new Set());
+      data.gallery.get(month)!.add(`__block_${block.id}`);
+
+      // 연인원: 날짜 범위 내 일수 (일요일 제외)
+      let blockedDays = 0;
+      const cur = new Date(blockStart + "T00:00:00Z");
+      const end = new Date(blockEnd + "T00:00:00Z");
+      while (cur <= end) {
+        const ymd = cur.toISOString().slice(0, 10);
+        if (dayOfWeek(ymd) !== 0) blockedDays++;
+        cur.setUTCDate(cur.getUTCDate() + 1);
+      }
+      data.galleryDays += blockedDays;
+      // 수입 = 0 (내부 대관)
     }
 
     // 결과 정리

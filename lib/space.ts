@@ -134,6 +134,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 0,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/gallery.jpg",
     note: "4층(북카페 일대) 전시 공간입니다. 전시 기간(일 단위)으로 신청하며, 시작일 이전 준비(세팅) 1일은 무료로 포함됩니다.",
     equipment: [
       {
@@ -221,6 +222,7 @@ export const ROOMS: SpaceRoom[] = [
     feeKRW: 20000,
     contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/room/media.jpg",
     note: "촬영·녹음·편집 등 미디어 활동을 지원하는 스튜디오 공간입니다. 기본 2인 이상 인원 추가 시 시간당 5,000원이 추가됩니다.",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },

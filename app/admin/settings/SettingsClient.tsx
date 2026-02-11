@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import AdminScheduleForm from "@/components/admin/AdminScheduleForm";
@@ -371,6 +371,172 @@ export default function SettingsClient(props: {
           </div>
         )}
       </section>
+
+      {/* 이메일 템플릿 섹션 */}
+      <EmailTemplateSection category={props.category ?? "lecture"} onToast={(t) => setToast(t)} />
     </div>
+  );
+}
+
+/* ── 이메일 템플릿 편집 섹션 ── */
+
+type EmailTemplate = { subject: string; body: string };
+type TemplateStatus = "승인" | "반려" | "취소";
+
+const STATUS_OPTIONS: TemplateStatus[] = ["승인", "반려", "취소"];
+
+const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}";
+
+function EmailTemplateSection({
+  category,
+  onToast,
+}: {
+  category: string;
+  onToast: (t: { type: "success" | "error"; message: string }) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [selectedStatus, setSelectedStatus] = useState<TemplateStatus>("승인");
+  const [templates, setTemplates] = useState<Record<string, EmailTemplate> | null>(null);
+  const [subject, setSubject] = useState("");
+  const [body, setBody] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [loaded, setLoaded] = useState(false);
+
+  const catId = category === "studio" ? "studio" : category === "gallery" ? "gallery" : "lecture";
+
+  const loadTemplates = useCallback(async () => {
+    try {
+      const res = await fetch("/api/admin/email-templates");
+      const data = await res.json();
+      if (data.ok && data.templates?.[catId]) {
+        setTemplates(data.templates[catId]);
+        const tpl = data.templates[catId][selectedStatus];
+        if (tpl) {
+          setSubject(tpl.subject);
+          setBody(tpl.body);
+        }
+        setLoaded(true);
+      }
+    } catch {
+      // ignore
+    }
+  }, [catId, selectedStatus]);
+
+  useEffect(() => {
+    if (open && !loaded) {
+      loadTemplates();
+    }
+  }, [open, loaded, loadTemplates]);
+
+  useEffect(() => {
+    if (templates && templates[selectedStatus]) {
+      setSubject(templates[selectedStatus].subject);
+      setBody(templates[selectedStatus].body);
+    }
+  }, [selectedStatus, templates]);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/admin/email-templates", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ category: catId, status: selectedStatus, subject, body }),
+      });
+      const data = await res.json();
+      if (data.ok) {
+        // Update local cache
+        setTemplates((prev) => ({ ...prev, [selectedStatus]: { subject, body } }));
+        onToast({ type: "success", message: `${selectedStatus} 메일 템플릿이 저장되었습니다.` });
+      } else {
+        onToast({ type: "error", message: data.message || "저장 실패" });
+      }
+    } catch {
+      onToast({ type: "error", message: "저장 중 오류가 발생했습니다." });
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+      <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">메일 템플릿</h2>
+            <p className="mt-0.5 text-xs text-slate-500">
+              승인/반려/취소 시 표시되는 메일 기본 내용을 수정합니다
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setOpen((v) => !v)}
+            className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+          >
+            {open ? "닫기" : "템플릿 편집"}
+          </button>
+        </div>
+      </div>
+
+      {open && (
+        <div className="px-5 py-5 space-y-4">
+          {/* 상태 선택 탭 */}
+          <div className="flex gap-2">
+            {STATUS_OPTIONS.map((st) => (
+              <button
+                key={st}
+                type="button"
+                onClick={() => setSelectedStatus(st)}
+                className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+                  selectedStatus === st
+                    ? "bg-slate-900 text-white"
+                    : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                }`}
+              >
+                {st}
+              </button>
+            ))}
+          </div>
+
+          {/* 제목 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">메일 제목</label>
+            <input
+              type="text"
+              value={subject}
+              onChange={(e) => setSubject(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+            />
+          </div>
+
+          {/* 본문 */}
+          <div>
+            <label className="block text-xs font-semibold text-slate-600 mb-1">메일 본문</label>
+            <textarea
+              value={body}
+              onChange={(e) => setBody(e.target.value)}
+              rows={14}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+            />
+            <p className="mt-1 text-xs text-slate-400">{TEMPLATE_VARS_HELP}</p>
+          </div>
+
+          {/* 저장 버튼 */}
+          <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={handleSave}
+              disabled={saving}
+              className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-60"
+            >
+              {saving ? "저장 중..." : "템플릿 저장"}
+            </button>
+            <span className="text-xs text-slate-500">
+              * 저장 후 승인/반려/취소 시 해당 템플릿이 메일 팝업에 표시됩니다.
+            </span>
+          </div>
+        </div>
+      )}
+    </section>
   );
 }

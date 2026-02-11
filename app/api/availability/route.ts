@@ -97,7 +97,11 @@ export async function GET(req: Request) {
         if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
         return overlaps(r.startTime, r.endTime, s.start, s.end);
       });
-      const byBlock = sameRoomBlocks.some((b) => overlaps(b.startTime, b.endTime, s.start, s.end));
+      // 갤러리 블록(내부 대관 등 날짜 범위)은 전일 차단으로 처리
+      const byBlock = sameRoomBlocks.some((b) => {
+        if (roomId === "gallery" && b.endDate) return true;
+        return overlaps(b.startTime, b.endTime, s.start, s.end);
+      });
       const bySchedule = sameRoomSchedules.some((sc) => overlaps(sc.startTime, sc.endTime, s.start, s.end));
 
       return {
