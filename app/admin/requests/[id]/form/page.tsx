@@ -20,6 +20,7 @@ import {
   normalizeRoomCategory,
   type SpaceRoom,
 } from "@/lib/space";
+import { dayOfWeek } from "@/lib/datetime";
 import { operatingNoticeLines } from "@/lib/operating";
 import {
   PLEDGE_TITLE,
@@ -85,15 +86,9 @@ export default async function AdminRequestFormPage({
   }
   const normalizedCategory = normalizeRoomCategory(rawCategory);
 
-  // 강의실 + E-스튜디오만 허용 (갤러리 제외)
-  if (normalizedCategory === "gallery") {
-    redirect(
-      `/admin/requests/${encodeURIComponent(req.requestId)}?category=${encodeURIComponent(normalizedCategory)}`
-    );
-  }
-
   const categoryLabel = getCategoryLabel(normalizedCategory);
   const isLecture = normalizedCategory === "lecture";
+  const isGallery = normalizedCategory === "gallery";
 
   /* ── batch / session ── */
   const batchList = req.batchId
@@ -559,7 +554,7 @@ export default async function AdminRequestFormPage({
         {/* ════════════════════════════════════════════════════ */}
         {/* ═══ PAGE 1-B: E-스튜디오 대관 신청서 (스튜디오 전용) ═══ */}
         {/* ════════════════════════════════════════════════════ */}
-        {!isLecture && (
+        {!isLecture && !isGallery && (
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
@@ -816,6 +811,327 @@ export default async function AdminRequestFormPage({
             <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
               <p>
                 위와 같이 서초여성가족플라자 서초센터 E-스튜디오 대관을 신청합니다.
+              </p>
+              <p className="mt-2">{printDate}</p>
+              <p className="mt-2">
+                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+              </p>
+            </div>
+
+            {/* ── 푸터 ── */}
+            <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
+              <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
+              <p>*대관규정 서약서 별도 첨부</p>
+              {req.requestId && (
+                <p className="mt-0.5 text-gray-400">
+                  신청번호: {req.requestId} | 출력일: {printDate}
+                </p>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ════════════════════════════════════════════════════════ */}
+        {/* ═══ PAGE 1-C: 우리동네 갤러리 대관 신청서 (갤러리 전용) ═══ */}
+        {/* ════════════════════════════════════════════════════════ */}
+        {isGallery && (
+          <div className="page-section">
+            {/* ── 문서 헤더 ── */}
+            <div className="text-center">
+              <p className="text-[10px] text-gray-500 print:text-[8px]">
+                [별첨1]
+              </p>
+              <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
+                서초여성가족플라자 서초센터
+              </h1>
+              <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+                우리동네 갤러리 대관 신청서
+              </h2>
+            </div>
+
+            {/* ── 1. 신청자 정보 ── */}
+            <table className="mt-3 w-full border-collapse print:mt-2">
+              <tbody>
+                <tr>
+                  <th className={TH} style={{ width: "14%" }}>
+                    신청자명
+                  </th>
+                  <td className={TD} style={{ width: "36%" }}>
+                    {req.applicantName}
+                  </td>
+                  <th className={TH} style={{ width: "14%" }}>
+                    생년월일
+                  </th>
+                  <td className={TD} style={{ width: "36%" }}>
+                    {req.birth || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>연락처</th>
+                  <td className={TD}>{req.phone}</td>
+                  <th className={TH}>E-mail</th>
+                  <td className={TD}>{req.email}</td>
+                </tr>
+                <tr>
+                  <th className={TH}>주소</th>
+                  <td className={TD} colSpan={3}>
+                    {req.address || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>단체명</th>
+                  <td className={TD}>{req.orgName || "-"}</td>
+                  <th className={TH}>관람인원</th>
+                  <td className={TD}>{req.headcount}명</td>
+                </tr>
+              </tbody>
+            </table>
+
+            {/* ── 2. 전시 정보 ── */}
+            <table className="mt-2 w-full border-collapse print:mt-1.5">
+              <tbody>
+                <tr>
+                  <th className={TH} style={{ width: "18%" }}>전시명</th>
+                  <td className={TD} colSpan={3}>
+                    {req.exhibitionTitle || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>전시 기간</th>
+                  <td className={TD} colSpan={3}>
+                    {req.startDate && req.endDate
+                      ? `${req.startDate} ~ ${req.endDate}`
+                      : req.date}
+                    {req.galleryExhibitionDayCount
+                      ? ` (전시 ${req.galleryExhibitionDayCount}일)`
+                      : ""}
+                    {req.galleryPrepDate
+                      ? ` / 준비일: ${req.galleryPrepDate}`
+                      : ""}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>철수시간</th>
+                  <td className={TD} colSpan={3}>
+                    {req.galleryRemovalTime
+                      ? `종료일 ${req.galleryRemovalTime}까지`
+                      : "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>전시 목적</th>
+                  <td className={TD} colSpan={3}>
+                    {req.exhibitionPurpose || req.purpose || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>장르 · 내용</th>
+                  <td className={TD} colSpan={3}>
+                    {req.genreContent || "-"}
+                  </td>
+                </tr>
+                <tr>
+                  <th className={TH}>인지 경로</th>
+                  <td className={TD} colSpan={3}>
+                    {req.awarenessPath || "-"}
+                  </td>
+                </tr>
+                {req.specialNotes && (
+                  <tr>
+                    <th className={TH}>특이사항</th>
+                    <td className={TD} colSpan={3}>
+                      {req.specialNotes}
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+
+            {/* ── 3. 대관 일정 상세 (배치 회차) ── */}
+            {isBatch && (
+              <table className="mt-2 w-full border-collapse print:mt-1.5">
+                <thead>
+                  <tr>
+                    <th className={TH} style={{ width: "8%" }}>회차</th>
+                    <th className={TH}>일자</th>
+                    <th className={TH} style={{ width: "14%" }}>구분</th>
+                    <th className={TH} style={{ width: "12%" }}>요일</th>
+                    <th className={TH} style={{ textAlign: "right", width: "16%" }}>이용료</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map((s, i) => {
+                    const base = computeBaseTotalKRW(s);
+                    const dow = ["일", "월", "화", "수", "목", "금", "토"][dayOfWeek(s.date)];
+                    return (
+                      <tr key={s.requestId}>
+                        <td className={`${TD} text-center`}>{i + 1}</td>
+                        <td className={TD}>{s.date}</td>
+                        <td className={`${TD} text-center`}>
+                          {s.isPrepDay ? "준비일" : "전시일"}
+                        </td>
+                        <td className={`${TD} text-center`}>{dow}</td>
+                        <td className={TD_R}>
+                          {s.isPrepDay ? "무료" : formatKRW(base.totalFeeKRW)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                  <tr>
+                    <th className={TH} colSpan={4} style={{ textAlign: "right" }}>
+                      합계
+                    </th>
+                    <td className={`${TD_R} font-bold`}>
+                      {formatKRW(baseFeeKRW)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+
+            {/* ── 3-1. 단건(1행) 형식: 일정 요약 + 비용 ── */}
+            {!isBatch && (
+              <table className="mt-2 w-full border-collapse print:mt-1.5">
+                <tbody>
+                  <tr>
+                    <th className={TH} style={{ width: "18%" }}>
+                      대관비용
+                      <br />
+                      <span className="font-normal text-gray-500 print:text-[7px]">
+                        (※담당자 기재)
+                      </span>
+                    </th>
+                    <td className={TD} colSpan={3}>
+                      <span className="font-semibold">
+                        {formatKRW(baseFeeKRW)}
+                      </span>
+                      {(req.galleryWeekdayCount ?? 0) > 0 && (
+                        <span className="ml-2 text-[10px] text-gray-600 print:text-[8px]">
+                          평일 {req.galleryWeekdayCount}일 × 20,000원
+                        </span>
+                      )}
+                      {(req.gallerySaturdayCount ?? 0) > 0 && (
+                        <span className="ml-2 text-[10px] text-gray-600 print:text-[8px]">
+                          토요일 {req.gallerySaturdayCount}일 × 10,000원
+                        </span>
+                      )}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+
+            {/* ── 4. 대관료 안내 ── */}
+            <div className="mt-2 rounded border border-gray-400 px-3 py-1.5 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+                대관료 안내
+              </h4>
+              <table className="mt-1 w-full border-collapse text-[10px] print:text-[8px]">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">구분</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">1일 대관료</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">비고</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">평일</td>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">20,000원</td>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center" rowSpan={3}>
+                      준비(세팅)일 1일 무료
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">토요일</td>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">10,000원</td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">일요일 · 공휴일</td>
+                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">휴관</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            {/* ── 5. 개인정보 수집·이용 안내 ── */}
+            <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
+              <h3 className="text-center text-[11px] font-bold text-gray-900 print:text-[9px]">
+                개인정보 수집 · 이용에 관한 안내 (* 필수항목)
+              </h3>
+              <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
+                <thead>
+                  <tr>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      개인정보 수집 · 이용 목적
+                    </th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      수집하려는 개인정보 항목
+                    </th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                      개인정보의 보유 및 이용 기간
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      갤러리 대관 신청업무 처리 및
+                      <br />
+                      의사소통 경로 확보
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      이름(또는 단체명), 대표자 성명,
+                      <br />
+                      연락처, E-mail, 주소, 생년월일
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      수집일로부터 3년 및 대관목적
+                      <br />
+                      달성 시 지체없이 해당정보 파기
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+                ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
+                대관 신청·진행에 일부 제한이 있습니다.
+              </p>
+              <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
+                <span className="font-bold text-gray-900">[필수]</span>
+                <span>
+                  위와 같이 개인정보의 수집 및 이용에 동의합니까?
+                </span>
+                <span className="ml-auto flex items-center gap-2">
+                  <span>{req.privacyAgree ? "■" : "□"} 동의</span>
+                  <span>{req.privacyAgree ? "□" : "■"} 미동의</span>
+                </span>
+              </div>
+            </div>
+
+            {/* ── 6. 전자 동의 확인 ── */}
+            <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+                [전자 동의 확인]
+              </h4>
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
+                <span>신청 일시: {consentDate}</span>
+                <span>
+                  개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
+                </span>
+                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
+              </div>
+              <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
+                본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
+                신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+              </p>
+            </div>
+
+            {/* ── 서명란 ── */}
+            <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+              <p>
+                위와 같이 서초여성가족플라자 서초센터 우리동네 갤러리 대관을
+                신청합니다.
               </p>
               <p className="mt-2">{printDate}</p>
               <p className="mt-2">

@@ -220,9 +220,13 @@ export default async function AdminRequestDetail({
               </Link>
             )}
             {normalizedCategory === "gallery" && (
-              <span className="rounded-full border border-gray-200 bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-400 cursor-default">
-                신청서 · 서약서 (준비 중)
-              </span>
+              <Link
+                href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
+                target="_blank"
+                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+              >
+                신청서 · 서약서
+              </Link>
             )}
             <Link
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
