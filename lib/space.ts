@@ -77,8 +77,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 70000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/bookcafe.jpg",
     note: "조용한 독서 및 소규모 모임에 적합한 공간입니다.",
     equipment: [
@@ -103,8 +103,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 100000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/classroom_all.jpg",
     note: "다양한 활동이 가능한 다목적 공간입니다.",
     equipment: [
@@ -132,8 +132,8 @@ export const ROOMS: SpaceRoom[] = [
     // 전시 기간(일 단위) 대관: 요금은 별도 정책(평일/토) 적용
     durationLimitHours: 0,
     feeKRW: 0,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/gallery.jpg",
     note: "4층(북카페 일대) 전시 공간입니다. 전시 기간(일 단위)으로 신청하며, 시작일 이전 준비(세팅) 1일은 무료로 포함됩니다.",
     equipment: [
@@ -171,8 +171,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 70000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/sangsang1.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
@@ -187,8 +187,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 50000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/sangsang2.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
@@ -203,8 +203,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 70000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/sangsang3.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "화이트보드(또는 보드)", "전원(콘센트)", "냉·난방", "조명"] },
@@ -220,8 +220,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료 (기본 인원 2명)
     feeKRW: 20000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/media.jpg",
     note: "촬영·녹음·편집 등 미디어 활동을 지원하는 스튜디오 공간입니다. 기본 2인 이상 인원 추가 시 시간당 5,000원이 추가됩니다.",
     equipment: [
@@ -257,8 +257,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 100000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/it.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },
@@ -275,8 +275,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 70000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/art.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },
@@ -292,8 +292,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 100000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/healing.jpg",
     equipment: [
       { title: "기본 비치", items: ["테이블(운영 형태에 따라 상이)", "의자", "전원(콘센트)", "냉·난방", "조명"] },
@@ -308,8 +308,8 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 100000,
-    contactName: "관리자",
-    contactPhone: "02-0000-0000",
+    contactName: "담당자",
+    contactPhone: "070-7163-2953",
     image: "/room/maru.jpg",
     equipment: [
       { title: "기본 비치", items: ["전원(콘센트)", "냉·난방", "조명"] },

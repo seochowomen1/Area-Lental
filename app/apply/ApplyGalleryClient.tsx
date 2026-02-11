@@ -142,12 +142,13 @@ function buildGallerySessions(startDate: string, endDate: string): {
   return { prepDate, sessions: out };
 }
 
-function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string }) {
-  // RequestInputSchema의 purpose(min 5) 충족 + 관리자 확인 편의
+function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string; galleryRemovalTime?: string }) {
+  // RequestInputSchema의 purpose(min 5) 충족 + 담당자 확인 편의
   const lines: string[] = [];
   if (fields.exhibitionPurpose?.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
   if (fields.genreContent?.trim()) lines.push(`장르·내용: ${fields.genreContent.trim()}`);
   if (fields.awarenessPath?.trim()) lines.push(`인지 경로: ${fields.awarenessPath.trim()}`);
+  if (fields.galleryRemovalTime?.trim()) lines.push(`철수 예정: 종료일 ${fields.galleryRemovalTime.trim()}`);
   if (fields.specialNotes?.trim()) lines.push(`특이사항: ${fields.specialNotes.trim()}`);
   const joined = lines.join("\n").trim();
   return joined.length >= 5 ? joined : "전시 신청";
@@ -207,6 +208,9 @@ export default function ApplyGalleryClient() {
       startDate: qpStart,
       endDate: qpEnd,
 
+      // 철수시간
+      galleryRemovalTime: "",
+
       // 전시 정보
       exhibitionTitle: "",
       exhibitionPurpose: "",
@@ -248,6 +252,7 @@ export default function ApplyGalleryClient() {
   const genreContent = watch("genreContent");
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
+  const galleryRemovalTime = watch("galleryRemovalTime");
 
   // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
   // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
@@ -262,9 +267,9 @@ export default function ApplyGalleryClient() {
 
   // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
   useEffect(() => {
-    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes });
+    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime });
     setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
-  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, setValue]);
+  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, setValue]);
 
   const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate), [startDate, endDate]);
 
@@ -320,7 +325,7 @@ export default function ApplyGalleryClient() {
       // 기존 저장 구조 호환: purpose 구성
       fd.set(
         "purpose",
-        composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes })
+        composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime })
       );
 
       // 회차 자동 생성(서버에서 재생성/검증 단계는 추후 /api/requests에서 확장)
@@ -434,11 +439,18 @@ export default function ApplyGalleryClient() {
                   <span className="text-sm font-semibold text-slate-900">{confirmData.startDate} ~ {confirmData.endDate}</span>
                 </div>
                 {sessionsBundle.prepDate && (
-                  <div className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500">준비일</span>
-                    <span className="text-sm font-semibold text-slate-900">{sessionsBundle.prepDate} (무료)</span>
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 my-1">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-amber-900">📌 전시 준비일</span>
+                      <span className="text-sm font-bold text-amber-900">{sessionsBundle.prepDate} (무료)</span>
+                    </div>
+                    <p className="mt-1 text-[11px] text-amber-700">변경 필요 시 담당자 문의 (070-7163-2953)</p>
                   </div>
                 )}
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">철수 일시</span>
+                  <span className="text-sm font-semibold text-slate-900">{confirmData.endDate} {confirmData.galleryRemovalTime}</span>
+                </div>
                 <div className="flex justify-between py-2.5">
                   <span className="text-sm text-slate-500">총 회차</span>
                   <span className="text-sm font-semibold text-slate-900">{sessionCount}회</span>
@@ -549,11 +561,11 @@ export default function ApplyGalleryClient() {
 
   return (
     <div>
-      <SiteHeader title="갤러리 대관 신청" backHref="/space?category=gallery" backLabel="목록" />
+      <SiteHeader title="우리동네 갤러리 대관 신청" backHref="/space?category=gallery" backLabel="목록" />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <h2 className="text-2xl font-bold">갤러리 대관 신청서 작성</h2>
-        <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 관리자 검토/승인 절차를 거쳐 확정됩니다.</p>
+        <h2 className="text-2xl font-bold">우리동네 갤러리 대관 신청서 작성</h2>
+        <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 담당자 검토/승인 절차를 거쳐 확정됩니다.</p>
 
         <div className="mt-4">
           <OperatingHoursNotice roomId="gallery" />
@@ -562,7 +574,7 @@ export default function ApplyGalleryClient() {
         <div className="mt-5">
           <Notice title="신청 전 확인" variant="info" pad="md">
             <ul className="list-disc space-y-1 pl-5">
-              <li>갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
+              <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
               <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 포함됩니다.</li>
               <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
               <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
@@ -615,14 +627,23 @@ export default function ApplyGalleryClient() {
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="text-sm text-slate-700">
                   자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
-                  {sessionsBundle.prepDate ? (
-                    <span className="ml-2 text-slate-600">(준비일 포함: {sessionsBundle.prepDate})</span>
-                  ) : null}
                 </div>
                 <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-[rgb(var(--brand-primary))] hover:underline">
-                  갤러리 안내 보기
+                  우리동네 갤러리 안내 보기
                 </button>
               </div>
+              {sessionsBundle.prepDate ? (
+                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base">📌</span>
+                    <span className="text-sm font-bold text-amber-900">전시 준비일: {sessionsBundle.prepDate} (무료)</span>
+                  </div>
+                  <p className="mt-1 text-xs text-amber-800">
+                    전시 준비일은 시작일 이전 1일(일요일·휴관일 제외)이 자동 배정됩니다.<br />
+                    전시 준비일 변경이 필요하면 담당자에게 문의해 주세요. (070-7163-2953)
+                  </p>
+                </div>
+              ) : null}
               {hasSundayInRange ? (
                 <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
               ) : null}
@@ -666,8 +687,48 @@ export default function ApplyGalleryClient() {
             )}
 
             <FieldHelp className="mt-2">
-              ※ 일요일은 자동 제외되며, 공휴일은 관리자 차단으로 관리됩니다.
+              ※ 일요일은 자동 제외되며, 공휴일은 담당자 차단으로 관리됩니다.
             </FieldHelp>
+
+            {/* 철수시간 설정 */}
+            {isYmd(endDate) && (
+              <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
+                <h4 className="text-sm font-bold text-orange-900">대관 철수 안내</h4>
+                <p className="mt-1 text-xs text-orange-800">
+                  전시 마지막 날({endDate}) <b>17시까지</b> 철수를 완료해야 합니다. 철수 예정 시간을 설정해 주세요.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-4">
+                  <div>
+                    <FieldLabel>철수 일자</FieldLabel>
+                    <Input type="text" value={endDate} readOnly className="bg-white/70 text-slate-700" />
+                  </div>
+                  <div>
+                    <FieldLabel htmlFor="galleryRemovalTime">철수 시간 *</FieldLabel>
+                    <Select id="galleryRemovalTime" {...register("galleryRemovalTime")}>
+                      <option value="">선택해 주세요</option>
+                      <option value="09:00">09:00</option>
+                      <option value="09:30">09:30</option>
+                      <option value="10:00">10:00</option>
+                      <option value="10:30">10:30</option>
+                      <option value="11:00">11:00</option>
+                      <option value="11:30">11:30</option>
+                      <option value="12:00">12:00</option>
+                      <option value="12:30">12:30</option>
+                      <option value="13:00">13:00</option>
+                      <option value="13:30">13:30</option>
+                      <option value="14:00">14:00</option>
+                      <option value="14:30">14:30</option>
+                      <option value="15:00">15:00</option>
+                      <option value="15:30">15:30</option>
+                      <option value="16:00">16:00</option>
+                      <option value="16:30">16:30</option>
+                      <option value="17:00">17:00</option>
+                    </Select>
+                    {errors.galleryRemovalTime?.message ? <FieldHelp className="text-red-600">{errors.galleryRemovalTime.message}</FieldHelp> : null}
+                  </div>
+                </div>
+              </div>
+            )}
           </Card>
 
           <Card pad="lg">
@@ -886,7 +947,7 @@ export default function ApplyGalleryClient() {
           {sessionCount === 0 && !startDate && !endDate ? (
             <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
           ) : null}
-          <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0} className="w-full py-3 shadow-sm hover:opacity-90">
+          <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0 || !galleryRemovalTime} className="w-full py-3 shadow-sm hover:opacity-90">
             {submitting ? "신청 중..." : "신청하기"}
           </Button>
         </form>

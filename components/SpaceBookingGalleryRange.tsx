@@ -167,6 +167,11 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     setError("");
 
     if (!startDate || (startDate && endDate)) {
+      // 시작일과 종료일이 모두 선택된 상태에서 같은 시작일 클릭 → 전체 초기화
+      if (startDate && endDate && dateYmd === startDate) {
+        clearRange();
+        return;
+      }
       trySetRange(dateYmd, "");
       return;
     }
@@ -242,8 +247,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       if (diffDaysInclusive(startDate, ymd) > 30) return true;
     }
 
-    // 시작/종료 모두 선택된 상태: 범위 밖은 비활성
+    // 시작/종료 모두 선택된 상태: 범위 밖은 비활성 (단, 시작일은 재클릭으로 초기화 가능)
     if (isYmd(startDate) && isYmd(endDate)) {
+      if (ymd === startDate) return false;
       if (!inRange(ymd, startDate, endDate)) return true;
     }
 
@@ -255,7 +261,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700">
         <p className="font-semibold">우리동네 갤러리(4층) 신청 안내</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
-          <li>갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
+          <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
           <li>일요일은 자동 제외되며, 공휴일은 자동 제외되지 않습니다(차단시간으로 관리).</li>
           <li>준비(세팅)일 1일은 무료로 자동 포함됩니다. (시작일 이전, 일요일이면 더 이전)</li>
           <li>전시 기간은 최대 30일까지 신청할 수 있습니다.</li>

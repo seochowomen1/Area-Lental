@@ -57,6 +57,7 @@ const REQUEST_OPTIONAL_HEADERS = [
   "galleryExhibitionDayCount",
   "galleryPrepDate",
   "galleryAuditJson",
+  "galleryRemovalTime",
 ] as const;
 
 function colToLetter(col1: number): string {
@@ -160,6 +161,7 @@ function buildRecordValueMap(record: RentalRequest): Record<string, string> {
     galleryExhibitionDayCount: String(record.galleryExhibitionDayCount ?? 0),
     galleryPrepDate: record.galleryPrepDate ?? "",
     galleryAuditJson: record.galleryAuditJson ?? "",
+    galleryRemovalTime: record.galleryRemovalTime ?? "",
   };
 }
 
@@ -281,6 +283,7 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   const iGalleryExhibitionDayCount = opt("galleryExhibitionDayCount");
   const iGalleryPrepDate = opt("galleryPrepDate");
   const iGalleryAuditJson = opt("galleryAuditJson");
+  const iGalleryRemovalTime = opt("galleryRemovalTime");
 
   return rows
     .slice(1)
@@ -317,6 +320,7 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       galleryExhibitionDayCount: iGalleryExhibitionDayCount >= 0 ? (parseInt(String(r[iGalleryExhibitionDayCount] ?? "0"), 10) || 0) : undefined,
       galleryPrepDate: iGalleryPrepDate >= 0 ? (String(r[iGalleryPrepDate] ?? "").trim() || undefined) : undefined,
       galleryAuditJson: iGalleryAuditJson >= 0 ? (String(r[iGalleryAuditJson] ?? "").trim() || undefined) : undefined,
+      galleryRemovalTime: iGalleryRemovalTime >= 0 ? (String(r[iGalleryRemovalTime] ?? "").trim() || undefined) : undefined,
 
       applicantName: r[idx("applicantName")],
       birth: r[idx("birth")],
@@ -537,6 +541,7 @@ export async function appendRequestsBatch(
       galleryExhibitionDayCount: input.galleryExhibitionDayCount,
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
+      galleryRemovalTime: input.galleryRemovalTime,
 
       applicantName: input.applicantName,
       birth: input.birth,

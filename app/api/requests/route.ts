@@ -398,6 +398,7 @@ export async function POST(req: Request) {
           startDate: galleryInput?.startDate,
           endDate: galleryInput?.endDate,
           prepDate: galleryPrepDate,
+          removalTime: galleryInput?.galleryRemovalTime,
           weekdayCount: galleryWeekdayCount ?? 0,
           saturdayCount: gallerySaturdayCount ?? 0,
           exhibitionDayCount: galleryExhibitionDayCount ?? 0,
@@ -434,6 +435,7 @@ export async function POST(req: Request) {
         galleryExhibitionDayCount,
         galleryPrepDate,
         galleryAuditJson,
+        galleryRemovalTime: isGallery ? (galleryInput?.galleryRemovalTime || undefined) : undefined,
 
         applicantName: input.applicantName,
         birth: input.birth,

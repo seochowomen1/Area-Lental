@@ -50,6 +50,8 @@ export type RentalRequest = {
   galleryPrepDate?: string;
   /** 우리동네 갤러리: 감사 로그(JSON 문자열, 선택) */
   galleryAuditJson?: string;
+  /** 우리동네 갤러리: 철수시간(HH:MM, 종료일 기준) */
+  galleryRemovalTime?: string;
 
   applicantName: string;
   birth: string;

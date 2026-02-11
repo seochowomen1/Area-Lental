@@ -115,6 +115,7 @@ export async function mock_appendRequest(input: Omit<RentalRequest, "requestId" 
     galleryExhibitionDayCount: input.galleryExhibitionDayCount,
     galleryPrepDate: input.galleryPrepDate,
     galleryAuditJson: input.galleryAuditJson,
+    galleryRemovalTime: input.galleryRemovalTime,
 
     applicantName: input.applicantName,
     birth: input.birth,

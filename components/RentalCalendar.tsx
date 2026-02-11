@@ -217,7 +217,7 @@ export default function RentalCalendar({ roomId, selectedDate, onSelectDate, dis
       </div>
 
       <p className="mt-3 text-xs text-gray-600">
-        * 달력의 “대관불가”는 관리자 차단 또는 이미 신청/승인된 일정이 있는 날짜를 기준으로 표시됩니다. 상세 시간 충돌은 신청 시 자동 검증됩니다.
+        * 달력의 "대관불가"는 담당자 차단 또는 이미 신청/승인된 일정이 있는 날짜를 기준으로 표시됩니다. 상세 시간 충돌은 신청 시 자동 검증됩니다.
       </p>
     </div>
   );
