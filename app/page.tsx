@@ -1,3 +1,4 @@
+import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
 import HomeReservationCheck from "@/components/home/HomeReservationCheck";
@@ -8,10 +9,10 @@ export const revalidate = 0;
 
 export default function Home() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-gray-50">
       <SiteHeader title="대관신청" />
 
-      <main className="relative mx-auto max-w-7xl px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <HomeCategoryCard
             title="강의실"
@@ -40,6 +41,23 @@ export default function Home() {
           <HomeReservationCheck />
         </div>
       </main>
+
+      {/* 하단 푸터 */}
+      <footer className="border-t border-slate-200 bg-white">
+        <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+          <div className="flex items-center justify-between">
+            <p className="text-xs text-slate-400">
+              서초여성가족플라자 서초센터
+            </p>
+            <Link
+              href="/admin"
+              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              관리자
+            </Link>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }

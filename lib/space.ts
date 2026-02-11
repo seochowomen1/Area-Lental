@@ -69,16 +69,17 @@ export const FLOORS: Floor[] = [
  * 다른 파일(lib/floors.ts, lib/config.ts)은 이 데이터를 참조합니다.
  */
 export const ROOMS: SpaceRoom[] = [
-  { 
-    id: "bookcafe", 
-    floor: "4", 
-    name: "북카페", 
-    capacity: 20, 
-    durationLimitHours: 6, 
+  {
+    id: "bookcafe",
+    floor: "4",
+    name: "북카페",
+    capacity: 20,
+    durationLimitHours: 6,
     // 시간당 대관료
-    feeKRW: 70000, 
-    contactName: "관리자", 
+    feeKRW: 70000,
+    contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/rooms/bookcafe.png",
     note: "조용한 독서 및 소규모 모임에 적합한 공간입니다.",
     equipment: [
       {
@@ -94,16 +95,17 @@ export const ROOMS: SpaceRoom[] = [
       },
     ],
   },
-  { 
-    id: "classroom_all", 
-    floor: "4", 
-    name: "모두의교실", 
-    capacity: 30, 
-    durationLimitHours: 6, 
+  {
+    id: "classroom_all",
+    floor: "4",
+    name: "모두의교실",
+    capacity: 30,
+    durationLimitHours: 6,
     // 시간당 대관료
-    feeKRW: 100000, 
-    contactName: "관리자", 
+    feeKRW: 100000,
+    contactName: "관리자",
     contactPhone: "02-0000-0000",
+    image: "/rooms/classroom_all.png",
     note: "다양한 활동이 가능한 다목적 공간입니다.",
     equipment: [
       {
