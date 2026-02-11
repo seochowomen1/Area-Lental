@@ -8,8 +8,9 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { GalleryRequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { todayYmdSeoul } from "@/lib/datetime";
 import SiteHeader from "@/components/SiteHeader";
-import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
+import { PLEDGE_FOOTER, PLEDGE_INTRO, PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
+import { operatingNoticeText } from "@/lib/operating";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
@@ -163,9 +164,9 @@ export default function ApplyGalleryClient() {
   const [batchError, setBatchError] = useState<string | null>(null);
 
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [pledgeOpen, setPledgeOpen] = useState(false);
   const [galleryInfoOpen, setGalleryInfoOpen] = useState(false);
   const [confirmData, setConfirmData] = useState<GalleryApplyValues | null>(null);
+  const [activeTab, setActiveTab] = useState<"form" | "pledge">("form");
 
   // 생년월일 3칸 입력
   const [birthYear, setBirthYear] = useState("");
@@ -571,19 +572,47 @@ export default function ApplyGalleryClient() {
           <OperatingHoursNotice roomId="gallery" />
         </div>
 
-        <div className="mt-5">
-          <Notice title="신청 전 확인" variant="info" pad="md">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
-              <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 포함됩니다.</li>
-              <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
-              <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
-              <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
-            </ul>
-          </Notice>
+        {/* ── 탭 내비게이션 ── */}
+        <div className="mt-6 flex border-b border-slate-200">
+          <button
+            type="button"
+            className={`relative px-6 py-3 text-sm font-semibold transition-colors ${
+              activeTab === "form"
+                ? "text-[rgb(var(--brand-primary))]"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveTab("form")}
+          >
+            신청서
+            {activeTab === "form" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[rgb(var(--brand-primary))]" />
+            )}
+          </button>
+          <button
+            type="button"
+            className={`relative px-6 py-3 text-sm font-semibold transition-colors ${
+              activeTab === "pledge"
+                ? "text-[rgb(var(--brand-primary))]"
+                : "text-slate-500 hover:text-slate-700"
+            }`}
+            onClick={() => setActiveTab("pledge")}
+          >
+            서약서
+            {activeTab === "pledge" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-[rgb(var(--brand-primary))]" />
+            )}
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit(handleConfirm)} className="mt-6 space-y-8">
+        <form
+          onSubmit={handleSubmit(handleConfirm, (formErrors) => {
+            const pledgeOnlyFields = ["privacyAgree", "pledgeAgree", "pledgeDate", "pledgeName"];
+            const hasFormFieldError = Object.keys(formErrors).some((k) => !pledgeOnlyFields.includes(k));
+            if (hasFormFieldError) setActiveTab("form");
+            else setActiveTab("pledge");
+          })}
+          className="mt-6"
+        >
           {/* hidden - roomId/date/start/end are driven by UI */}
           <input type="hidden" {...register("roomId")} />
           <input type="hidden" {...register("date")} />
@@ -605,351 +634,420 @@ export default function ApplyGalleryClient() {
             </Notice>
           ) : null}
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>전시 기간</h3>
-            <p className={SECTION_DESC}>기간을 선택하면 회차가 자동 생성됩니다.</p>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="startDate">시작일 *</FieldLabel>
-                <Input id="startDate" type="date" {...register("startDate")} />
-                {errors.startDate?.message ? <FieldHelp className="text-red-600">{errors.startDate.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="endDate">종료일 *</FieldLabel>
-                <Input id="endDate" type="date" {...register("endDate")} />
-                {errors.endDate?.message ? <FieldHelp className="text-red-600">{errors.endDate.message}</FieldHelp> : null}
-              </div>
+          {/* ═══════════ 신청서 탭 ═══════════ */}
+          <div style={activeTab === "form" ? undefined : { display: "none" }} className="space-y-8">
+            <div>
+              <Notice title="신청 전 확인" variant="info" pad="md">
+                <ul className="list-disc space-y-1 pl-5">
+                  <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
+                  <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 포함됩니다.</li>
+                  <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
+                  <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
+                  <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
+                </ul>
+              </Notice>
             </div>
 
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-slate-700">
-                  자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
+            {/* ── 전시 기간 ── */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>전시 기간</h3>
+              <p className={SECTION_DESC}>기간을 선택하면 회차가 자동 생성됩니다.</p>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="startDate">시작일 *</FieldLabel>
+                  <Input id="startDate" type="date" {...register("startDate")} />
+                  {errors.startDate?.message ? <FieldHelp className="text-red-600">{errors.startDate.message}</FieldHelp> : null}
                 </div>
-                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-[rgb(var(--brand-primary))] hover:underline">
-                  우리동네 갤러리 안내 보기
-                </button>
+
+                <div>
+                  <FieldLabel htmlFor="endDate">종료일 *</FieldLabel>
+                  <Input id="endDate" type="date" {...register("endDate")} />
+                  {errors.endDate?.message ? <FieldHelp className="text-red-600">{errors.endDate.message}</FieldHelp> : null}
+                </div>
               </div>
-              {sessionsBundle.prepDate ? (
-                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-base">📌</span>
-                    <span className="text-sm font-bold text-amber-900">전시 준비일: {sessionsBundle.prepDate} (무료)</span>
+
+              <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-sm text-slate-700">
+                    자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
                   </div>
-                  <p className="mt-1 text-xs text-amber-800">
-                    전시 준비일은 시작일 이전 1일(일요일·휴관일 제외)이 자동 배정됩니다.<br />
-                    전시 준비일 변경이 필요하면 담당자에게 문의해 주세요. (070-7163-2953)
+                  <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-[rgb(var(--brand-primary))] hover:underline">
+                    우리동네 갤러리 안내 보기
+                  </button>
+                </div>
+                {sessionsBundle.prepDate ? (
+                  <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-base">📌</span>
+                      <span className="text-sm font-bold text-amber-900">전시 준비일: {sessionsBundle.prepDate} (무료)</span>
+                    </div>
+                    <p className="mt-1 text-xs text-amber-800">
+                      전시 준비일은 시작일 이전 1일(일요일·휴관일 제외)이 자동 배정됩니다.<br />
+                      전시 준비일 변경이 필요하면 담당자에게 문의해 주세요. (070-7163-2953)
+                    </p>
+                  </div>
+                ) : null}
+                {hasSundayInRange ? (
+                  <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
+                ) : null}
+              </div>
+
+              {/* 대관료 자동 계산 */}
+              {sessionCount > 0 && (
+                <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+                  <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                    <span className="text-base">💰</span>
+                    <span className="text-sm font-bold text-slate-800">예상 대관료</span>
+                  </div>
+                  <div className="px-4 py-3">
+                    <div className="space-y-2">
+                      {feeBreakdown.weekdays > 0 && (
+                        <div className="flex items-center justify-between text-sm text-slate-600">
+                          <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
+                          <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                        </div>
+                      )}
+                      {feeBreakdown.saturdays > 0 && (
+                        <div className="flex items-center justify-between text-sm text-slate-600">
+                          <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
+                          <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                        </div>
+                      )}
+                      {feeBreakdown.prepDays > 0 && (
+                        <div className="flex items-center justify-between text-sm text-slate-400">
+                          <span>준비일 {feeBreakdown.prepDays}일</span>
+                          <span className="font-medium">무료</span>
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                      <span className="text-sm font-bold text-slate-900">합계</span>
+                      <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
+                  </div>
+                </div>
+              )}
+
+              <FieldHelp className="mt-2">
+                ※ 일요일은 자동 제외되며, 공휴일은 담당자 차단으로 관리됩니다.
+              </FieldHelp>
+
+              {/* 철수시간 설정 */}
+              {isYmd(endDate) && (
+                <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
+                  <h4 className="text-sm font-bold text-orange-900">대관 철수 안내</h4>
+                  <p className="mt-1 text-xs text-orange-800">
+                    전시 마지막 날({endDate}) <b>17시까지</b> 철수를 완료해야 합니다. 철수 예정 시간을 설정해 주세요.
                   </p>
-                </div>
-              ) : null}
-              {hasSundayInRange ? (
-                <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
-              ) : null}
-            </div>
-
-            {/* 대관료 자동 계산 */}
-            {sessionCount > 0 && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                  <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
-                </div>
-                <div className="px-4 py-3">
-                  <div className="space-y-2">
-                    {feeBreakdown.weekdays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
-                      </div>
-                    )}
-                    {feeBreakdown.saturdays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
-                      </div>
-                    )}
-                    {feeBreakdown.prepDays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-400">
-                        <span>준비일 {feeBreakdown.prepDays}일</span>
-                        <span className="font-medium">무료</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-                    <span className="text-sm font-bold text-slate-900">합계</span>
-                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
-                  </div>
-                  <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
-                </div>
-              </div>
-            )}
-
-            <FieldHelp className="mt-2">
-              ※ 일요일은 자동 제외되며, 공휴일은 담당자 차단으로 관리됩니다.
-            </FieldHelp>
-
-            {/* 철수시간 설정 */}
-            {isYmd(endDate) && (
-              <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
-                <h4 className="text-sm font-bold text-orange-900">대관 철수 안내</h4>
-                <p className="mt-1 text-xs text-orange-800">
-                  전시 마지막 날({endDate}) <b>17시까지</b> 철수를 완료해야 합니다. 철수 예정 시간을 설정해 주세요.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-4">
-                  <div>
-                    <FieldLabel>철수 일자</FieldLabel>
-                    <Input type="text" value={endDate} readOnly className="bg-white/70 text-slate-700" />
-                  </div>
-                  <div>
-                    <FieldLabel htmlFor="galleryRemovalTime">철수 시간 *</FieldLabel>
-                    <Select id="galleryRemovalTime" {...register("galleryRemovalTime")}>
-                      <option value="">선택해 주세요</option>
-                      <option value="09:00">09:00</option>
-                      <option value="09:30">09:30</option>
-                      <option value="10:00">10:00</option>
-                      <option value="10:30">10:30</option>
-                      <option value="11:00">11:00</option>
-                      <option value="11:30">11:30</option>
-                      <option value="12:00">12:00</option>
-                      <option value="12:30">12:30</option>
-                      <option value="13:00">13:00</option>
-                      <option value="13:30">13:30</option>
-                      <option value="14:00">14:00</option>
-                      <option value="14:30">14:30</option>
-                      <option value="15:00">15:00</option>
-                      <option value="15:30">15:30</option>
-                      <option value="16:00">16:00</option>
-                      <option value="16:30">16:30</option>
-                      <option value="17:00">17:00</option>
-                    </Select>
-                    {errors.galleryRemovalTime?.message ? <FieldHelp className="text-red-600">{errors.galleryRemovalTime.message}</FieldHelp> : null}
+                  <div className="mt-3 grid grid-cols-2 gap-4">
+                    <div>
+                      <FieldLabel>철수 일자</FieldLabel>
+                      <Input type="text" value={endDate} readOnly className="bg-white/70 text-slate-700" />
+                    </div>
+                    <div>
+                      <FieldLabel htmlFor="galleryRemovalTime">철수 시간 *</FieldLabel>
+                      <Select id="galleryRemovalTime" {...register("galleryRemovalTime")}>
+                        <option value="">선택해 주세요</option>
+                        <option value="09:00">09:00</option>
+                        <option value="09:30">09:30</option>
+                        <option value="10:00">10:00</option>
+                        <option value="10:30">10:30</option>
+                        <option value="11:00">11:00</option>
+                        <option value="11:30">11:30</option>
+                        <option value="12:00">12:00</option>
+                        <option value="12:30">12:30</option>
+                        <option value="13:00">13:00</option>
+                        <option value="13:30">13:30</option>
+                        <option value="14:00">14:00</option>
+                        <option value="14:30">14:30</option>
+                        <option value="15:00">15:00</option>
+                        <option value="15:30">15:30</option>
+                        <option value="16:00">16:00</option>
+                        <option value="16:30">16:30</option>
+                        <option value="17:00">17:00</option>
+                      </Select>
+                      {errors.galleryRemovalTime?.message ? <FieldHelp className="text-red-600">{errors.galleryRemovalTime.message}</FieldHelp> : null}
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
-          </Card>
+              )}
+            </Card>
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>신청자 정보</h3>
-            <p className={SECTION_DESC}>담당자에게 연락할 정보를 입력해 주세요.</p>
+            {/* ── 신청자 정보 ── */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>신청자 정보</h3>
+              <p className={SECTION_DESC}>담당자에게 연락할 정보를 입력해 주세요.</p>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="applicantName">성명 *</FieldLabel>
-                <Input id="applicantName" {...register("applicantName")} placeholder="홍길동" />
-                {errors.applicantName?.message ? <FieldHelp className="text-red-600">{errors.applicantName.message}</FieldHelp> : null}
-              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="applicantName">성명 *</FieldLabel>
+                  <Input id="applicantName" {...register("applicantName")} placeholder="홍길동" />
+                  {errors.applicantName?.message ? <FieldHelp className="text-red-600">{errors.applicantName.message}</FieldHelp> : null}
+                </div>
 
-              <div>
-                <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
-                <input type="hidden" {...register("birth")} />
-                <div className="flex items-center gap-1">
-                  <input
-                    id="birthYear"
-                    className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={4}
-                    placeholder="YYYY"
+                <div>
+                  <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
+                  <input type="hidden" {...register("birth")} />
+                  <div className="flex items-center gap-1">
+                    <input
+                      id="birthYear"
+                      className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      maxLength={4}
+                      placeholder="YYYY"
+                      inputMode="numeric"
+                      value={birthYear}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 4);
+                        setBirthYear(v);
+                        if (v.length === 4) birthMonthRef.current?.focus();
+                        handleBirthSync(v, birthMonth, birthDay);
+                      }}
+                    />
+                    <span className="text-slate-400">-</span>
+                    <input
+                      ref={birthMonthRef}
+                      className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      maxLength={2}
+                      placeholder="MM"
+                      inputMode="numeric"
+                      value={birthMonth}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                        setBirthMonth(v);
+                        if (v.length === 2) birthDayRef.current?.focus();
+                        handleBirthSync(birthYear, v, birthDay);
+                      }}
+                    />
+                    <span className="text-slate-400">-</span>
+                    <input
+                      ref={birthDayRef}
+                      className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
+                      maxLength={2}
+                      placeholder="DD"
+                      inputMode="numeric"
+                      value={birthDay}
+                      onChange={(e) => {
+                        const v = e.target.value.replace(/\D/g, "").slice(0, 2);
+                        setBirthDay(v);
+                        handleBirthSync(birthYear, birthMonth, v);
+                      }}
+                    />
+                  </div>
+                  {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
+                </div>
+
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="address">주소 *</FieldLabel>
+                  <Input id="address" {...register("address")} placeholder="서울특별시 서초구 서운로26길 3, 4층" />
+                  {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
+                </div>
+
+                <div>
+                  <FieldLabel htmlFor="phone">연락처 *</FieldLabel>
+                  <Input
+                    id="phone"
+                    placeholder="010-0000-0000"
                     inputMode="numeric"
-                    value={birthYear}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setBirthYear(v);
-                      if (v.length === 4) birthMonthRef.current?.focus();
-                      handleBirthSync(v, birthMonth, birthDay);
-                    }}
+                    autoComplete="tel"
+                    {...register("phone", {
+                      onChange: (e) => {
+                        const formatted = formatPhoneKR((e.target as HTMLInputElement).value);
+                        setValue("phone", formatted, { shouldDirty: true, shouldValidate: true });
+                      },
+                    })}
                   />
-                  <span className="text-slate-400">-</span>
-                  <input
-                    ref={birthMonthRef}
-                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={2}
-                    placeholder="MM"
-                    inputMode="numeric"
-                    value={birthMonth}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                      setBirthMonth(v);
-                      if (v.length === 2) birthDayRef.current?.focus();
-                      handleBirthSync(birthYear, v, birthDay);
-                    }}
-                  />
-                  <span className="text-slate-400">-</span>
-                  <input
-                    ref={birthDayRef}
-                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={2}
-                    placeholder="DD"
-                    inputMode="numeric"
-                    value={birthDay}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                      setBirthDay(v);
-                      handleBirthSync(birthYear, birthMonth, v);
-                    }}
-                  />
+                  {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
                 </div>
-                {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
+
+                <div>
+                  <FieldLabel htmlFor="email">이메일 *</FieldLabel>
+                  <Input id="email" type="email" {...register("email")} placeholder="example@email.com" />
+                  {errors.email?.message ? <FieldHelp className="text-red-600">{errors.email.message}</FieldHelp> : null}
+                </div>
               </div>
 
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="address">주소 *</FieldLabel>
-                <Input id="address" {...register("address")} placeholder="서울특별시 서초구 서운로26길 3, 4층" />
-                {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
+              <div className="mt-4">
+                <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
+                <Input id="orgName" {...register("orgName")} placeholder={`개인 신청 시 \u0027개인\u0027으로 입력`} />
+                {errors.orgName?.message ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
+              </div>
+            </Card>
+
+            {/* ── 전시 정보 ── */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>전시 정보</h3>
+              <p className={SECTION_DESC}>전시 운영에 필요한 정보를 입력해 주세요.</p>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="exhibitionTitle">전시명 *</FieldLabel>
+                  <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
+                  {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
+                </div>
+
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="exhibitionPurpose">전시 목적</FieldLabel>
+                  <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
+                  {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
+                </div>
+
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
+                  <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
+                  {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
+                </div>
+
+                <div>
+                  <FieldLabel htmlFor="awarenessPath">인지 경로</FieldLabel>
+                  <Select id="awarenessPath" {...register("awarenessPath")}>
+                    <option value="">선택해 주세요</option>
+                    <option value="서초센터 홈페이지">서초센터 홈페이지</option>
+                    <option value="센터 내 홍보 리플릿">센터 내 홍보 리플릿</option>
+                    <option value="서초구청 홈페이지">서초구청 홈페이지</option>
+                    <option value="지인 소개">지인 소개</option>
+                    <option value="기타">기타</option>
+                  </Select>
+                  {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
+                </div>
+
+                <div className="md:col-span-2">
+                  <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
+                  <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
+                  {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
+                </div>
+              </div>
+            </Card>
+
+            {/* 다음: 서약서 버튼 */}
+            <Button
+              type="button"
+              variant="primary"
+              className="w-full py-3 shadow-sm hover:opacity-90"
+              onClick={() => {
+                setActiveTab("pledge");
+                window.scrollTo({ top: 0, behavior: "smooth" });
+              }}
+            >
+              다음: 서약서 작성
+            </Button>
+          </div>
+
+          {/* ═══════════ 서약서 탭 ═══════════ */}
+          <div style={activeTab === "pledge" ? undefined : { display: "none" }} className="space-y-8">
+            {/* ── 대관규정 서약서 본문 (강의실/E-스튜디오와 동일) ── */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>{PLEDGE_TITLE}</h3>
+              <p className="mt-3 text-sm text-slate-700">{PLEDGE_INTRO}</p>
+              <p className="mt-2 text-sm text-slate-700">
+                <b>운영시간:</b> {operatingNoticeText("gallery")}
+              </p>
+
+              <div className="mt-4 space-y-4">
+                {PLEDGE_SECTIONS.map((sec) => (
+                  <section key={sec.title} className="rounded-xl border bg-slate-50 p-4">
+                    <h4 className="text-sm font-semibold">{sec.title}</h4>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
+                      {sec.bullets.map((b, idx) => (
+                        <li key={idx}>{b}</li>
+                      ))}
+                    </ul>
+                  </section>
+                ))}
               </div>
 
-              <div>
-                <FieldLabel htmlFor="phone">연락처 *</FieldLabel>
-                <Input
-                  id="phone"
-                  placeholder="010-0000-0000"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  {...register("phone", {
-                    onChange: (e) => {
-                      const formatted = formatPhoneKR((e.target as HTMLInputElement).value);
-                      setValue("phone", formatted, { shouldDirty: true, shouldValidate: true });
-                    },
-                  })}
-                />
-                {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
-              </div>
+              <p className="mt-4 text-sm text-slate-700">{PLEDGE_FOOTER}</p>
+            </Card>
 
-              <div>
-                <FieldLabel htmlFor="email">이메일 *</FieldLabel>
-                <Input id="email" type="email" {...register("email")} placeholder="example@email.com" />
-                {errors.email?.message ? <FieldHelp className="text-red-600">{errors.email.message}</FieldHelp> : null}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
-              <Input id="orgName" {...register("orgName")} placeholder="개인 신청 시 '개인'으로 입력" />
-              {errors.orgName?.message ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
-            </div>
-          </Card>
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>전시 정보</h3>
-            <p className={SECTION_DESC}>전시 운영에 필요한 정보를 입력해 주세요.</p>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="exhibitionTitle">전시명 *</FieldLabel>
-                <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
-                {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="exhibitionPurpose">전시 목적</FieldLabel>
-                <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
-                {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
-                <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
-                {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="awarenessPath">인지 경로</FieldLabel>
-                <Select id="awarenessPath" {...register("awarenessPath")}>
-                  <option value="">선택해 주세요</option>
-                  <option value="서초센터 홈페이지">서초센터 홈페이지</option>
-                  <option value="센터 내 홍보 리플릿">센터 내 홍보 리플릿</option>
-                  <option value="서초구청 홈페이지">서초구청 홈페이지</option>
-                  <option value="지인 소개">지인 소개</option>
-                  <option value="기타">기타</option>
-                </Select>
-                {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
-                <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
-                {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
-              </div>
-            </div>
-          </Card>
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>동의/서약</h3>
-            <div className="mt-4">
-              <input type="hidden" {...register("privacyAgree")} />
-              <Checkbox
-                checked={!!privacyAgree}
-                readOnly
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPrivacyOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
+            {/* ── 동의/서약 ── */}
+            <Card pad="lg">
+              <h3 className={SECTION_TITLE}>동의/서약</h3>
+              <div className="mt-4">
+                <input type="hidden" {...register("privacyAgree")} />
+                <Checkbox
+                  checked={!!privacyAgree}
+                  readOnly
+                  onClick={(e) => {
                     e.preventDefault();
                     setPrivacyOpen(true);
-                  }
-                }}
-                label="개인정보 수집·이용에 동의합니다. (필수)"
-                error={errors.privacyAgree?.message}
-              />
-              <FieldHelp className="mt-1">* 체크 시 안내 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
-            </div>
-            <div className="mt-4">
-              <input type="hidden" {...register("pledgeAgree")} />
-              <Checkbox
-                checked={!!pledgeAgree}
-                readOnly
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPledgeOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPledgeOpen(true);
-                  }
-                }}
-                label="서약 내용에 동의합니다. (필수)"
-                error={errors.pledgeAgree?.message}
-              />
-              <FieldHelp className="mt-1">
-                * 체크 시 서약서 내용을 확인한 후 동의 여부가 반영됩니다.
-              </FieldHelp>
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="pledgeDate">서약 일자 *</FieldLabel>
-                <input type="hidden" {...register("pledgeDate")} />
-                <Input id="pledgeDate" type="text" value={fixedPledgeDate} readOnly className="bg-slate-50 text-slate-700" />
-                {errors.pledgeDate?.message ? <FieldHelp className="text-red-600">{errors.pledgeDate.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
-                <Input
-                  id="pledgeName"
-                  {...register("pledgeName", {
-                    onChange: (e) => {
-                      pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
-                    },
-                  })}
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setPrivacyOpen(true);
+                    }
+                  }}
+                  label="개인정보 수집·이용에 동의합니다. (필수)"
+                  error={errors.privacyAgree?.message}
                 />
-                {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
+                <FieldHelp className="mt-1">* 체크 시 안내 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
               </div>
-            </div>
-          </Card>
+              <div className="mt-4">
+                <input type="hidden" {...register("pledgeAgree")} />
+                <Checkbox
+                  checked={!!pledgeAgree}
+                  onChange={(e) => {
+                    const checked = (e.target as HTMLInputElement).checked;
+                    setValue("pledgeAgree", checked, { shouldValidate: true, shouldDirty: true });
+                    if (checked) clearErrors("pledgeAgree");
+                  }}
+                  label="위 서약 내용을 확인하였으며, 동의합니다. (필수)"
+                  error={errors.pledgeAgree?.message}
+                />
+              </div>
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                <div>
+                  <FieldLabel htmlFor="pledgeDate">서약 일자 *</FieldLabel>
+                  <input type="hidden" {...register("pledgeDate")} />
+                  <Input id="pledgeDate" type="text" value={fixedPledgeDate} readOnly className="bg-slate-50 text-slate-700" />
+                  {errors.pledgeDate?.message ? <FieldHelp className="text-red-600">{errors.pledgeDate.message}</FieldHelp> : null}
+                </div>
 
-          {sessionCount === 0 && (startDate || endDate) ? (
-            <Notice variant="warn">전시 기간(시작일·종료일)을 올바르게 입력해 주세요. 회차가 0회이면 신청할 수 없습니다.</Notice>
-          ) : null}
-          {sessionCount === 0 && !startDate && !endDate ? (
-            <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
-          ) : null}
-          <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0 || !galleryRemovalTime} className="w-full py-3 shadow-sm hover:opacity-90">
-            {submitting ? "신청 중..." : "신청하기"}
-          </Button>
+                <div>
+                  <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
+                  <Input
+                    id="pledgeName"
+                    {...register("pledgeName", {
+                      onChange: (e) => {
+                        pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
+                      },
+                    })}
+                  />
+                  {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
+                </div>
+              </div>
+            </Card>
+
+            {sessionCount === 0 && (startDate || endDate) ? (
+              <Notice variant="warn">전시 기간(시작일·종료일)을 올바르게 입력해 주세요. 회차가 0회이면 신청할 수 없습니다.</Notice>
+            ) : null}
+            {sessionCount === 0 && !startDate && !endDate ? (
+              <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
+            ) : null}
+
+            <div className="flex gap-3">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1 py-3"
+                onClick={() => {
+                  setActiveTab("form");
+                  window.scrollTo({ top: 0, behavior: "smooth" });
+                }}
+              >
+                이전: 신청서
+              </Button>
+              <Button
+                type="submit"
+                variant="primary"
+                disabled={submitting || !exhibitionTitle || sessionCount === 0 || !galleryRemovalTime}
+                className="flex-1 py-3 shadow-sm hover:opacity-90"
+              >
+                {submitting ? "신청 중..." : "신청하기"}
+              </Button>
+            </div>
+          </div>
         </form>
 
         <PrivacyModal
@@ -961,19 +1059,6 @@ export default function ApplyGalleryClient() {
           }}
           onDisagree={() => {
             setValue("privacyAgree", false, { shouldValidate: true, shouldDirty: true });
-          }}
-        />
-
-        <PledgeModal
-          open={pledgeOpen}
-          onClose={() => setPledgeOpen(false)}
-          roomId="gallery"
-          onAgree={() => {
-            setValue("pledgeAgree", true, { shouldValidate: true, shouldDirty: true });
-            clearErrors("pledgeAgree");
-          }}
-          onDisagree={() => {
-            setValue("pledgeAgree", false, { shouldValidate: true, shouldDirty: true });
           }}
         />
 
