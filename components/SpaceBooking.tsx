@@ -120,6 +120,20 @@ export default function SpaceBooking({
 }) {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const { days } = useMemo(() => getCalendarGrid(month), [month]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+
+  // 월 변경 시 예약 마감 날짜를 조회
+  useEffect(() => {
+    const monthKey = `${month.getFullYear()}-${pad2(month.getMonth() + 1)}`;
+    fetch(`/api/booked-dates?roomId=${encodeURIComponent(roomId)}&month=${monthKey}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.bookedDates)) {
+          setBookedDates(new Set(data.bookedDates));
+        }
+      })
+      .catch(() => {});
+  }, [month, roomId]);
 
   const monthLabel = useMemo(() => `${month.getFullYear()}.${pad2(month.getMonth() + 1)}`, [month]);
   const selectedLabel = selectedDate;
@@ -351,7 +365,8 @@ export default function SpaceBooking({
               const isToday = ymd === fmtYMD(new Date());
               const isPast = ymd < fmtYMD(new Date());
               const isSunday = d.getDay() === 0;
-              const isDisabled = !isCurrentMonth || isPast || isSunday;
+              const isBooked = bookedDates.has(ymd);
+              const isDisabled = !isCurrentMonth || isPast || isSunday || isBooked;
 
               return (
                 <button
@@ -374,9 +389,9 @@ export default function SpaceBooking({
                       <span
                         className={cn(
                           "inline-block h-2.5 w-2.5 rounded-full",
-                          isSunday ? "bg-gray-300" : isPast ? "bg-gray-400" : "bg-orange-500"
+                          isSunday ? "bg-gray-300" : (isPast || isBooked) ? "bg-gray-400" : "bg-orange-500"
                         )}
-                        title={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
+                        title={isSunday ? "휴관" : isBooked ? "마감" : isPast ? "마감" : "선택 가능"}
                       />
                     </div>
                   )}

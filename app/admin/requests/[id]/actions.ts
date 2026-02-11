@@ -6,7 +6,7 @@ import { getDatabase } from "@/lib/database";
 import type { RequestStatus, RentalRequest } from "@/lib/types";
 import { getDefaultDecidedBy } from "@/lib/adminAuth";
 import { normalizeDiscount, computeBaseTotalKRW } from "@/lib/pricing";
-import { sendApplicantDecisionEmail, sendApplicantDecisionEmailBatch } from "@/lib/mail";
+import { sendCustomDecisionEmail } from "@/lib/mail";
 
 function sortSessions(list: RentalRequest[]) {
   return (Array.isArray(list) ? list : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
@@ -47,17 +47,10 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
     discountReason: isGallery ? "" : discountReason,
   });
 
-  // 최종 결정 상태로 변경된 경우에만 메일 발송
-  if ((status === "승인" || status === "반려") && status !== current.status) {
-    if (updated.batchId) {
-      const latest = sortSessions(await db.getRequestsByBatchId(updated.batchId));
-      await sendApplicantDecisionEmailBatch(latest);
-    } else {
-      await sendApplicantDecisionEmail(updated);
-    }
-  }
-
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?saved=1`);
+  // 승인/반려/취소 시 이메일 발송 팝업을 표시하기 위해 상태 전달 (자동 발송 안 함)
+  const isDecision = (status === "승인" || status === "반려" || status === "취소") && status !== current.status;
+  const emailParam = isDecision ? `&emailPending=${encodeURIComponent(status)}` : "";
+  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?saved=1${emailParam}`);
 }
 
 /** 묶음 공통 메타(할인/메모) 저장 */
@@ -146,22 +139,20 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     })
   );
 
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?saved=1`);
+  // 승인/반려 시 이메일 발송 팝업 표시를 위해 상태 전달
+  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?saved=1&emailPending=${encodeURIComponent(actionStatus)}`);
 }
 
-/** 현재 상태 메일 발송(단일/묶음 자동 분기) */
-export async function sendCurrentStatusEmailAction(requestId: string) {
-  const db = getDatabase();
-  const current = await db.getRequestById(requestId);
-  if (!current) redirect("/admin");
+/** 메일 발송: 관리자가 확인한 내용으로 발송 */
+export async function sendConfirmedEmailAction(requestId: string, formData: FormData) {
+  const to = String(formData.get("to") || "").trim();
+  const subject = String(formData.get("subject") || "").trim();
+  const body = String(formData.get("body") || "").trim();
 
-  if (current.batchId) {
-    const latest = sortSessions(await db.getRequestsByBatchId(current.batchId));
-    await sendApplicantDecisionEmailBatch(latest);
-  } else {
-    const latest = await db.getRequestById(current.requestId);
-    if (latest) await sendApplicantDecisionEmail(latest);
+  if (!to || !subject || !body) {
+    redirect(`/admin/requests/${encodeURIComponent(requestId)}?emailError=1`);
   }
 
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?mailed=1`);
+  await sendCustomDecisionEmail(to, subject, body);
+  redirect(`/admin/requests/${encodeURIComponent(requestId)}?mailed=1`);
 }

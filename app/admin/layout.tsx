@@ -3,6 +3,7 @@ import Link from "next/link";
 import { Suspense, type ReactNode } from "react";
 
 import AdminNavTabs from "@/components/AdminNavTabs";
+import AdminLogoutButton from "@/components/admin/AdminLogoutButton";
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   return (
@@ -22,13 +23,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
               <span className="hidden text-sm font-semibold text-gray-700 md:inline">대관 관리자</span>
             </Link>
 
-            <div className="flex items-center justify-between gap-4">
+            <div className="flex items-center justify-between gap-3">
               <Link
                 href="/"
                 className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
               >
                 사용자 화면
               </Link>
+              <AdminLogoutButton />
             </div>
           </div>
 

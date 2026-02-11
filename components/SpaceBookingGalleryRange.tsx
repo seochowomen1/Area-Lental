@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Button from "@/components/ui/Button";
@@ -60,6 +60,20 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
   const [error, setError] = useState<string>("");
 
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+
+  // 월 변경 시 예약 마감 날짜를 조회
+  useEffect(() => {
+    const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+    fetch(`/api/booked-dates?roomId=gallery&month=${monthKey}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.bookedDates)) {
+          setBookedDates(new Set(data.bookedDates));
+        }
+      })
+      .catch(() => {});
+  }, [month]);
 
   const days = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return 0;
@@ -217,6 +231,10 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     if (!isYmd(ymd)) return true;
     // 일요일은 선택 불가
     if (dayOfWeekLocal(ymd) === 0) return true;
+    // 예약 마감 날짜는 선택 불가
+    if (bookedDates.has(ymd)) return true;
+    // 과거 날짜 선택 불가
+    if (ymd < dateToYmdLocal(new Date())) return true;
 
     // 시작일만 선택된 상태: 시작일 이전은 비활성, 최대 30일(포함) 초과는 비활성
     if (isYmd(startDate) && !isYmd(endDate)) {
@@ -337,12 +355,16 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                     <div className="mt-1 flex items-center gap-1">
                       {isSunday ? (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" title="휴관" />
+                      ) : bookedDates.has(c.ymd) ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
                       ) : isStart ? (
                         <span className="text-[9px] font-bold text-orange-600">시작</span>
                       ) : isEnd && !isStart ? (
                         <span className="text-[9px] font-bold text-orange-600">종료</span>
                       ) : isBetween ? (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
+                      ) : c.ymd < dateToYmdLocal(new Date()) ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
                       ) : (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
                       )}

@@ -14,11 +14,13 @@ import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, forma
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
 
+import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
+import { Suspense } from "react";
+
 import {
   decideSingleAction,
   saveBundleMetaAction,
   decideSelectedSessionsAction,
-  sendCurrentStatusEmailAction,
 } from "./actions";
 
 export const runtime = "nodejs";
@@ -145,7 +147,6 @@ export default async function AdminRequestDetail({
   const decideSingle = decideSingleAction.bind(null, req.requestId);
   const saveBundleMeta = saveBundleMetaAction.bind(null, req.requestId);
   const decideSelectedSessions = decideSelectedSessionsAction.bind(null, req.requestId);
-  const sendCurrentStatusEmail = sendCurrentStatusEmailAction.bind(null, req.requestId);
 
   const sessionSelectorRows = isBatch
     ? sessions.map((s, idx) => ({
@@ -595,20 +596,9 @@ export default async function AdminRequestDetail({
                     </form>
                   </div>
 
-                  {/* ── 현재 상태 메일 발송 ── */}
-                  <div className="border-t border-gray-100 pt-6">
-                    <form action={sendCurrentStatusEmail} className="flex flex-wrap items-center gap-4">
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                      >
-                        결정 메일 발송
-                      </button>
-                      <p className="text-xs text-gray-500">
-                        승인/반려 결과를 신청자에게 안내합니다.
-                      </p>
-                    </form>
-                  </div>
+                  <p className="mt-4 text-xs text-gray-500">
+                    * 전체 승인/반려 처리 후 메일 확인 팝업이 표시됩니다.
+                  </p>
                 </>
               ) : (
                 <>
@@ -666,20 +656,9 @@ export default async function AdminRequestDetail({
                     </form>
                   </div>
 
-                  {/* ── 현재 상태 메일 발송 ── */}
-                  <div className="border-t border-gray-100 pt-6">
-                    <form action={sendCurrentStatusEmail} className="flex flex-wrap items-center gap-4">
-                      <button
-                        type="submit"
-                        className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-900 hover:bg-gray-50"
-                      >
-                        현재 상태 메일 발송
-                      </button>
-                      <p className="text-xs text-gray-500">
-                        회차별 진행 상황(승인/반려/접수)을 신청자에게 안내합니다.
-                      </p>
-                    </form>
-                  </div>
+                  <p className="mt-4 text-xs text-gray-500">
+                    * 승인/반려 처리 후 메일 확인 팝업이 표시됩니다.
+                  </p>
                 </>
               )}
             </div>
@@ -741,12 +720,20 @@ export default async function AdminRequestDetail({
               </div>
 
               <button type="submit" className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black">
-                저장 및 (최종결정 시) 메일 발송
+                저장 (승인/반려/취소 시 메일 확인)
               </button>
+              <p className="text-xs text-gray-500 mt-2">
+                * 승인/반려/취소로 변경하면 저장 후 메일 확인 팝업이 표시됩니다.
+              </p>
             </form>
           )}
         </div>
       </section>
+
+      {/* 이메일 확인 모달 */}
+      <Suspense>
+        <EmailConfirmModal requestId={req.requestId} />
+      </Suspense>
     </main>
   );
 }

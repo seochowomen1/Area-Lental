@@ -71,6 +71,7 @@ export async function POST(req: Request) {
     sameSite: "lax",
     secure: isProduction,
     path: "/",
+    maxAge: 24 * 60 * 60, // 24시간 후 자동 만료
   });
   return res;
   } catch (e: unknown) {

@@ -231,7 +231,9 @@ ${sessions}
   await maybeSend({ to: first.email, subject, text });
 }
 
-export async function sendApplicantDecisionEmail(req: RentalRequest) {
+/** 단일 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
+export function generateDecisionEmailContent(req: RentalRequest): { to: string; subject: string; body: string } | null {
+  if (!req.email) return null;
   const cat = spaceCategoryLabel(req);
   const subject = `[${req.status}] ${cat} 대관 신청 결과 (${req.requestId})`;
   const base = getBaseEnv();
@@ -260,22 +262,32 @@ ${eqText}- 처리상태: ${req.status}
 
   const tail = req.status === "반려"
     ? `\n반려 사유:\n${req.rejectReason || "(사유 미입력)"}\n`
+    : req.status === "취소"
+    ? `\n취소 처리되었습니다.\n`
     : "\n";
 
-  const text = header + "\n" + (req.status === "승인" ? feeBlock + "\n" : "") + tail +
+  const body = header + "\n" + (req.status === "승인" ? feeBlock + "\n" : "") + tail +
 `승인/반려 결과는 아래 페이지에서도 확인할 수 있습니다.
 ${resultUrl}
 
 감사합니다.
 `;
 
-  await maybeSend({ to: req.email, subject, text });
+  return { to: req.email, subject, body };
 }
 
-export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
+export async function sendApplicantDecisionEmail(req: RentalRequest) {
+  const content = generateDecisionEmailContent(req);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 묶음 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
+export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): { to: string; subject: string; body: string } | null {
   const list = (Array.isArray(reqs) ? reqs : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
-  if (list.length === 0) return;
+  if (list.length === 0) return null;
   const first = list[0];
+  if (!first.email) return null;
   const cat = spaceCategoryLabel(first);
 
   const approvedList = list.filter((r) => r.status === "승인");
@@ -333,7 +345,7 @@ ${sessions}
     ? `\n반려된 회차가 있습니다. (사유는 위 회차별 현황에 함께 표기했습니다.)\n`
     : "\n";
 
-  const text =
+  const body =
     header +
     "\n" +
     (feeAvailable ? feeBlock + "\n" : "") +
@@ -344,5 +356,16 @@ ${resultUrl}
 감사합니다.
 `;
 
-  await maybeSend({ to: first.email, subject, text });
+  return { to: first.email, subject, body };
+}
+
+export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
+  const content = generateBatchDecisionEmailContent(reqs);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 관리자가 수정한 내용으로 메일을 발송합니다 */
+export async function sendCustomDecisionEmail(to: string, subject: string, body: string) {
+  await maybeSend({ to, subject, text: body });
 }
