@@ -70,18 +70,16 @@ export default function AdminNavTabs() {
       label: "설정",
       active: pathname.startsWith("/admin/settings"),
     },
+    {
+      href: `/admin/stats`,
+      label: "실적",
+      active: pathname.startsWith("/admin/stats"),
+    },
   ];
 
-  // 카테고리 전환은 현재 페이지를 유지한 채 category만 변경
+  // 카테고리 전환 → 해당 공간의 목록 페이지로 이동
   const buildCategoryHref = (catId: string) => {
-    if (pathname === "/admin") return `/admin?category=${catId}`;
-    if (pathname.startsWith("/admin/requests") && !pathname.includes("/admin/requests/"))
-      return `/admin/requests?category=${catId}`;
-    if (pathname.startsWith("/admin/calendar"))
-      return `/admin/calendar?category=${catId}`;
-    if (pathname.startsWith("/admin/settings"))
-      return `/admin/settings?category=${catId}`;
-    return `/admin?category=${catId}`;
+    return `/admin/requests?category=${catId}`;
   };
 
   return (

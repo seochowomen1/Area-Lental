@@ -64,9 +64,18 @@ export async function GET(req: Request) {
 
     const conflictStatuses: RequestStatus[] = ["접수", "승인"];
 
-    const sameRoomSameDate = requests.filter(
-      (r) => r.roomId === roomId && r.date === date && conflictStatuses.includes(r.status)
-    );
+    const sameRoomSameDate = requests.filter((r) => {
+      if (r.roomId !== roomId) return false;
+      if (!conflictStatuses.includes(r.status)) return false;
+      // 갤러리 1행 형식: 날짜 범위 체크
+      if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+        if (date >= r.startDate && date <= r.endDate && dayOfWeek(date) !== 0) return true;
+        if (r.galleryPrepDate && date === r.galleryPrepDate) return true;
+        return false;
+      }
+      // 기존 형식: 개별 날짜 매칭
+      return r.date === date;
+    });
 
     // ✅ "전체(all)"로 등록된 차단/정규수업은 모든 강의실에 적용
     // endDate가 있는 블록(갤러리 날짜 범위)은 date가 [b.date, b.endDate] 범위인지 확인
@@ -83,7 +92,11 @@ export async function GET(req: Request) {
       .filter((s) => inRangeYmd(date, s.effectiveFrom || undefined, s.effectiveTo || undefined));
 
     const slots: Slot[] = baseSlots.map((s) => {
-      const byRequest = sameRoomSameDate.some((r) => overlaps(r.startTime, r.endTime, s.start, s.end));
+      const byRequest = sameRoomSameDate.some((r) => {
+        // 갤러리 1행 형식: 날짜 범위 내이면 전일 차단
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
+        return overlaps(r.startTime, r.endTime, s.start, s.end);
+      });
       const byBlock = sameRoomBlocks.some((b) => overlaps(b.startTime, b.endTime, s.start, s.end));
       const bySchedule = sameRoomSchedules.some((sc) => overlaps(sc.startTime, sc.endTime, s.start, s.end));
 
