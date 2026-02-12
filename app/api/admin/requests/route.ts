@@ -36,25 +36,25 @@ export async function DELETE(req: Request) {
     const targetMap = new Map(allRequests.map((r) => [r.requestId, r]));
     const DELETABLE_STATUSES = new Set(["반려", "취소"]);
 
+    // 스프레드시트에 존재하는 것만 필터 (이미 삭제된 건은 무시)
+    const existingIds: string[] = [];
     for (const id of requestIds) {
       const req = targetMap.get(id);
-      if (!req) {
-        return NextResponse.json(
-          { ok: false, message: `신청번호 ${id}를 찾을 수 없습니다.` },
-          { status: 404 },
-        );
-      }
+      if (!req) continue; // 이미 스프레드시트에서 삭제됨 → 무시
       if (!DELETABLE_STATUSES.has(req.status)) {
         return NextResponse.json(
           { ok: false, message: `${id}은(는) ${req.status} 상태이므로 삭제할 수 없습니다. 반려 또는 취소된 건만 삭제 가능합니다.` },
           { status: 400 },
         );
       }
+      existingIds.push(id);
     }
 
-    await db.deleteRequests(requestIds);
+    if (existingIds.length > 0) {
+      await db.deleteRequests(existingIds);
+    }
 
-    return NextResponse.json({ ok: true, deletedCount: requestIds.length });
+    return NextResponse.json({ ok: true, deletedCount: existingIds.length, skippedCount: requestIds.length - existingIds.length });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "삭제 중 오류가 발생했습니다.";
     return NextResponse.json({ ok: false, message }, { status: 500 });

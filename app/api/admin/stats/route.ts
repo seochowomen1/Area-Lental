@@ -22,6 +22,7 @@ type MonthStats = {
   month: string; // "YYYY-MM"
   lecture: CategoryStats;
   studio: CategoryStats;
+  lectureStudio: CategoryStats; // 강의실 + E-스튜디오 합산
   gallery: CategoryStats;
   total: CategoryStats;
 };
@@ -202,6 +203,17 @@ export async function GET(req: Request) {
         totalRevenue: data?.galleryRevenue ?? 0,
       };
 
+      // 강의실 + E-스튜디오 합산 (실인원은 이메일 중복 제거)
+      const lectureStudioApplicants = new Set<string>();
+      lectureApplicants.forEach((e) => lectureStudioApplicants.add(e));
+      studioApplicants.forEach((e) => lectureStudioApplicants.add(e));
+
+      const lectureStudio: CategoryStats = {
+        uniqueApplicants: lectureStudioApplicants.size,
+        totalDays: lecture.totalDays + studio.totalDays,
+        totalRevenue: lecture.totalRevenue + studio.totalRevenue,
+      };
+
       const allEmails = new Set<string>();
       lectureApplicants.forEach((e) => allEmails.add(e));
       studioApplicants.forEach((e) => allEmails.add(e));
@@ -211,6 +223,7 @@ export async function GET(req: Request) {
         month,
         lecture,
         studio,
+        lectureStudio,
         gallery,
         total: {
           uniqueApplicants: allEmails.size,
