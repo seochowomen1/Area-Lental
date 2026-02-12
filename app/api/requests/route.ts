@@ -128,6 +128,7 @@ export async function POST(req: Request) {
       awarenessPath: String(form.get("awarenessPath") ?? ""),
       specialNotes: String(form.get("specialNotes") ?? ""),
       galleryRemovalTime: String(form.get("galleryRemovalTime") ?? ""),
+      galleryPrepDate: String(form.get("galleryPrepDate") ?? ""),
 
       purpose: String(form.get("purpose") ?? ""),
 
@@ -187,7 +188,10 @@ export async function POST(req: Request) {
         );
       }
 
-      sessions = buildGallerySessionsFromPeriod(startDate, endDate);
+      // 사용자가 선택한 준비일 사용 (빈 문자열이면 준비일 없음, 미전송 시 자동 계산)
+      const customPrepDate = galleryInput?.galleryPrepDate;
+      const prepDateParam = customPrepDate !== undefined ? (customPrepDate || null) : undefined;
+      sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam);
     } else {
       const rawSessions = String(form.get("sessions") ?? "").trim();
       if (rawSessions) {

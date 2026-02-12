@@ -147,6 +147,9 @@ export const GalleryRequestInputSchema = z
     // 철수시간 (종료일 당일, 17:00 이전 필수)
     galleryRemovalTime: z.string().regex(/^\d{2}:\d{2}$/, "철수 시간을 선택해 주세요."),
 
+    // 전시 준비일 (사용자 선택, 빈 문자열이면 준비일 없음)
+    galleryPrepDate: z.string().optional().default(""),
+
     // 호환: 관리자 확인용 텍스트(갤러리 전용 필드를 합쳐서 구성)
     purpose: z.string().min(1, "사용 목적을 입력해 주세요.").max(2000),
 
@@ -183,6 +186,15 @@ export const GalleryRequestInputSchema = z
       const rmMin = toMinutes(v.galleryRemovalTime);
       if (Number.isFinite(rmMin) && rmMin > toMinutes("17:00")) {
         ctx.addIssue({ code: "custom", path: ["galleryRemovalTime"], message: "철수 시간은 17:00 이전으로 설정해 주세요." });
+      }
+    }
+
+    // 준비일 검증: 비어있지 않으면 YYYY-MM-DD 형식이고, 시작일 이전이어야 함
+    if (v.galleryPrepDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.galleryPrepDate)) {
+        ctx.addIssue({ code: "custom", path: ["galleryPrepDate"], message: "준비일 형식을 확인해 주세요." });
+      } else if (v.galleryPrepDate >= v.startDate) {
+        ctx.addIssue({ code: "custom", path: ["galleryPrepDate"], message: "준비일은 전시 시작일 이전이어야 합니다." });
       }
     }
   });

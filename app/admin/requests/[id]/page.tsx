@@ -292,11 +292,14 @@ export default async function AdminRequestDetail({
               <>
                 <InfoRow label="전시 기간">
                   {req.startDate ?? req.date} ~ {req.endDate ?? req.date}
-                  {galleryPrepDate && <span className="ml-1 text-xs text-gray-500">(준비일 1일 포함)</span>}
+                </InfoRow>
+                <InfoRow label="준비일">
+                  {galleryPrepDate
+                    ? <span className="font-medium text-emerald-700">{galleryPrepDate} (무료)</span>
+                    : <span className="text-gray-400">없음</span>}
                 </InfoRow>
                 <InfoRow label="전시일수">
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)
-                  {galleryPrepDate ? <span className="ml-1 text-gray-500">/ 준비일 {galleryPrepDate}</span> : null}
                 </InfoRow>
                 <InfoRow label="철거일">
                   {req.endDate ?? req.date}

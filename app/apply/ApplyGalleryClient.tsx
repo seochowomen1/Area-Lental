@@ -90,9 +90,32 @@ const GalleryApplySchema = GalleryRequestInputSchema.superRefine((v, ctx) => {
   }
 });
 
+const DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
+function dowLabel(ymd: string): string {
+  return DOW_LABELS[dayOfWeekLocal(ymd)] ?? "";
+}
+
+/**
+ * 전시 시작일 기준으로 선택 가능한 준비일 후보를 반환합니다.
+ * 일요일(휴관)은 제외하며, 기본 3개까지 반환합니다.
+ */
+function getAvailablePrepDates(startDate: string, count = 3): string[] {
+  if (!isYmd(startDate)) return [];
+  const dates: string[] = [];
+  let cur = addDays(startDate, -1);
+  let safety = 0;
+  while (dates.length < count && safety++ < 30) {
+    if (dayOfWeekLocal(cur) !== 0) {
+      dates.push(cur);
+    }
+    cur = addDays(cur, -1);
+  }
+  return dates;
+}
+
 type SessionInput = { date: string; startTime: string; endTime: string };
 
-function buildGallerySessions(startDate: string, endDate: string): {
+function buildGallerySessions(startDate: string, endDate: string, selectedPrepDate?: string): {
   prepDate: string | null;
   sessions: SessionInput[];
 } {
@@ -100,17 +123,13 @@ function buildGallerySessions(startDate: string, endDate: string): {
     return { prepDate: null, sessions: [] };
   }
 
-  // 준비일: 시작일 이전 1일(일요일이면 직전 영업일로 역추적)
-  let prep = addDays(startDate, -1);
-  while (isYmd(prep) && dayOfWeekLocal(prep) === 0) {
-    prep = addDays(prep, -1);
-  }
-  const prepDate = isYmd(prep) ? prep : null;
+  // 준비일 결정
+  const prepDate = (selectedPrepDate && isYmd(selectedPrepDate)) ? selectedPrepDate : null;
 
   const sessions: SessionInput[] = [];
   // 전시 기간(포함)
   let cur = startDate;
-  const safetyCap = 400; // 기술 안전장치(전시기간 제한은 없음)
+  const safetyCap = 400;
   let count = 0;
   while (cur <= endDate) {
     if (count++ > safetyCap) break;
@@ -125,7 +144,7 @@ function buildGallerySessions(startDate: string, endDate: string): {
     cur = addDays(cur, 1);
   }
 
-  // 준비일 세션은 전시 시작일과 겹치지 않도록 별도 추가(일요일 제외는 이미 처리됨)
+  // 준비일 세션 추가
   if (prepDate && prepDate < startDate) {
     const dow = dayOfWeekLocal(prepDate);
     if (dow !== 0) {
@@ -142,12 +161,13 @@ function buildGallerySessions(startDate: string, endDate: string): {
   return { prepDate, sessions: out };
 }
 
-function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string; galleryRemovalTime?: string }) {
+function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string; galleryRemovalTime?: string; galleryPrepDate?: string }) {
   // RequestInputSchema의 purpose(min 5) 충족 + 담당자 확인 편의
   const lines: string[] = [];
   if (fields.exhibitionPurpose?.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
   if (fields.genreContent?.trim()) lines.push(`장르·내용: ${fields.genreContent.trim()}`);
   if (fields.awarenessPath?.trim()) lines.push(`인지 경로: ${fields.awarenessPath.trim()}`);
+  if (fields.galleryPrepDate?.trim()) lines.push(`준비일: ${fields.galleryPrepDate.trim()}`);
   if (fields.galleryRemovalTime?.trim()) lines.push(`철수 예정: 종료일 ${fields.galleryRemovalTime.trim()}`);
   if (fields.specialNotes?.trim()) lines.push(`특이사항: ${fields.specialNotes.trim()}`);
   const joined = lines.join("\n").trim();
@@ -211,6 +231,9 @@ export default function ApplyGalleryClient() {
       // 철수시간
       galleryRemovalTime: "",
 
+      // 준비일 (기본값은 startDate 설정 후 useEffect에서 채움)
+      galleryPrepDate: "",
+
       // 전시 정보
       exhibitionTitle: "",
       exhibitionPurpose: "",
@@ -253,6 +276,20 @@ export default function ApplyGalleryClient() {
   const awarenessPath = watch("awarenessPath");
   const specialNotes = watch("specialNotes");
   const galleryRemovalTime = watch("galleryRemovalTime");
+  const galleryPrepDate = watch("galleryPrepDate");
+
+  // 준비일 후보 목록
+  const availablePrepDates = useMemo(() => getAvailablePrepDates(startDate), [startDate]);
+
+  // startDate가 바뀌면 기본 준비일(가장 가까운 날짜)을 자동 선택
+  useEffect(() => {
+    const dates = getAvailablePrepDates(startDate);
+    if (dates.length > 0) {
+      setValue("galleryPrepDate", dates[0], { shouldValidate: true, shouldDirty: true });
+    } else {
+      setValue("galleryPrepDate", "", { shouldValidate: true, shouldDirty: true });
+    }
+  }, [startDate, setValue]);
 
   // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
   // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
@@ -267,11 +304,11 @@ export default function ApplyGalleryClient() {
 
   // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
   useEffect(() => {
-    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime });
+    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate });
     setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
-  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, setValue]);
+  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate, setValue]);
 
-  const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate), [startDate, endDate]);
+  const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate, galleryPrepDate), [startDate, endDate, galleryPrepDate]);
 
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
   useEffect(() => {
@@ -325,7 +362,7 @@ export default function ApplyGalleryClient() {
       // 기존 저장 구조 호환: purpose 구성
       fd.set(
         "purpose",
-        composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime })
+        composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate })
       );
 
       // 회차 자동 생성(서버에서 재생성/검증 단계는 추후 /api/requests에서 확장)
@@ -438,15 +475,14 @@ export default function ApplyGalleryClient() {
                   <span className="text-sm text-slate-500">전시 기간</span>
                   <span className="text-sm font-semibold text-slate-900">{confirmData.startDate} ~ {confirmData.endDate}</span>
                 </div>
-                {sessionsBundle.prepDate && (
-                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 my-1">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-bold text-amber-900">📌 전시 준비일</span>
-                      <span className="text-sm font-bold text-amber-900">{sessionsBundle.prepDate} (무료)</span>
-                    </div>
-                    <p className="mt-1 text-[11px] text-amber-700">변경 필요 시 담당자 문의 (070-7163-2953)</p>
-                  </div>
-                )}
+                <div className="flex justify-between py-2.5">
+                  <span className="text-sm text-slate-500">전시 준비일</span>
+                  <span className="text-sm font-semibold text-slate-900">
+                    {sessionsBundle.prepDate
+                      ? `${sessionsBundle.prepDate} (${dowLabel(sessionsBundle.prepDate)}) — 무료`
+                      : "없음"}
+                  </span>
+                </div>
                 <div className="flex justify-between py-2.5">
                   <span className="text-sm text-slate-500">철수 일시</span>
                   <span className="text-sm font-semibold text-slate-900">{confirmData.endDate} {confirmData.galleryRemovalTime}</span>
@@ -530,9 +566,9 @@ export default function ApplyGalleryClient() {
                       <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
                     </div>
                   )}
-                  {feeBreakdown.prepDays > 0 && (
-                    <div className="flex items-center justify-between text-sm text-slate-400">
-                      <span>준비일 {feeBreakdown.prepDays}일</span>
+                  {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
+                    <div className="flex items-center justify-between text-sm text-emerald-600">
+                      <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
                       <span className="font-medium">무료</span>
                     </div>
                   )}
@@ -575,7 +611,7 @@ export default function ApplyGalleryClient() {
           <Notice title="신청 전 확인" variant="info" pad="md">
             <ul className="list-disc space-y-1 pl-5">
               <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
-              <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 포함됩니다.</li>
+              <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. (날짜 선택 가능)</li>
               <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
               <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
               <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
@@ -632,18 +668,30 @@ export default function ApplyGalleryClient() {
                   우리동네 갤러리 안내 보기
                 </button>
               </div>
-              {sessionsBundle.prepDate ? (
-                <div className="mt-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3">
+              {isYmd(startDate) && availablePrepDates.length > 0 && (
+                <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3">
                   <div className="flex items-center gap-2">
-                    <span className="text-base">📌</span>
-                    <span className="text-sm font-bold text-amber-900">전시 준비일: {sessionsBundle.prepDate} (무료)</span>
+                    <span className="text-sm font-bold text-emerald-900">전시 준비일 (무료)</span>
                   </div>
-                  <p className="mt-1 text-xs text-amber-800">
-                    전시 준비일은 시작일 이전 1일(일요일·휴관일 제외)이 자동 배정됩니다.<br />
-                    전시 준비일 변경이 필요하면 담당자에게 문의해 주세요. (070-7163-2953)
+                  <p className="mt-1 text-xs text-emerald-800">
+                    전시 시작 전 준비(세팅)를 위한 1일을 무료로 사용할 수 있습니다. 필요 없으면 &lsquo;준비일 없음&rsquo;을 선택하세요.
                   </p>
+                  <div className="mt-2">
+                    <Select
+                      id="galleryPrepDate"
+                      {...register("galleryPrepDate")}
+                    >
+                      {availablePrepDates.map((d) => (
+                        <option key={d} value={d}>
+                          {d} ({dowLabel(d)})
+                        </option>
+                      ))}
+                      <option value="">준비일 없음</option>
+                    </Select>
+                  </div>
+                  {errors.galleryPrepDate?.message ? <FieldHelp className="text-red-600">{errors.galleryPrepDate.message}</FieldHelp> : null}
                 </div>
-              ) : null}
+              )}
               {hasSundayInRange ? (
                 <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
               ) : null}
@@ -670,9 +718,9 @@ export default function ApplyGalleryClient() {
                         <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
                       </div>
                     )}
-                    {feeBreakdown.prepDays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-400">
-                        <span>준비일 {feeBreakdown.prepDays}일</span>
+                    {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
+                      <div className="flex items-center justify-between text-sm text-emerald-600">
+                        <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
                         <span className="font-medium">무료</span>
                       </div>
                     )}
