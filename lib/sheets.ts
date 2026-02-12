@@ -166,12 +166,35 @@ function buildRecordValueMap(record: RentalRequest): Record<string, string> {
 }
 
 /**
+ * Google Sheets 수식 인젝션 방어
+ * =, +, -, @, \t, \r 로 시작하는 값은 Sheets에서 수식으로 해석될 수 있음
+ */
+function sanitizeForSheets(value: string): string {
+  if (!value) return value;
+  const first = value.charAt(0);
+  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r") {
+    return "'" + value;
+  }
+  return value;
+}
+
+/** 수식 인젝션 방어 대상 (사용자 입력 필드) */
+const USER_INPUT_COLUMNS = new Set([
+  "applicantName", "address", "orgName", "purpose",
+  "exhibitionTitle", "exhibitionPurpose", "genreContent",
+  "awarenessPath", "specialNotes", "adminMemo", "rejectReason", "discountReason",
+]);
+
+/**
  * 헤더 배열 순서에 맞춰 레코드 값 배열을 생성합니다.
  * 헤더 순서가 코드와 다르더라도 정확한 컬럼에 값이 배치됩니다.
  */
 function buildRowFromHeader(header: string[], record: RentalRequest): string[] {
   const map = buildRecordValueMap(record);
-  return header.map((col) => map[col] ?? "");
+  return header.map((col) => {
+    const val = map[col] ?? "";
+    return USER_INPUT_COLUMNS.has(col) ? sanitizeForSheets(val) : val;
+  });
 }
 
 function roomName(roomId: string): string {

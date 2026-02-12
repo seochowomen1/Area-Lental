@@ -508,12 +508,20 @@ export async function POST(req: Request) {
       savedList = await db.appendRequestsBatch(appendInputs);
     }
 
-    if (savedList.length > 1) {
-      await sendAdminNewRequestEmailBatch(savedList);
-      await sendApplicantReceivedEmailBatch(savedList);
-    } else {
-      await sendAdminNewRequestEmail(savedList[0]);
-      await sendApplicantReceivedEmail(savedList[0]);
+    try {
+      if (savedList.length > 1) {
+        await sendAdminNewRequestEmailBatch(savedList);
+        await sendApplicantReceivedEmailBatch(savedList);
+      } else {
+        await sendAdminNewRequestEmail(savedList[0]);
+        await sendApplicantReceivedEmail(savedList[0]);
+      }
+    } catch (emailErr) {
+      // 메일 발송 실패해도 신청 자체는 성공 처리
+      logger.error("메일 발송 실패 (신청은 정상 저장됨)", {
+        requestId: savedList[0]?.requestId,
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
     }
 
     logger.info('대관 신청 생성 완료', {

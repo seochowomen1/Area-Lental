@@ -93,13 +93,13 @@ export async function POST(req: Request) {
 
   const db = getDatabase();
   const r = await db.getRequestById(requestId);
-  if (!r) {
-    return NextResponse.json({ ok: false, message: "신청건을 찾을 수 없습니다." }, { status: 404 });
-  }
 
-  // 이메일 일치 확인
-  if (normalizeEmail(r.email) !== email) {
-    return NextResponse.json({ ok: false, message: "신청번호와 이메일이 일치하지 않습니다." }, { status: 403 });
+  // 신청번호 미존재 또는 이메일 불일치 시 동일 메시지 반환 (이메일 열거 방지)
+  if (!r || normalizeEmail(r.email) !== email) {
+    return NextResponse.json(
+      { ok: false, message: "신청번호 또는 이메일을 확인해주세요." },
+      { status: 400 },
+    );
   }
 
   // 묶음 신청이면 같은 batchId 전체를 조회하여 요약

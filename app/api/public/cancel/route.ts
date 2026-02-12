@@ -51,11 +51,13 @@ export async function POST(req: Request) {
 
   const db = getDatabase();
   const found = await db.getRequestById(requestId);
-  if (!found) {
-    return NextResponse.json({ ok: false, message: "해당 신청을 찾을 수 없습니다." }, { status: 404 });
-  }
-  if (normalizeEmail(found.email) !== email) {
-    return NextResponse.json({ ok: false, message: "인증 정보가 일치하지 않습니다." }, { status: 403 });
+
+  // 신청번호 미존재 또는 이메일 불일치 시 동일 메시지 반환 (이메일 열거 방지)
+  if (!found || normalizeEmail(found.email) !== email) {
+    return NextResponse.json(
+      { ok: false, message: "신청번호 또는 이메일을 확인해주세요." },
+      { status: 400 },
+    );
   }
 
   const all = await db.getAllRequests();

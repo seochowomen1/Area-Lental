@@ -29,21 +29,30 @@ function timingSafeEqualString(a: string, b: string) {
   return crypto.timingSafeEqual(ab, bb);
 }
 
+/** 로그 중복 방지 플래그 */
+let _warnedLinkSecretFallback = false;
+
 function getTokenSecret(): string {
   if (process.env.PUBLIC_LINK_SECRET) {
     return process.env.PUBLIC_LINK_SECRET;
   }
-  // 운영 환경에서는 반드시 별도의 PUBLIC_LINK_SECRET 설정 필요
+
+  // 운영 환경에서는 반드시 별도 시크릿 필요 (ADMIN_PASSWORD 공유 금지)
   if (process.env.NODE_ENV === "production") {
-    if (process.env.ADMIN_PASSWORD) {
-      console.error("[SECURITY] PUBLIC_LINK_SECRET 미설정 — 운영 환경에서는 ADMIN_PASSWORD와 다른 별도 시크릿을 설정해 주세요.");
-      return process.env.ADMIN_PASSWORD;
-    }
-    throw new Error("[SECURITY] PUBLIC_LINK_SECRET이 설정되지 않았습니다. 운영 환경에서 필수 환경변수입니다.");
+    throw new Error(
+      "[SECURITY] PUBLIC_LINK_SECRET이 설정되지 않았습니다. " +
+      "운영 환경에서는 ADMIN_PASSWORD와 다른 별도 시크릿을 반드시 설정해 주세요. " +
+      "생성: node -e \"console.log(require('crypto').randomBytes(32).toString('hex'))\""
+    );
   }
-  // 개발 환경 전용 폴백
+
+  // 개발 환경 전용 폴백 (ADMIN_PASSWORD와 분리된 파생 키 사용)
   if (process.env.ADMIN_PASSWORD) {
-    return process.env.ADMIN_PASSWORD;
+    if (!_warnedLinkSecretFallback) {
+      console.warn("[DEV] PUBLIC_LINK_SECRET 미설정 — ADMIN_PASSWORD 기반 파생 키를 사용합니다.");
+      _warnedLinkSecretFallback = true;
+    }
+    return `link-token-dev::${process.env.ADMIN_PASSWORD}`;
   }
   return "dev-local-only-insecure";
 }
