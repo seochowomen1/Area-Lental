@@ -101,10 +101,13 @@ function dowLabel(ymd: string): string {
  */
 function getAvailablePrepDates(startDate: string, count = 7): string[] {
   if (!isYmd(startDate)) return [];
+  const today = todayYmdSeoul();
   const dates: string[] = [];
   let cur = addDays(startDate, -1);
   let safety = 0;
   while (dates.length < count && safety++ < 30) {
+    // 과거 날짜는 후보에서 제외
+    if (cur < today) break;
     if (dayOfWeekLocal(cur) !== 0) {
       dates.push(cur);
     }
@@ -557,6 +560,9 @@ export default function ApplyGalleryClient() {
                   </div>
                 ))}
               </div>
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                이메일은 대관 승인 여부 및 신청 조회 등에 활용되므로 반드시 정확히 입력해 주세요.
+              </p>
             </Card>
 
             {/* 전시 정보 */}

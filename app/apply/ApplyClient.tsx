@@ -622,6 +622,9 @@ export default function ApplyClient() {
                   </div>
                 ))}
               </div>
+              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                이메일은 대관 승인 여부 및 신청 조회 등에 활용되므로 반드시 정확히 입력해 주세요.
+              </p>
             </Card>
 
             {/* 단체/행사 정보 (E-스튜디오 제외) */}
