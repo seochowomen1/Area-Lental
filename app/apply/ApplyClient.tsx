@@ -717,10 +717,10 @@ export default function ApplyClient() {
 
   return (
     <div>
-      <SiteHeader title="대관신청" backHref="/space" backLabel="목록" />
+      <SiteHeader title={isStudioRoom ? "E-스튜디오 대관신청" : "강의실 대관신청"} backHref="/space" backLabel="목록" />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <h2 className="text-2xl font-bold">대관신청서 작성</h2>
+        <h2 className="text-2xl font-bold">{isStudioRoom ? "E-스튜디오" : "강의실"} 대관신청서 작성</h2>
         <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 담당자 검토/승인 절차를 거쳐 확정됩니다.</p>
 
         <div className="mt-4">
@@ -729,14 +729,24 @@ export default function ApplyClient() {
 
         <div className="mt-5">
           <Notice title="신청 전 확인" variant="info" pad="md">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>
-                시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.
-              </li>
-              <li>“대관 일정 추가하기”를 이용하면 <b>여러 날짜/시간</b>을 한 번에 신청할 수 있습니다.</li>
-              <li>신청 시 &lsquo;정규 수업시간/담당자 차단/기 승인 일정&rsquo;과 충돌하면 자동으로 신청이 제한됩니다.</li>
-              <li>상세 화면의 “공간정보 및 시설안내 / 취소·환불규정”을 확인한 후 신청해 주세요.</li>
-            </ul>
+            {isStudioRoom ? (
+              <ul className="list-disc space-y-1 pl-5">
+                <li>이용 시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.</li>
+                <li>기본 2인 기준 <b>시간당 20,000원</b>이며, 추가 인원 시 시간당 5,000원이 추가됩니다.</li>
+                <li>촬영장비는 <b>별도 사용료</b>가 적용되며, 대관 이용 기간 중 1일 1회만 과금됩니다.</li>
+                <li>촬영 시 <b>SD카드 또는 외장하드</b>를 반드시 준비해 주세요.</li>
+                <li>기존 승인 일정·차단 시간과 충돌하면 자동으로 신청이 제한됩니다.</li>
+                <li>신청서 접수 후 담당자 확인을 거쳐 <b>대관료 결제 완료 시 예약이 확정</b>됩니다.</li>
+              </ul>
+            ) : (
+              <ul className="list-disc space-y-1 pl-5">
+                <li>이용 시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.</li>
+                <li>&ldquo;대관 일정 추가하기&rdquo;를 이용하면 <b>여러 날짜/시간</b>을 한 번에 신청할 수 있습니다.</li>
+                <li>기자재(노트북·빔프로젝터·음향) 사용 시 각 <b>10,000원</b>이 추가됩니다.</li>
+                <li>정규 수업·기존 승인 일정·차단 시간과 충돌하면 자동으로 신청이 제한됩니다.</li>
+                <li>신청서 접수 후 담당자 확인을 거쳐 <b>대관료 결제 완료 시 예약이 확정</b>됩니다.</li>
+              </ul>
+            )}
           </Notice>
         </div>
 
