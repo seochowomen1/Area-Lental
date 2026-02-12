@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import LinkButton from "@/components/ui/LinkButton";
 import Button from "@/components/ui/Button";
 import Notice from "@/components/ui/Notice";
+import { cn } from "@/lib/cn";
 import { isTuesdayNightOverlap, operatingRangesForDate } from "@/lib/operating";
 import { getRoom } from "@/lib/space";
 import { CARD_BASE, FIELD_CONTROL_BASE, FIELD_HELP, FIELD_LABEL } from "@/components/ui/presets";
@@ -67,18 +68,32 @@ function addMonths(d: Date, delta: number) {
 }
 
 function getCalendarGrid(monthStart: Date) {
-  // monthStart is the first day of the month
   const year = monthStart.getFullYear();
   const month = monthStart.getMonth();
   const first = new Date(year, month, 1);
-  const last = new Date(year, month + 1, 0);
   const startDow = first.getDay(); // 0(Sun)...6
-  const start = new Date(year, month, 1 - startDow);
+  const lastDay = new Date(year, month + 1, 0).getDate();
+
   const days: Date[] = [];
-  for (let i = 0; i < 42; i++) {
-    days.push(new Date(start.getFullYear(), start.getMonth(), start.getDate() + i));
+
+  // 이전 달 날짜로 첫 줄 채우기
+  const prevMonthLast = new Date(year, month, 0).getDate();
+  for (let i = startDow - 1; i >= 0; i--) {
+    days.push(new Date(year, month - 1, prevMonthLast - i));
   }
-  return { days, first, last };
+
+  // 이번 달 날짜
+  for (let d = 1; d <= lastDay; d++) {
+    days.push(new Date(year, month, d));
+  }
+
+  // 다음 달 날짜로 마지막 줄 채우기
+  let nextDay = 1;
+  while (days.length % 7 !== 0) {
+    days.push(new Date(year, month + 1, nextDay++));
+  }
+
+  return { days, first, last: new Date(year, month + 1, 0) };
 }
 
 export default function SpaceBooking({
@@ -105,6 +120,20 @@ export default function SpaceBooking({
 }) {
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const { days } = useMemo(() => getCalendarGrid(month), [month]);
+  const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+
+  // 월 변경 시 예약 마감 날짜를 조회
+  useEffect(() => {
+    const monthKey = `${month.getFullYear()}-${pad2(month.getMonth() + 1)}`;
+    fetch(`/api/booked-dates?roomId=${encodeURIComponent(roomId)}&month=${monthKey}`)
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.ok && Array.isArray(data.bookedDates)) {
+          setBookedDates(new Set(data.bookedDates));
+        }
+      })
+      .catch(() => {});
+  }, [month, roomId]);
 
   const monthLabel = useMemo(() => `${month.getFullYear()}.${pad2(month.getMonth() + 1)}`, [month]);
   const selectedLabel = selectedDate;
@@ -159,9 +188,20 @@ export default function SpaceBooking({
     // 운영시간 내 모든 시작 후보를 노출하되,
     //  - 예약/차단/정규수업 등으로 불가한 시간은 비활성화(회색)
     //  - 최소 1시간(60분) 연속 가능해야 선택 가능
+    //  - 오늘 날짜인 경우 이미 지난 시간은 비활성화
     const candidates = Array.from(new Set(slots.map((s) => s.start))).sort((a, b) => toMinutes(a) - toMinutes(b));
 
+    const now = new Date();
+    const todayYmd = fmtYMD(now);
+    const isToday = selectedDate === todayYmd;
+    const nowMinutes = isToday ? now.getHours() * 60 + now.getMinutes() : 0;
+
     return candidates.map((start) => {
+      // 오늘인 경우 이미 지난 시간은 비활성화
+      if (isToday && toMinutes(start) < nowMinutes) {
+        return { value: start, disabled: true };
+      }
+
       let total = 0;
       let curStart = start;
       for (let guard = 0; guard < 200; guard++) {
@@ -174,7 +214,7 @@ export default function SpaceBooking({
       const enabled = total >= 60;
       return { value: start, disabled: !enabled };
     });
-  }, [busy, slots, slotMap, maxMinutes]);
+  }, [busy, slots, slotMap, maxMinutes, selectedDate]);
 
   const [startSel, setStartSel] = useState<string>("");
   const [endSel, setEndSel] = useState<string>("");
@@ -246,6 +286,12 @@ export default function SpaceBooking({
     return Math.round((hourlyFee * durationMinutes) / 60);
   }, [hourlyFee, durationMinutes]);
 
+  // 선택 가능한 시간이 하나도 없으면 마감 처리
+  const allSlotsDisabled = useMemo(() => {
+    if (busy || !slots.length) return false;
+    return startOptions.length > 0 && startOptions.every((o) => o.disabled);
+  }, [busy, slots.length, startOptions]);
+
   const canApply = Boolean(startSel && endSel && endOptions.length && durationMinutes >= 60);
 
   return (
@@ -304,16 +350,8 @@ export default function SpaceBooking({
 
         <div className="overflow-hidden rounded-lg border bg-white">
           <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-xs font-semibold text-gray-700">
-            {[
-              "SUN",
-              "MON",
-              "TUE",
-              "WED",
-              "THU",
-              "FRI",
-              "SAT",
-            ].map((d) => (
-              <div key={d} className="py-2">
+            {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
+              <div key={d} className={`py-2${d === "일" ? " text-rose-500" : d === "토" ? " text-blue-600" : ""}`}>
                 {d}
               </div>
             ))}
@@ -324,11 +362,11 @@ export default function SpaceBooking({
               const ymd = fmtYMD(d);
               const isCurrentMonth = d.getMonth() === month.getMonth();
               const isSelected = ymd === selectedDate;
-
-              const todayYmd = fmtYMD(new Date());
-              const isPast = ymd < todayYmd;
+              const isToday = ymd === fmtYMD(new Date());
+              const isPast = ymd < fmtYMD(new Date());
               const isSunday = d.getDay() === 0;
-              const isDisabled = !isCurrentMonth || isPast || isSunday;
+              const isBooked = bookedDates.has(ymd);
+              const isDisabled = !isCurrentMonth || isPast || isSunday || isBooked;
 
               return (
                 <button
@@ -336,29 +374,27 @@ export default function SpaceBooking({
                   type="button"
                   disabled={isDisabled}
                   onClick={() => onSelectDate(ymd)}
-                  className={
-                    "relative h-20 border-b border-r p-2 text-left text-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] " +
-                    (isCurrentMonth ? "bg-white" : "bg-gray-50 text-gray-400") +
-                    (isSelected ? " z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset" : "") +
-                    (isDisabled ? " cursor-not-allowed opacity-50" : "")
-                  }
+                  className={cn(
+                    "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
+                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
+                    !isCurrentMonth && "bg-gray-50 text-gray-300 cursor-default",
+                    isCurrentMonth && !isDisabled && !isSelected && "bg-white text-slate-900 hover:bg-slate-50",
+                    isCurrentMonth && isDisabled && !isSelected && "cursor-not-allowed bg-white opacity-50",
+                    isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
+                  )}
                 >
-                  <div className="font-medium">{d.getDate()}</div>
-                  {/* 간단 표시(데이터는 우측 기준) */}
-                  <div className="mt-2 flex items-center gap-1">
-                    <span
-                      className={
-                        "inline-block h-2.5 w-2.5 rounded-full " +
-                        (isSunday
-                          ? "bg-gray-300"
-                          : isPast
-                            ? "bg-gray-400"
-                            : "bg-orange-500")
-                      }
-                      title={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
-                      aria-label={isSunday ? "휴관" : isPast ? "마감" : "선택 가능"}
-                    />
-                  </div>
+                  <span className={cn("font-medium", isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))]")}>{d.getDate()}</span>
+                  {isCurrentMonth && (
+                    <div className="mt-1 flex items-center gap-1">
+                      <span
+                        className={cn(
+                          "inline-block h-2.5 w-2.5 rounded-full",
+                          isSunday ? "bg-gray-300" : (isPast || isBooked) ? "bg-gray-400" : "bg-orange-500"
+                        )}
+                        title={isSunday ? "휴관" : isBooked ? "마감" : isPast ? "마감" : "선택 가능"}
+                      />
+                    </div>
+                  )}
                 </button>
               );
             })}
@@ -380,10 +416,8 @@ export default function SpaceBooking({
           </div>
         </div>
 
-        <p className="mt-3 text-xs text-gray-600">
-          ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다.
-          <br />
-          ※ 일요일은 휴관으로 대관이 불가하며, 지난 날짜는 선택할 수 없습니다.
+        <p className="mt-2 text-xs text-gray-500">
+          ※ 시간은 <b>30분 단위</b>로 선택 가능 · 일요일 휴관 · 지난 날짜 선택 불가
         </p>
 
       </div>
@@ -416,7 +450,17 @@ export default function SpaceBooking({
           </div>
         )}
 
-        {!busy && !noSlotsMessage && (
+        {!busy && !noSlotsMessage && allSlotsDisabled && (
+          <div className="mt-3">
+            <Notice variant="warn" title="금일 마감">
+              <div className="text-sm text-slate-700">
+                선택 가능한 시간대가 모두 지났습니다. 다른 날짜를 선택해 주세요.
+              </div>
+            </Notice>
+          </div>
+        )}
+
+        {!busy && !noSlotsMessage && !allSlotsDisabled && (
           <div className="space-y-4">
             <div className="grid gap-3 sm:grid-cols-2">
               <div>
@@ -465,24 +509,36 @@ export default function SpaceBooking({
             </div>
 
             {durationMinutes > 0 ? (
-              <div className="mt-3">
+              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
+                  <span className="text-base">💰</span>
+                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
+                </div>
                 {hourlyFee > 0 ? (
-                  <Notice variant="info" title="예상 대관 이용료">
-                    <div className="flex items-end justify-between gap-3">
-                      <span className="text-sm text-slate-700">
-                        {fmtDuration(durationMinutes)} · 시간당 {hourlyFee.toLocaleString()}원
-                      </span>
-                      <span className="text-base font-semibold text-slate-900">{estimatedFeeKRW.toLocaleString()}원</span>
+                  <div className="px-4 py-3">
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm text-slate-600">
+                        <span>이용시간</span>
+                        <span className="font-semibold text-slate-800">{fmtDuration(durationMinutes)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-sm text-slate-600">
+                        <span>시간당 요금</span>
+                        <span className="font-semibold text-slate-800">{hourlyFee.toLocaleString()}원</span>
+                      </div>
                     </div>
-                    <div className="mt-1 text-[11px] text-slate-500">※ 기자재 사용료 별도</div>
-                  </Notice>
+                    <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                      <span className="text-sm font-bold text-slate-900">합계</span>
+                      <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{estimatedFeeKRW.toLocaleString()}원</span>
+                    </div>
+                    <p className="mt-2 text-[11px] text-slate-400">※ 기자재 사용료 별도</p>
+                  </div>
                 ) : (
-                  <Notice variant="info" title="대관 이용료 안내">
-                    <div className="text-sm text-slate-700">
-                      선택하신 이용시간 기준 <b>대관 이용료는 별도 협의</b> 대상입니다.
-                    </div>
-                    <div className="mt-1 text-[11px] text-slate-500">※ 기자재 사용료 별도</div>
-                  </Notice>
+                  <div className="px-4 py-3">
+                    <p className="text-sm text-slate-700">
+                      선택하신 이용시간 기준 <b>대관료는 별도 협의</b> 대상입니다.
+                    </p>
+                    <p className="mt-2 text-[11px] text-slate-400">※ 기자재 사용료 별도</p>
+                  </div>
                 )}
               </div>
             ) : null}

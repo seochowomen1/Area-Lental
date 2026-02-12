@@ -3,8 +3,8 @@ import type { Metadata } from "next";
 import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
-  title: "강의실 대관 신청",
-  description: "서초여성가족플라자 서초센터 강의실 대관 신청"
+  title: "서초여성가족플라자 대관 신청",
+  description: "서초여성가족플라자 서초센터 강의실·E-스튜디오·갤러리 대관 신청",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

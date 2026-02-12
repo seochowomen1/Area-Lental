@@ -41,6 +41,14 @@ const REQUEST_OPTIONAL_HEADERS = [
   "awarenessPath",
   "specialNotes",
 
+  // E-스튜디오 촬영장비
+  "equipment_mirrorless",
+  "equipment_camcorder",
+  "equipment_wirelessMic",
+  "equipment_pinMic",
+  "equipment_rodeMic",
+  "equipment_electronicBoard",
+
   // 갤러리: 서버 생성(감사) 로그
   "galleryGeneratedAt",
   "galleryGenerationVersion",
@@ -49,6 +57,7 @@ const REQUEST_OPTIONAL_HEADERS = [
   "galleryExhibitionDayCount",
   "galleryPrepDate",
   "galleryAuditJson",
+  "galleryRemovalTime",
 ] as const;
 
 function colToLetter(col1: number): string {
@@ -63,7 +72,7 @@ function colToLetter(col1: number): string {
   return s;
 }
 
-async function ensureRequestOptionalHeaders() {
+async function ensureRequestOptionalHeaders(): Promise<string[]> {
   const env = requireGoogleEnv();
   const { sheets } = getGoogleClient();
 
@@ -73,10 +82,10 @@ async function ensureRequestOptionalHeaders() {
   });
 
   const header = ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v).trim());
-  if (!header.length) return;
+  if (!header.length) return [];
 
   const missing = REQUEST_OPTIONAL_HEADERS.filter((h) => !header.includes(h));
-  if (!missing.length) return;
+  if (!missing.length) return header;
 
   const nextHeader = [...header, ...missing];
   const endCol = colToLetter(nextHeader.length);
@@ -87,6 +96,82 @@ async function ensureRequestOptionalHeaders() {
     valueInputOption: "RAW",
     requestBody: { values: [nextHeader] }
   });
+
+  return nextHeader;
+}
+
+/**
+ * RentalRequest → 헤더명:값 맵핑
+ * 시트 헤더 순서에 의존하지 않고 정확한 컬럼에 데이터를 기록합니다.
+ */
+function buildRecordValueMap(record: RentalRequest): Record<string, string> {
+  return {
+    requestId: record.requestId,
+    createdAt: record.createdAt,
+    roomId: record.roomId,
+    roomName: record.roomName,
+    date: record.date,
+    startTime: record.startTime,
+    endTime: record.endTime,
+    applicantName: record.applicantName,
+    birth: record.birth,
+    address: record.address,
+    phone: record.phone,
+    email: record.email,
+    orgName: record.orgName,
+    headcount: String(record.headcount),
+    equipment_laptop: record.equipment.laptop ? "TRUE" : "FALSE",
+    equipment_projector: record.equipment.projector ? "TRUE" : "FALSE",
+    equipment_audio: record.equipment.audio ? "TRUE" : "FALSE",
+    purpose: record.purpose,
+    attachments: (record.attachments ?? []).join("|"),
+    privacyAgree: record.privacyAgree ? "TRUE" : "FALSE",
+    pledgeAgree: record.pledgeAgree ? "TRUE" : "FALSE",
+    pledgeDate: record.pledgeDate,
+    pledgeName: record.pledgeName,
+    status: record.status,
+    adminMemo: record.adminMemo,
+    rejectReason: record.rejectReason,
+    decidedAt: record.decidedAt,
+    decidedBy: record.decidedBy,
+    discountRatePct: String(record.discountRatePct ?? 0),
+    discountAmountKRW: String(record.discountAmountKRW ?? 0),
+    discountReason: record.discountReason ?? "",
+    batchId: record.batchId ?? "",
+    batchSeq: String(record.batchSeq ?? 0),
+    batchSize: String(record.batchSize ?? 0),
+    isPrepDay: record.isPrepDay ? "TRUE" : "FALSE",
+    startDate: record.startDate ?? "",
+    endDate: record.endDate ?? "",
+    exhibitionTitle: record.exhibitionTitle ?? "",
+    exhibitionPurpose: record.exhibitionPurpose ?? "",
+    genreContent: record.genreContent ?? "",
+    awarenessPath: record.awarenessPath ?? "",
+    specialNotes: record.specialNotes ?? "",
+    equipment_mirrorless: record.equipment.mirrorless ? "TRUE" : "FALSE",
+    equipment_camcorder: record.equipment.camcorder ? "TRUE" : "FALSE",
+    equipment_wirelessMic: record.equipment.wirelessMic ? "TRUE" : "FALSE",
+    equipment_pinMic: record.equipment.pinMic ? "TRUE" : "FALSE",
+    equipment_rodeMic: record.equipment.rodeMic ? "TRUE" : "FALSE",
+    equipment_electronicBoard: record.equipment.electronicBoard ? "TRUE" : "FALSE",
+    galleryGeneratedAt: record.galleryGeneratedAt ?? "",
+    galleryGenerationVersion: record.galleryGenerationVersion ?? "",
+    galleryWeekdayCount: String(record.galleryWeekdayCount ?? 0),
+    gallerySaturdayCount: String(record.gallerySaturdayCount ?? 0),
+    galleryExhibitionDayCount: String(record.galleryExhibitionDayCount ?? 0),
+    galleryPrepDate: record.galleryPrepDate ?? "",
+    galleryAuditJson: record.galleryAuditJson ?? "",
+    galleryRemovalTime: record.galleryRemovalTime ?? "",
+  };
+}
+
+/**
+ * 헤더 배열 순서에 맞춰 레코드 값 배열을 생성합니다.
+ * 헤더 순서가 코드와 다르더라도 정확한 컬럼에 값이 배치됩니다.
+ */
+function buildRowFromHeader(header: string[], record: RentalRequest): string[] {
+  const map = buildRecordValueMap(record);
+  return header.map((col) => map[col] ?? "");
 }
 
 function roomName(roomId: string): string {
@@ -184,6 +269,13 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   const iAwarenessPath = opt("awarenessPath");
   const iSpecialNotes = opt("specialNotes");
 
+  const iMirrorless = opt("equipment_mirrorless");
+  const iCamcorder = opt("equipment_camcorder");
+  const iWirelessMic = opt("equipment_wirelessMic");
+  const iPinMic = opt("equipment_pinMic");
+  const iRodeMic = opt("equipment_rodeMic");
+  const iElectronicBoard = opt("equipment_electronicBoard");
+
   const iGalleryGeneratedAt = opt("galleryGeneratedAt");
   const iGalleryGenerationVersion = opt("galleryGenerationVersion");
   const iGalleryWeekdayCount = opt("galleryWeekdayCount");
@@ -191,6 +283,7 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   const iGalleryExhibitionDayCount = opt("galleryExhibitionDayCount");
   const iGalleryPrepDate = opt("galleryPrepDate");
   const iGalleryAuditJson = opt("galleryAuditJson");
+  const iGalleryRemovalTime = opt("galleryRemovalTime");
 
   return rows
     .slice(1)
@@ -227,6 +320,7 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       galleryExhibitionDayCount: iGalleryExhibitionDayCount >= 0 ? (parseInt(String(r[iGalleryExhibitionDayCount] ?? "0"), 10) || 0) : undefined,
       galleryPrepDate: iGalleryPrepDate >= 0 ? (String(r[iGalleryPrepDate] ?? "").trim() || undefined) : undefined,
       galleryAuditJson: iGalleryAuditJson >= 0 ? (String(r[iGalleryAuditJson] ?? "").trim() || undefined) : undefined,
+      galleryRemovalTime: iGalleryRemovalTime >= 0 ? (String(r[iGalleryRemovalTime] ?? "").trim() || undefined) : undefined,
 
       applicantName: r[idx("applicantName")],
       birth: r[idx("birth")],
@@ -240,7 +334,13 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       equipment: {
         laptop: r[idx("equipment_laptop")] === "TRUE",
         projector: r[idx("equipment_projector")] === "TRUE",
-        audio: r[idx("equipment_audio")] === "TRUE"
+        audio: r[idx("equipment_audio")] === "TRUE",
+        mirrorless: iMirrorless >= 0 ? (String(r[iMirrorless] ?? "").trim().toUpperCase() === "TRUE") : false,
+        camcorder: iCamcorder >= 0 ? (String(r[iCamcorder] ?? "").trim().toUpperCase() === "TRUE") : false,
+        wirelessMic: iWirelessMic >= 0 ? (String(r[iWirelessMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        pinMic: iPinMic >= 0 ? (String(r[iPinMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        rodeMic: iRodeMic >= 0 ? (String(r[iRodeMic] ?? "").trim().toUpperCase() === "TRUE") : false,
+        electronicBoard: iElectronicBoard >= 0 ? (String(r[iElectronicBoard] ?? "").trim().toUpperCase() === "TRUE") : false,
       },
 
       purpose: r[idx("purpose")],
@@ -295,8 +395,8 @@ export async function appendRequest(
 
   const env = requireGoogleEnv();
 
-  // optional 할인 컬럼이 없다면 헤더에 자동 추가
-  await ensureRequestOptionalHeaders();
+  // optional 컬럼이 없다면 헤더에 자동 추가 + 현재 헤더 반환
+  const header = await ensureRequestOptionalHeaders();
 
   const { sheets } = getGoogleClient();
 
@@ -334,6 +434,7 @@ export async function appendRequest(
     galleryExhibitionDayCount: input.galleryExhibitionDayCount,
     galleryPrepDate: input.galleryPrepDate,
     galleryAuditJson: input.galleryAuditJson,
+    galleryRemovalTime: input.galleryRemovalTime,
 
     applicantName: input.applicantName,
     birth: input.birth,
@@ -365,57 +466,8 @@ export async function appendRequest(
     decidedBy: ""
   };
 
-  const values = [[
-    record.requestId,
-    record.createdAt,
-    record.roomId,
-    record.roomName,
-    record.date,
-    record.startTime,
-    record.endTime,
-    record.applicantName,
-    record.birth,
-    record.address,
-    record.phone,
-    record.email,
-    record.orgName,
-    String(record.headcount),
-    record.equipment.laptop ? "TRUE" : "FALSE",
-    record.equipment.projector ? "TRUE" : "FALSE",
-    record.equipment.audio ? "TRUE" : "FALSE",
-    record.purpose,
-    record.attachments.join("|"),
-    record.privacyAgree ? "TRUE" : "FALSE",
-    record.pledgeAgree ? "TRUE" : "FALSE",
-    record.pledgeDate,
-    record.pledgeName,
-    record.status,
-    record.adminMemo,
-    record.rejectReason,
-    record.decidedAt,
-    record.decidedBy,
-    String(record.discountRatePct ?? 0),
-    String(record.discountAmountKRW ?? 0),
-    record.discountReason ?? "",
-    record.batchId ?? "",
-    String(record.batchSeq ?? 0),
-    String(record.batchSize ?? 0),
-    record.isPrepDay ? "TRUE" : "FALSE",
-    record.startDate ?? "",
-    record.endDate ?? "",
-    record.exhibitionTitle ?? "",
-    record.exhibitionPurpose ?? "",
-    record.genreContent ?? "",
-    record.awarenessPath ?? "",
-    record.specialNotes ?? "",
-    record.galleryGeneratedAt ?? "",
-    record.galleryGenerationVersion ?? "",
-    String(record.galleryWeekdayCount ?? 0),
-    String(record.gallerySaturdayCount ?? 0),
-    String(record.galleryExhibitionDayCount ?? 0),
-    record.galleryPrepDate ?? "",
-    record.galleryAuditJson ?? ""
-  ]];
+  // 헤더 순서 기반 값 배열 생성 (컬럼 순서 불일치 방지)
+  const values = [buildRowFromHeader(header, record)];
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
@@ -437,8 +489,8 @@ export async function appendRequestsBatch(
 
   const env = requireGoogleEnv();
 
-  // optional 컬럼이 없다면 헤더에 자동 추가
-  await ensureRequestOptionalHeaders();
+  // optional 컬럼이 없다면 헤더에 자동 추가 + 현재 헤더 반환
+  const header = await ensureRequestOptionalHeaders();
 
   const { sheets } = getGoogleClient();
 
@@ -490,6 +542,7 @@ export async function appendRequestsBatch(
       galleryExhibitionDayCount: input.galleryExhibitionDayCount,
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
+      galleryRemovalTime: input.galleryRemovalTime,
 
       applicantName: input.applicantName,
       birth: input.birth,
@@ -522,57 +575,8 @@ export async function appendRequestsBatch(
     };
 
     saved.push(record);
-    values.push([
-      record.requestId,
-      record.createdAt,
-      record.roomId,
-      record.roomName,
-      record.date,
-      record.startTime,
-      record.endTime,
-      record.applicantName,
-      record.birth,
-      record.address,
-      record.phone,
-      record.email,
-      record.orgName,
-      String(record.headcount),
-      record.equipment.laptop ? "TRUE" : "FALSE",
-      record.equipment.projector ? "TRUE" : "FALSE",
-      record.equipment.audio ? "TRUE" : "FALSE",
-      record.purpose,
-      (record.attachments ?? []).join("|"),
-      record.privacyAgree ? "TRUE" : "FALSE",
-      record.pledgeAgree ? "TRUE" : "FALSE",
-      record.pledgeDate,
-      record.pledgeName,
-      record.status,
-      record.adminMemo,
-      record.rejectReason,
-      record.decidedAt,
-      record.decidedBy,
-      String(record.discountRatePct ?? 0),
-      String(record.discountAmountKRW ?? 0),
-      record.discountReason ?? "",
-      record.batchId ?? "",
-      String(record.batchSeq ?? 0),
-      String(record.batchSize ?? 0),
-      record.isPrepDay ? "TRUE" : "FALSE",
-      record.startDate ?? "",
-      record.endDate ?? "",
-      record.exhibitionTitle ?? "",
-      record.exhibitionPurpose ?? "",
-      record.genreContent ?? "",
-      record.awarenessPath ?? "",
-      record.specialNotes ?? "",
-      record.galleryGeneratedAt ?? "",
-      record.galleryGenerationVersion ?? "",
-      String(record.galleryWeekdayCount ?? 0),
-      String(record.gallerySaturdayCount ?? 0),
-      String(record.galleryExhibitionDayCount ?? 0),
-      record.galleryPrepDate ?? "",
-      record.galleryAuditJson ?? ""
-    ]);
+    // 헤더 순서 기반 값 배열 생성 (컬럼 순서 불일치 방지)
+    values.push(buildRowFromHeader(header, record));
   }
 
   await sheets.spreadsheets.values.append({
@@ -783,7 +787,7 @@ export async function getBlocks(): Promise<BlockTime[]> {
   const { sheets } = getGoogleClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_BLOCKS}!A:F`
+    range: `${SHEET_BLOCKS}!A:G`
   });
   const rows = (res.data.values ?? []) as string[][];
   if (rows.length <= 1) return [];
@@ -793,11 +797,14 @@ export async function getBlocks(): Promise<BlockTime[]> {
     ["id", "roomId", "date", "startTime", "endTime", "reason"],
     SHEET_BLOCKS
   );
+  // endDate 컬럼은 선택적 (기존 시트에 없을 수 있음)
+  const endDateIdx = header.indexOf("endDate");
 
   return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
     id: r[idx("id")],
     roomId: r[idx("roomId")],
     date: r[idx("date")],
+    ...(endDateIdx >= 0 && r[endDateIdx] ? { endDate: r[endDateIdx] } : {}),
     startTime: r[idx("startTime")],
     endTime: r[idx("endTime")],
     reason: r[idx("reason")] || ""
@@ -813,9 +820,9 @@ export async function addBlock(b: Omit<BlockTime, "id">): Promise<BlockTime> {
   const id = `BL-${Date.now()}`;
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_BLOCKS}!A:F`,
+    range: `${SHEET_BLOCKS}!A:G`,
     valueInputOption: "RAW",
-    requestBody: { values: [[id, b.roomId, b.date, b.startTime, b.endTime, b.reason]] }
+    requestBody: { values: [[id, b.roomId, b.date, b.startTime, b.endTime, b.reason, b.endDate || ""]] }
   });
 
   return { id, ...b };

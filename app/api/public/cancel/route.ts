@@ -11,6 +11,7 @@ function normalizeEmail(email: string) {
 }
 
 export async function POST(req: Request) {
+  try {
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
@@ -49,11 +50,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: "해당 신청을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  // 완료(결제/종결) 상태는 사용자 취소를 막습니다.
-  if (group.some((r) => r.status === "완료")) {
-    return NextResponse.json({ ok: false, message: "이미 처리 완료된 신청은 취소할 수 없습니다." }, { status: 400 });
-  }
-
   // 이미 전부 취소인 경우는 멱등 처리
   if (group.every((r) => r.status === "취소")) {
     return NextResponse.json({ ok: true, message: "이미 취소된 신청입니다." });
@@ -70,4 +66,8 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, message: "예약이 취소되었습니다." });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

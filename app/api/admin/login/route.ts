@@ -2,10 +2,15 @@ import { NextResponse } from "next/server";
 import crypto from "crypto";
 
 import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE } from "@/lib/adminConstants";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 로그인: IP당 15분 내 5회 시도 제한 */
+const LOGIN_MAX_ATTEMPTS = 5;
+const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 
 function tokenFor(adminPassword: string) {
   return crypto
@@ -15,6 +20,17 @@ function tokenFor(adminPassword: string) {
 }
 
 export async function POST(req: Request) {
+  try {
+  // Rate limit 체크
+  const ip = getClientIp(req);
+  const rl = rateLimit("login", ip, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `너무 많은 로그인 시도입니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const adminPw = process.env.ADMIN_PASSWORD;
   if (!adminPw) {
     return NextResponse.json(
@@ -49,12 +65,19 @@ export async function POST(req: Request) {
 
   const token = tokenFor(adminPw);
   const res = NextResponse.json({ ok: true, redirect: nextPath });
+  const isProduction = process.env.NODE_ENV === "production";
   res.cookies.set(ADMIN_COOKIE_NAME, token, {
     httpOnly: true,
     sameSite: "lax",
+    secure: isProduction,
     path: "/",
+    maxAge: 24 * 60 * 60, // 24시간 후 자동 만료
   });
   return res;
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }
 
 export async function DELETE() {

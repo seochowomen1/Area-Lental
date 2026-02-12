@@ -19,7 +19,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
       )}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
-        {/* 이미지 추가 방법: public/rooms/... 에 넣고 room.image를 "/rooms/파일명.jpg" 로 설정 */}
+        {/* 이미지 추가 방법: public/room/... 에 넣고 room.image를 "/room/파일명.jpg" 로 설정 */}
         {room.image ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img
@@ -34,7 +34,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
         )}
 
         <span className="absolute left-3 top-3 rounded-full bg-[rgb(var(--brand-primary))] px-3 py-1 text-xs font-semibold text-white shadow">
-          신청예약 필수
+          대관신청 필수
         </span>
       </div>
 
@@ -54,13 +54,13 @@ function RoomCard({ room }: { room: SpaceRoom }) {
             )}
           </div>
           <div className="flex items-center justify-between">
-            <span>이용금액</span>
+            <span>대관료</span>
             <span className="font-medium text-slate-900">
               {room.category === "gallery" ? "평일 20,000원/일 · 토 10,000원/일" : room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}
             </span>
           </div>
           <div className="flex items-center justify-between">
-            <span>장소위치</span>
+            <span>위치</span>
             <span className="font-medium text-slate-900">{room.floor}층</span>
           </div>
         </div>
@@ -82,33 +82,35 @@ export default function SpaceFloorTabs({
 
   return (
     <div>
-      <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-2 flex items-center justify-between">
-          <div className="text-sm font-semibold text-slate-800">층 선택</div>
-          <div className="text-xs text-slate-500">원하는 층을 선택해 공간을 확인하세요</div>
-        </div>
+      {floors.length > 1 ? (
+        <div className="mx-auto w-full max-w-4xl">
+          <div className="mb-2 flex items-center justify-between">
+            <div className="text-sm font-semibold text-slate-800">층 선택</div>
+            <div className="text-xs text-slate-500">원하는 층을 선택해 공간을 확인하세요</div>
+          </div>
 
-        <Card pad="sm" className="flex w-full justify-center gap-2">
-          {floors.map((f) => {
-            const active = selected === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                onClick={() => setSelected(f.id)}
-                className={cn(
-                  BUTTON_BASE,
-                  active ? BUTTON_VARIANT.primary : BUTTON_VARIANT.outline,
-                  "rounded-full px-5 py-2.5 text-sm",
-                  active ? "shadow" : ""
-                )}
-              >
-                {f.label}
-              </button>
-            );
-          })}
-        </Card>
-      </div>
+          <Card pad="sm" className="flex w-full justify-center gap-2">
+            {floors.map((f) => {
+              const active = selected === f.id;
+              return (
+                <button
+                  key={f.id}
+                  type="button"
+                  onClick={() => setSelected(f.id)}
+                  className={cn(
+                    BUTTON_BASE,
+                    active ? BUTTON_VARIANT.primary : BUTTON_VARIANT.outline,
+                    "rounded-full px-5 py-2.5 text-sm",
+                    active ? "shadow" : ""
+                  )}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
+          </Card>
+        </div>
+      ) : null}
 
       {/*
         ✅ 반응형 카드 배치 규칙

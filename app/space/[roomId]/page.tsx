@@ -1,5 +1,5 @@
 import { notFound } from "next/navigation";
-import { ROOMS_BY_ID } from "@/lib/space";
+import { ROOMS_BY_ID, getCategoryLabel, normalizeRoomCategory } from "@/lib/space";
 import SiteHeader from "@/components/SiteHeader";
 import SpaceDetailShell from "@/components/SpaceDetailShell";
 
@@ -16,7 +16,7 @@ export default function SpaceDetailPage({
 
   return (
     <div>
-      <SiteHeader title="대관신청" backHref="/space" backLabel="목록" />
+      <SiteHeader title={`${getCategoryLabel(normalizeRoomCategory(room.category))} 대관신청`} backHref="/space" backLabel="목록" />
 
       <SpaceDetailShell room={room} />
     </div>

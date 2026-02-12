@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, inRangeYmd } from "@/lib/datetime";
+import { galleryOperatingWindow } from "@/lib/gallery";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
 
@@ -113,7 +114,7 @@ function filterByRoomAndFloor(
 function filterStatus(statusParam: string, r: RentalRequest): boolean {
   if (statusParam === "all") return true;
   if (statusParam === "active") {
-    const active: RequestStatus[] = ["접수", "검토중", "승인"];
+    const active: RequestStatus[] = ["접수", "승인"];
     return active.includes(r.status);
   }
   return r.status === (statusParam as RequestStatus);
@@ -132,6 +133,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const { searchParams } = new URL(req.url);
   const rawCategory = searchParams.get("category");
   const category = normalizeRoomCategory(rawCategory);
@@ -164,11 +166,67 @@ export async function GET(req: Request) {
 
   // 1) Requests
   for (const r of requests) {
-    if (!inRangeYmd(r.date, from, to)) continue;
     if (!filterStatus(status, r)) continue;
     if (!isAllowedRoom(r.roomId)) continue;
 
-    // room/floor filter
+    // 갤러리 1행 형식: 전시 기간 전체를 개별 날짜로 확장
+    if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+      const rf = filterByRoomAndFloor(roomId, floorId, r.roomId, r.roomName);
+      if (!rf.ok) continue;
+
+      // 준비일
+      if (r.galleryPrepDate) {
+        const prepDt = r.galleryPrepDate;
+        if (inRangeYmd(prepDt, from, to)) {
+          const win = galleryOperatingWindow(prepDt);
+          items.push({
+            kind: "request",
+            id: `${r.requestId}:prep`,
+            roomId: r.roomId,
+            roomName: rf.roomName,
+            floorId: rf.floorId,
+            date: prepDt,
+            startTime: win?.startTime ?? "09:00",
+            endTime: win?.endTime ?? "18:00",
+            title: rf.roomName,
+            status: r.status,
+            applicantName: r.applicantName,
+            phone: r.phone,
+            isPrepDay: true,
+          });
+        }
+      }
+
+      // 전시일: startDate~endDate(일요일 제외)
+      const exhibDates = eachYmd(r.startDate, r.endDate);
+      for (const dt of exhibDates) {
+        if (!inRangeYmd(dt, from, to)) continue;
+        if (dayOfWeek(dt) === 0) continue; // 일요일 제외
+        const win = galleryOperatingWindow(dt);
+        if (!win) continue;
+
+        items.push({
+          kind: "request",
+          id: `${r.requestId}:${dt}`,
+          roomId: r.roomId,
+          roomName: rf.roomName,
+          floorId: rf.floorId,
+          date: dt,
+          startTime: win.startTime,
+          endTime: win.endTime,
+          title: rf.roomName,
+          status: r.status,
+          applicantName: r.applicantName,
+          phone: r.phone,
+          isPrepDay: false,
+        });
+      }
+      continue;
+    }
+
+    // 기존 형식(강의실/E-스튜디오 또는 레거시 갤러리 배치)
+    if (!inRangeYmd(r.date, from, to)) continue;
+
     const rf = filterByRoomAndFloor(roomId, floorId, r.roomId, r.roomName);
     if (!rf.ok) continue;
 
@@ -192,28 +250,33 @@ export async function GET(req: Request) {
     });
   }
 
-  // 2) Blocks
+  // 2) Blocks (endDate 범위 블록은 각 날짜로 확장)
   if (includeBlocks) {
     for (const b of blocks) {
-      if (!inRangeYmd(b.date, from, to)) continue;
-
       if (!isAllowedRoom(b.roomId)) continue;
 
       const rf = filterByRoomAndFloor(roomId, floorId, b.roomId, b.roomId === "all" ? "전체" : undefined);
       if (!rf.ok) continue;
 
-      items.push({
-        kind: "block",
-        id: `block:${b.id}`,
-        roomId: b.roomId,
-        roomName: rf.roomName,
-        floorId: rf.floorId,
-        date: b.date,
-        startTime: b.startTime,
-        endTime: b.endTime,
-        title: "차단시간",
-        reason: b.reason
-      });
+      const blockEnd = b.endDate || b.date;
+      const blockDates = blockEnd > b.date ? eachYmd(b.date, blockEnd) : [b.date];
+
+      for (const dt of blockDates) {
+        if (!inRangeYmd(dt, from, to)) continue;
+
+        items.push({
+          kind: "block",
+          id: `block:${b.id}:${dt}`,
+          roomId: b.roomId,
+          roomName: rf.roomName,
+          floorId: rf.floorId,
+          date: dt,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          title: b.endDate ? "내부 대관" : "차단시간",
+          reason: b.reason
+        });
+      }
     }
   }
 
@@ -268,4 +331,8 @@ export async function GET(req: Request) {
   };
 
   return NextResponse.json(payload, { status: 200 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

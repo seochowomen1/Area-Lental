@@ -1,4 +1,4 @@
-export type RequestStatus = "접수" | "검토중" | "승인" | "반려" | "취소" | "완료";
+export type RequestStatus = "접수" | "승인" | "반려" | "취소";
 
 export type RentalRequest = {
   requestId: string;
@@ -50,6 +50,8 @@ export type RentalRequest = {
   galleryPrepDate?: string;
   /** 우리동네 갤러리: 감사 로그(JSON 문자열, 선택) */
   galleryAuditJson?: string;
+  /** 우리동네 갤러리: 철수시간(HH:MM, 종료일 기준) */
+  galleryRemovalTime?: string;
 
   applicantName: string;
   birth: string;
@@ -64,6 +66,13 @@ export type RentalRequest = {
     laptop: boolean;
     projector: boolean;
     audio: boolean;
+    /** E-스튜디오 촬영장비 */
+    mirrorless?: boolean;
+    camcorder?: boolean;
+    wirelessMic?: boolean;
+    pinMic?: boolean;
+    rodeMic?: boolean;
+    electronicBoard?: boolean;
   };
 
   purpose: string;
@@ -103,6 +112,8 @@ export type BlockTime = {
   id: string;
   roomId: string;
   date: string;
+  /** 갤러리 등 일 단위 차단 시 종료일 (YYYY-MM-DD) */
+  endDate?: string;
   startTime: string;
   endTime: string;
   reason: string;

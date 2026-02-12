@@ -6,7 +6,12 @@ export const revalidate = 0;
 export default function MyPage({
   searchParams,
 }: {
-  searchParams: { token?: string };
+  searchParams: { token?: string; email?: string };
 }) {
-  return <MyClient token={searchParams.token ?? ""} />;
+  return (
+    <MyClient
+      token={searchParams.token ?? ""}
+      initialEmail={searchParams.email ?? ""}
+    />
+  );
 }

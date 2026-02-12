@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
-import { GalleryRequestInputSchema, RequestInputSchema } from "@/lib/schema";
+import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { UPLOAD, ROOMS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps } from "@/lib/datetime";
@@ -15,6 +15,7 @@ import {
   sendApplicantReceivedEmailBatch
 } from "@/lib/mail";
 import { logger } from "@/lib/logger";
+import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import type { RequestStatus } from "@/lib/types";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
@@ -87,6 +88,13 @@ export async function POST(req: Request) {
       projector: String(form.get("projector") ?? "false"),
       audio: String(form.get("audio") ?? "false"),
 
+      mirrorless: String(form.get("mirrorless") ?? "false"),
+      camcorder: String(form.get("camcorder") ?? "false"),
+      wirelessMic: String(form.get("wirelessMic") ?? "false"),
+      pinMic: String(form.get("pinMic") ?? "false"),
+      rodeMic: String(form.get("rodeMic") ?? "false"),
+      electronicBoard: String(form.get("electronicBoard") ?? "false"),
+
       // gallery 전용 필드(추가 데이터로 전달되며, 저장 확장은 추후 진행)
       startDate: String(form.get("startDate") ?? ""),
       endDate: String(form.get("endDate") ?? ""),
@@ -95,6 +103,7 @@ export async function POST(req: Request) {
       genreContent: String(form.get("genreContent") ?? ""),
       awarenessPath: String(form.get("awarenessPath") ?? ""),
       specialNotes: String(form.get("specialNotes") ?? ""),
+      galleryRemovalTime: String(form.get("galleryRemovalTime") ?? ""),
 
       purpose: String(form.get("purpose") ?? ""),
 
@@ -124,10 +133,13 @@ export async function POST(req: Request) {
 
     let sessions: SessionInput[] = [];
 
-    if (input.roomId === "gallery") {
+    // 갤러리 입력일 경우 타입 안전하게 접근
+    const galleryInput = input.roomId === "gallery" ? (input as GalleryRequestInput) : null;
+
+    if (galleryInput) {
       // ✅ 보안: gallery는 client sessions를 무시하고 서버가 startDate~endDate로 회차를 재생성합니다.
-      const startDate = String((input as any).startDate ?? "").trim();
-      const endDate = String((input as any).endDate ?? "").trim();
+      const startDate = String(galleryInput.startDate ?? "").trim();
+      const endDate = String(galleryInput.endDate ?? "").trim();
 
       if (!isYmd(startDate) || !isYmd(endDate)) {
         return NextResponse.json(
@@ -242,7 +254,7 @@ export async function POST(req: Request) {
 
     // 운영시간/충돌 검증은 회차별로 수행
     const all = await db.getAllRequests();
-    const conflictStatuses: RequestStatus[] = ["접수", "검토중", "승인"];
+    const conflictStatuses: RequestStatus[] = ["접수", "승인"];
     const schedules = await db.getClassSchedules();
     const blocks = await db.getBlocks();
 
@@ -254,10 +266,23 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const sameRoomSameDate = all.filter(
-        (r) => r.roomId === input.roomId && r.date === sess.date && conflictStatuses.includes(r.status)
-      );
-      const hasRequestConflict = sameRoomSameDate.some((r) => overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime));
+      const sameRoomSameDate = all.filter((r) => {
+        if (r.roomId !== input.roomId) return false;
+        if (!conflictStatuses.includes(r.status)) return false;
+        // 갤러리 1행 형식: 날짜 범위로 충돌 판정
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+          if (sess.date >= r.startDate && sess.date <= r.endDate && dayOfWeek(sess.date) !== 0) return true;
+          if (r.galleryPrepDate && sess.date === r.galleryPrepDate) return true;
+          return false;
+        }
+        // 기존 형식: 개별 날짜 매칭
+        return r.date === sess.date;
+      });
+      const hasRequestConflict = sameRoomSameDate.some((r) => {
+        // 갤러리 1행 형식은 시간대 겹침이 아니라 날짜 범위 겹침으로 이미 판정됨
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
+        return overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime);
+      });
       if (hasRequestConflict) {
         issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "CONFLICT", message: conflictMessage(input.roomId, sess.date, sess.startTime, sess.endTime) });
         continue;
@@ -274,7 +299,12 @@ export async function POST(req: Request) {
       }
 
       const blockConf = blocks
-        .filter((b) => (b.roomId === input.roomId || b.roomId === "all") && b.date === sess.date)
+        .filter((b) => {
+          if (b.roomId !== input.roomId && b.roomId !== "all") return false;
+          const bStart = b.date;
+          const bEnd = b.endDate || b.date;
+          return sess.date >= bStart && sess.date <= bEnd;
+        })
         .some((b) => overlaps(b.startTime, b.endTime, sess.startTime, sess.endTime));
       if (blockConf) {
         issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "BLOCKED", message: "해당 시간대는 센터 운영 사정으로 신청이 불가합니다." });
@@ -343,22 +373,21 @@ export async function POST(req: Request) {
       }
     }
 
-    const batchId = sessions.length > 1 ? `BAT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
-    const equipment = input.roomId === "gallery"
-      ? { laptop: false, projector: false, audio: false }
-      : { laptop: input.laptop, projector: input.projector, audio: input.audio };
-
     const isGallery = input.roomId === "gallery";
+    const equipment = isGallery
+      ? { laptop: false, projector: false, audio: false, mirrorless: false, camcorder: false, wirelessMic: false, pinMic: false, rodeMic: false, electronicBoard: false }
+      : {
+          laptop: input.laptop, projector: input.projector, audio: input.audio,
+          mirrorless: input.mirrorless, camcorder: input.camcorder, wirelessMic: input.wirelessMic,
+          pinMic: input.pinMic, rodeMic: input.rodeMic, electronicBoard: input.electronicBoard,
+        };
 
-    // ✅ 갤러리(B안) 감사 로그: 서버가 생성한 결과를 기록(조작 방지/추적용)
+    // ✅ 갤러리: 감사 로그 + 일수 통계
     const galleryGeneratedAt = isGallery ? nowIsoSeoul() : undefined;
-    const galleryGenerationVersion = isGallery ? "gallery-gen-v1" : undefined;
+    const galleryGenerationVersion = isGallery ? "gallery-gen-v2" : undefined;
     const exhibitionSessions = isGallery ? sessions.filter((s) => !s.isPrepDay) : [];
     const galleryWeekdayCount = isGallery
-      ? exhibitionSessions.filter((s) => {
-          const dow = dayOfWeek(s.date);
-          return dow >= 1 && dow <= 5;
-        }).length
+      ? exhibitionSessions.filter((s) => { const dow = dayOfWeek(s.date); return dow >= 1 && dow <= 5; }).length
       : undefined;
     const gallerySaturdayCount = isGallery
       ? exhibitionSessions.filter((s) => dayOfWeek(s.date) === 6).length
@@ -367,9 +396,10 @@ export async function POST(req: Request) {
     const galleryPrepDate = isGallery ? (sessions.find((s) => s.isPrepDay)?.date || undefined) : undefined;
     const galleryAuditJson = isGallery
       ? JSON.stringify({
-          startDate: (input as any).startDate,
-          endDate: (input as any).endDate,
+          startDate: galleryInput?.startDate,
+          endDate: galleryInput?.endDate,
           prepDate: galleryPrepDate,
+          removalTime: galleryInput?.galleryRemovalTime,
           weekdayCount: galleryWeekdayCount ?? 0,
           saturdayCount: gallerySaturdayCount ?? 0,
           exhibitionDayCount: galleryExhibitionDayCount ?? 0,
@@ -378,57 +408,81 @@ export async function POST(req: Request) {
         })
       : undefined;
 
-    const appendInputs = sessions.map((s, i) => ({
-      roomId: input.roomId,
-      date: s.date,
-      startTime: s.startTime,
-      endTime: s.endTime,
+    let savedList: Awaited<ReturnType<typeof db.appendRequestsBatch>>;
+    let batchId: string | undefined;
 
-      batchId,
-      batchSeq: batchId ? i + 1 : undefined,
-      batchSize: batchId ? sessions.length : undefined,
+    if (isGallery) {
+      // ✅ 갤러리: 1행으로 저장 (startDate~endDate + 일수 통계)
+      const firstExhibition = exhibitionSessions[0] ?? sessions[0];
+      const singleRow = await db.appendRequest({
+        roomId: input.roomId,
+        date: galleryInput!.startDate,                  // 대표 날짜 = 전시 시작일
+        startTime: firstExhibition.startTime,           // 대표 시간
+        endTime: firstExhibition.endTime,
 
-      // gallery: prep day 표시
-      isPrepDay: isGallery ? (s.isPrepDay ? true : false) : undefined,
+        // batchId 없음 (1행 형식)
+        startDate: galleryInput!.startDate,
+        endDate: galleryInput!.endDate,
+        exhibitionTitle: galleryInput!.exhibitionTitle,
+        exhibitionPurpose: galleryInput!.exhibitionPurpose,
+        genreContent: galleryInput!.genreContent,
+        awarenessPath: galleryInput!.awarenessPath,
+        specialNotes: galleryInput!.specialNotes,
 
-      // gallery: 기간/전시 정보 저장(회차별 row에 반복 저장)
-      startDate: isGallery ? (input as any).startDate : undefined,
-      endDate: isGallery ? (input as any).endDate : undefined,
-      exhibitionTitle: isGallery ? (input as any).exhibitionTitle : undefined,
-      exhibitionPurpose: isGallery ? (input as any).exhibitionPurpose : undefined,
-      genreContent: isGallery ? (input as any).genreContent : undefined,
-      awarenessPath: isGallery ? (input as any).awarenessPath : undefined,
-      specialNotes: isGallery ? (input as any).specialNotes : undefined,
+        galleryGeneratedAt,
+        galleryGenerationVersion,
+        galleryWeekdayCount,
+        gallerySaturdayCount,
+        galleryExhibitionDayCount,
+        galleryPrepDate,
+        galleryAuditJson,
+        galleryRemovalTime: isGallery ? (galleryInput?.galleryRemovalTime || undefined) : undefined,
 
-      galleryGeneratedAt,
-      galleryGenerationVersion,
-      galleryWeekdayCount,
-      gallerySaturdayCount,
-      galleryExhibitionDayCount,
-      galleryPrepDate,
-      galleryAuditJson,
+        applicantName: input.applicantName,
+        birth: input.birth,
+        address: input.address,
+        phone: input.phone,
+        email: input.email,
+        orgName: input.orgName,
+        headcount: input.headcount,
+        equipment,
+        purpose: input.purpose,
+        attachments: uploadedUrls,
+        privacyAgree: input.privacyAgree,
+        pledgeAgree: input.pledgeAgree,
+        pledgeDate: input.pledgeDate,
+        pledgeName: input.pledgeName,
+      });
+      savedList = [singleRow];
+    } else {
+      // ✅ 강의실/스튜디오: 기존 묶음 저장
+      batchId = sessions.length > 1 ? `BAT-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}` : undefined;
 
-      applicantName: input.applicantName,
-      birth: input.birth,
-      address: input.address,
-      phone: input.phone,
-      email: input.email,
-
-      orgName: input.orgName,
-      headcount: input.headcount,
-
-      equipment,
-
-      purpose: input.purpose,
-      attachments: uploadedUrls,
-
-      privacyAgree: input.privacyAgree,
-      pledgeAgree: input.pledgeAgree,
-      pledgeDate: input.pledgeDate,
-      pledgeName: input.pledgeName
-    }));
-
-    const savedList = await db.appendRequestsBatch(appendInputs);
+      const appendInputs = sessions.map((s, i) => ({
+        roomId: input.roomId,
+        date: s.date,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        batchId,
+        batchSeq: batchId ? i + 1 : undefined,
+        batchSize: batchId ? sessions.length : undefined,
+        applicantName: input.applicantName,
+        birth: input.birth,
+        address: input.address,
+        phone: input.phone,
+        email: input.email,
+        orgName: input.orgName,
+        headcount: input.headcount,
+        equipment,
+        purpose: input.purpose,
+        attachments: uploadedUrls,
+        privacyAgree: input.privacyAgree,
+        pledgeAgree: input.pledgeAgree,
+        pledgeDate: input.pledgeDate,
+        pledgeName: input.pledgeName,
+      }));
+      savedList = await db.appendRequestsBatch(appendInputs);
+    }
 
     if (savedList.length > 1) {
       await sendAdminNewRequestEmailBatch(savedList);
@@ -443,8 +497,18 @@ export async function POST(req: Request) {
       batchId,
       count: savedList.length,
       roomId: input.roomId,
-      date: (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
+      date: isGallery ? galleryInput?.startDate : (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
     });
+
+    let applicantToken = "";
+    try {
+      applicantToken = createApplicantLinkToken({
+        email: input.email,
+        ttlSeconds: 7 * 24 * 60 * 60,
+      });
+    } catch {
+      // 토큰 발급 실패해도 신청 자체는 성공 처리
+    }
 
     return NextResponse.json(
       {
@@ -452,41 +516,44 @@ export async function POST(req: Request) {
         requestId: savedList[0]?.requestId,
         batchId: batchId ?? "",
         count: savedList.length,
-        requestIds: savedList.map((r) => r.requestId)
+        requestIds: savedList.map((r) => r.requestId),
+        token: applicantToken,
       },
       { status: 200 }
     );
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    const errWithCode = e as { code?: string };
     logger.error('대관 신청 처리 중 오류 발생', {
-      error: e.message,
-      code: e.code,
-      stack: process.env.NODE_ENV === 'development' ? e.stack : undefined
+      error: err.message,
+      code: errWithCode.code,
+      stack: process.env.NODE_ENV === 'development' ? err.stack : undefined
     });
-    
+
     // Google API 관련 에러
-    if (e.message?.includes('Google') || e.code === 'EAUTH') {
+    if (err.message?.includes('Google') || errWithCode.code === 'EAUTH') {
       return NextResponse.json(
         { ok: false, code: "GOOGLE_API_ERROR", message: "Google API 연동 오류가 발생했습니다." },
         { status: 503 }
       );
     }
-    
+
     // 네트워크 연결 에러
-    if (e.code === 'ECONNREFUSED' || e.code === 'ETIMEDOUT') {
+    if (errWithCode.code === 'ECONNREFUSED' || errWithCode.code === 'ETIMEDOUT') {
       return NextResponse.json(
         { ok: false, code: "NETWORK_ERROR", message: "네트워크 연결 오류가 발생했습니다." },
         { status: 503 }
       );
     }
-    
+
     // 개발 환경에서는 상세 에러 메시지 포함
     const isDev = process.env.NODE_ENV === 'development';
     return NextResponse.json(
-      { 
-        ok: false, 
-        code: "SERVER_ERROR", 
-        message: isDev ? `서버 오류: ${e.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        ...((isDev ? { stack: e.stack } : {}))
+      {
+        ok: false,
+        code: "SERVER_ERROR",
+        message: isDev ? `서버 오류: ${err.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
+        ...((isDev ? { stack: err.stack } : {}))
       },
       { status: 500 }
     );

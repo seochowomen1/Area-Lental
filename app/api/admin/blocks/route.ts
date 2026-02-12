@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
+import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, overlaps } from "@/lib/datetime";
 import { validateOperatingHours } from "@/lib/operating";
 import type { ClassSchedule } from "@/lib/types";
@@ -12,6 +13,7 @@ type Block = {
   id: string;
   roomId: string;
   date: string; // YYYY-MM-DD
+  endDate?: string; // YYYY-MM-DD (갤러리 날짜 범위 차단용)
   startTime: string; // HH:MM
   endTime: string; // HH:MM
   reason: string;
@@ -39,13 +41,16 @@ function is30Min(v: string) {
 function galleryHoursForDate(date: string) {
   const dow = dayOfWeek(date);
   if (dow === 0) return null;
+  if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
   if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
-  return { startTime: "10:00", endTime: "18:00" };
+  return { startTime: "09:00", endTime: "18:00" };
 }
 
 
 
 export async function GET() {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const db = getDatabase();
     const blocks = await db.getBlocks();
@@ -56,10 +61,13 @@ export async function GET() {
 }
 
 export async function POST(req: Request) {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const body = (await req.json()) as Partial<Block>;
     const roomId = String(body.roomId ?? "").trim();
     const date = body.date;
+    const endDateRaw = body.endDate;
     let startTime = body.startTime;
     let endTime = body.endTime;
     const isGallery = roomId === "gallery";
@@ -67,6 +75,32 @@ export async function POST(req: Request) {
 
     if (!roomId) return jsonError("대상을 선택해 주세요.", 400, "VALIDATION");
     if (!isYmd(date)) return jsonError("날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)", 400, "VALIDATION");
+
+    // 갤러리 날짜 범위 차단 모드
+    if (isGallery && isYmd(endDateRaw)) {
+      if (endDateRaw < date) return jsonError("종료일은 시작일 이후여야 합니다.", 400, "VALIDATION");
+
+      const db = getDatabase();
+      const existingBlocks = await db.getBlocks();
+
+      // 범위 내 기존 갤러리 블록 겹침 체크
+      const rangeConflict = existingBlocks.some((b) => {
+        if (b.roomId !== roomId && b.roomId !== "all") return false;
+        const bStart = b.date;
+        const bEnd = b.endDate || b.date;
+        // 두 범위 [date, endDate] 과 [bStart, bEnd] 가 겹치는지 체크
+        return bStart <= endDateRaw && bEnd >= date;
+      });
+      if (rangeConflict) {
+        return jsonError("이미 등록된 일정과 기간이 겹칩니다.", 409, "CONFLICT");
+      }
+
+      const item = { roomId, date, endDate: endDateRaw, startTime: "09:00", endTime: "18:00", reason };
+      const result = await db.addBlock(item);
+      return NextResponse.json({ ok: true, created: result });
+    }
+
+    // 단일 날짜 갤러리 차단 (레거시 호환)
     if (isGallery) {
       const hours = galleryHoursForDate(date);
       if (!hours) return jsonError("일요일은 차단할 수 없습니다.", 400, "VALIDATION");
@@ -81,8 +115,6 @@ export async function POST(req: Request) {
     }
 
     // 운영시간 검증(날짜 기준)
-    // - gallery는 별도 운영시간(평일 10~18 / 토 09~13)을 사용하므로,
-    //   일반 운영시간(평일 10~17 등) 검증을 적용하면 false negative가 발생할 수 있습니다.
     if (!isGallery) {
       const op = validateOperatingHours(date, startTime, endTime);
       if (!op.ok) return jsonError(op.message, 400, "OUT_OF_HOURS");
@@ -102,7 +134,7 @@ export async function POST(req: Request) {
       return overlaps(b.startTime, b.endTime, startTime, endTime);
     });
     if (blockConflict) {
-      return jsonError("이미 등록된 수동 차단 시간과 겹칩니다.", 409, "CONFLICT");
+      return jsonError("이미 등록된 차단 시간과 겹칩니다.", 409, "CONFLICT");
     }
 
     // 2) 정규수업과 겹침 방지(적용 기간 포함)
@@ -122,13 +154,15 @@ export async function POST(req: Request) {
     const item = { roomId, date, startTime, endTime, reason };
     const result = await db.addBlock(item);
     return NextResponse.json({ ok: true, created: result });
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "요청 처리 중 오류가 발생했습니다.";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return jsonError(msg, 500, "SERVER_ERROR");
   }
 }
 
 export async function DELETE(req: Request) {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");
@@ -137,8 +171,8 @@ export async function DELETE(req: Request) {
     const db = getDatabase();
     await db.deleteBlock(id);
     return NextResponse.json({ ok: true });
-  } catch (e: any) {
-    const msg = e?.message ? String(e.message) : "요청 처리 중 오류가 발생했습니다.";
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return jsonError(msg, 500, "SERVER_ERROR");
   }
 }

@@ -7,6 +7,7 @@
 //
 // The actual UI/logic lives in ApplyClient (Client Component).
 
+import { Suspense } from "react";
 import ApplyClient from "./ApplyClient";
 import ApplyGalleryClient from "./ApplyGalleryClient";
 
@@ -22,5 +23,9 @@ export default function ApplyPage({
   const category = Array.isArray(searchParams?.category) ? searchParams?.category[0] : searchParams?.category;
   const isGallery = roomId === "gallery" || category === "gallery";
 
-  return isGallery ? <ApplyGalleryClient /> : <ApplyClient />;
+  return (
+    <Suspense>
+      {isGallery ? <ApplyGalleryClient /> : <ApplyClient />}
+    </Suspense>
+  );
 }

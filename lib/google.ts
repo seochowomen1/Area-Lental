@@ -16,7 +16,12 @@ export function getGoogleClient() {
 
   const env = requireGoogleEnv();
 
-  const credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  let credentials: { client_email: string; private_key: string };
+  try {
+    credentials = JSON.parse(env.GOOGLE_SERVICE_ACCOUNT_JSON);
+  } catch {
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON 환경변수의 JSON 형식이 올바르지 않습니다.");
+  }
 
   const auth = new google.auth.JWT({
     email: credentials.client_email,

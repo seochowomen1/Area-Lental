@@ -1,7 +1,9 @@
 import nodemailer from "nodemailer";
 import { getBaseEnv, getSmtpEnvOptional, isMockMode } from "@/lib/env";
 import type { RentalRequest } from "@/lib/types";
-import { computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
+import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
+import { ROOMS_BY_ID } from "@/lib/space";
+import { getTemplate, renderTemplate, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
 
 function isGallery(r: RentalRequest) {
   return r.roomId === "gallery";
@@ -29,7 +31,7 @@ function summarizeStatus(list: RentalRequest[]) {
   if (statuses.size === 1) return list[0].status;
   // 혼합 상태인 경우(부분 처리)
   if ([...statuses].includes("반려")) return "반려";
-  if ([...statuses].includes("승인")) return "검토중";
+  if ([...statuses].includes("승인")) return "접수";
   return "접수";
 }
 
@@ -45,6 +47,28 @@ function transporter() {
     secure: parseInt(smtp.SMTP_PORT, 10) === 465,
     auth: { user: smtp.SMTP_USER, pass: smtp.SMTP_PASS }
   });
+}
+
+function getRoomCategory(r: RentalRequest): "lecture" | "studio" | "gallery" {
+  if (r.roomId === "gallery") return "gallery";
+  const room = ROOMS_BY_ID[r.roomId];
+  if (room?.category === "studio") return "studio";
+  return "lecture";
+}
+
+function spaceCategoryLabel(r: RentalRequest): string {
+  const cat = getRoomCategory(r);
+  if (cat === "studio") return "E-스튜디오";
+  if (cat === "gallery") return "우리동네 갤러리";
+  return "강의실";
+}
+
+function formatEquipmentForEmail(r: RentalRequest): string {
+  const cat = getRoomCategory(r);
+  if (cat === "gallery") return "해당없음";
+  const details = getSelectedEquipmentDetails(r.equipment, cat);
+  if (details.length === 0) return "선택 없음";
+  return details.map((eq) => `${eq.label} (${formatKRW(eq.feeKRW)})`).join(", ");
 }
 
 function maskPhone(phone: string) {
@@ -99,9 +123,9 @@ ${args.linkUrl}
 
 export async function sendAdminNewRequestEmail(req: RentalRequest) {
   const base = getBaseEnv();
+  const cat = spaceCategoryLabel(req);
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(req.requestId)}`;
-  const eq = (req as any).equipment ?? { laptop: false, projector: false, audio: false };
-  const atts = Array.isArray((req as any).attachments) ? (req as any).attachments : [];
+  const atts = Array.isArray(req.attachments) ? req.attachments : [];
 
   const subject = isGallery(req)
     ? `[대관신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.applicantName}`
@@ -110,11 +134,11 @@ export async function sendAdminNewRequestEmail(req: RentalRequest) {
 `새 대관 신청이 등록되었습니다.
 
 - 신청번호: ${req.requestId}
-- ${isGallery(req) ? "공간" : "강의실"}: ${req.roomName}
+- 공간(${cat}): ${req.roomName}
 - ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}
 - 신청자: ${req.applicantName} (${maskPhone(req.phone)})
 - 단체/인원: ${req.orgName} / ${req.headcount}명
-- 기자재: ${isGallery(req) ? "해당없음" : `노트북(${eq.laptop ? "O" : "X"}), 빔프로젝터(${eq.projector ? "O" : "X"}), 음향(${eq.audio ? "O" : "X"})`}
+- ${isGallery(req) ? "장비" : getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}
 - 첨부: ${atts.length ? atts.join("\n  - ") : "없음"}
 
 관리자에서 확인: ${url}
@@ -131,7 +155,7 @@ export async function sendAdminNewRequestEmailBatch(reqs: RentalRequest[]) {
 
   const base = getBaseEnv();
   const first = list[0];
-  const eq = (first as any).equipment ?? { laptop: false, projector: false, audio: false };
+  const cat = spaceCategoryLabel(first);
 
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(first.requestId)}`;
 
@@ -140,15 +164,17 @@ export async function sendAdminNewRequestEmailBatch(reqs: RentalRequest[]) {
     : `[대관신청] ${first.roomName} / ${list.length}회차 / ${first.applicantName}`;
   const sessions = list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n");
 
+  const eqLabel = isGallery(first) ? "장비" : getRoomCategory(first) === "studio" ? "촬영장비(회차별 동일)" : "기자재(회차별 동일)";
+
   const text =
 `새 대관 신청(묶음)이 등록되었습니다.
 
 - 대표 신청번호: ${first.requestId}
 - ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}
-- ${isGallery(first) ? "공간" : "강의실"}: ${first.roomName}
+- 공간(${cat}): ${first.roomName}
 - 신청자: ${first.applicantName} (${maskPhone(first.phone)})
 - 단체/인원: ${first.orgName} / ${first.headcount}명
-- 기자재(회차별 동일): ${isGallery(first) ? "해당없음" : `노트북(${eq.laptop ? "O" : "X"}), 빔프로젝터(${eq.projector ? "O" : "X"}), 음향(${eq.audio ? "O" : "X"})`}
+- ${eqLabel}: ${formatEquipmentForEmail(first)}
 
 [${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]
 ${sessions}
@@ -162,18 +188,18 @@ ${sessions}
 }
 
 export async function sendApplicantReceivedEmail(req: RentalRequest) {
-  const subject = isGallery(req)
-    ? `[신청완료] 우리동네 갤러리 대관 신청 (${req.requestId})`
-    : `[신청완료] 강의실 대관 신청 (${req.requestId})`;
+  const cat = spaceCategoryLabel(req);
+  const subject = `[신청완료] ${cat} 대관 신청 (${req.requestId})`;
+  const eqText = !isGallery(req) ? `\n- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}` : "";
   const text =
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
-${isGallery(req) ? "우리동네 갤러리" : "강의실"} 대관 신청이 정상적으로 완료되었습니다.
+${cat} 대관 신청이 정상적으로 완료되었습니다.
 담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
 
 - 신청번호: ${req.requestId}
-- ${isGallery(req) ? "공간" : "강의실"}: ${req.roomName}
-- ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}
+- 공간(${cat}): ${req.roomName}
+- ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}${eqText}
 
 감사합니다.
 `;
@@ -184,19 +210,19 @@ export async function sendApplicantReceivedEmailBatch(reqs: RentalRequest[]) {
   const list = (Array.isArray(reqs) ? reqs : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
   if (list.length === 0) return;
   const first = list[0];
-  const subject = isGallery(first)
-    ? `[신청완료] 우리동네 갤러리 대관 신청 (${first.requestId})`
-    : `[신청완료] 강의실 대관 신청 (${first.requestId})`;
+  const cat = spaceCategoryLabel(first);
+  const subject = `[신청완료] ${cat} 대관 신청 (${first.requestId})`;
   const sessions = list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n");
+  const eqText = !isGallery(first) ? `\n- ${getRoomCategory(first) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(first)}` : "";
   const text =
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
-${isGallery(first) ? "우리동네 갤러리" : "강의실"} 대관 신청이 정상적으로 완료되었습니다.
+${cat} 대관 신청이 정상적으로 완료되었습니다.
 담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
 
 - 대표 신청번호: ${first.requestId}
-- ${isGallery(first) ? "공간" : "강의실"}: ${first.roomName}
-- ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}
+- 공간(${cat}): ${first.roomName}
+- ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}${eqText}
 
 [${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]
 ${sessions}
@@ -206,10 +232,12 @@ ${sessions}
   await maybeSend({ to: first.email, subject, text });
 }
 
-export async function sendApplicantDecisionEmail(req: RentalRequest) {
-  const subject = isGallery(req)
-    ? `[${req.status}] 우리동네 갤러리 대관 신청 결과 (${req.requestId})`
-    : `[${req.status}] 강의실 대관 신청 결과 (${req.requestId})`;
+/** 단일 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
+export function generateDecisionEmailContent(req: RentalRequest): { to: string; subject: string; body: string } | null {
+  if (!req.email) return null;
+  const cat = spaceCategoryLabel(req);
+  const catId = getRoomCategory(req) as TemplateCategory;
+  const status = req.status as TemplateStatus;
   const base = getBaseEnv();
   const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(req.requestId)}`;
 
@@ -221,50 +249,70 @@ export async function sendApplicantDecisionEmail(req: RentalRequest) {
 - 총 금액: ${formatKRW(fee.totalFeeKRW)}
 - 할인: ${fee.discountAmountKRW > 0 ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})` : "-"}
 - 할인 사유: ${fee.discountReason || "-"}
-- 최종금액: ${formatKRW(fee.finalFeeKRW)}
-`;
+- 최종금액: ${formatKRW(fee.finalFeeKRW)}`;
 
-  const header =
+  // 커스텀 템플릿 사용
+  if (["승인", "반려", "취소"].includes(status)) {
+    const template = getTemplate(catId, status);
+    const vars: Record<string, string> = {
+      "신청번호": req.requestId,
+      "공간": req.roomName,
+      "카테고리": cat,
+      "일시": formatWhenSingle(req),
+      "신청자": req.applicantName,
+      "상태": req.status,
+      "요금정보": req.status === "승인" ? feeBlock : "",
+      "반려사유": req.rejectReason || "(사유 미입력)",
+      "조회링크": resultUrl,
+    };
+    const rendered = renderTemplate(template, vars);
+    return { to: req.email, subject: rendered.subject, body: rendered.body };
+  }
+
+  // Fallback (접수 등)
+  const subject = `[${req.status}] ${cat} 대관 신청 결과 (${req.requestId})`;
+  const body =
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
 - 신청번호: ${req.requestId}
-- ${isGallery(req) ? "공간" : "강의실"}: ${req.roomName}
+- 공간(${cat}): ${req.roomName}
 - ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}
 - 처리상태: ${req.status}
-`;
 
-  const tail = req.status === "반려"
-    ? `\n반려 사유:\n${req.rejectReason || "(사유 미입력)"}\n`
-    : "\n";
-
-  const text = header + "\n" + (req.status === "승인" ? feeBlock + "\n" : "") + tail +
-`승인/반려 결과는 아래 페이지에서도 확인할 수 있습니다.
+승인/반려 결과는 아래 페이지에서도 확인할 수 있습니다.
 ${resultUrl}
 
 감사합니다.
 `;
 
-  await maybeSend({ to: req.email, subject, text });
+  return { to: req.email, subject, body };
 }
 
-export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
+export async function sendApplicantDecisionEmail(req: RentalRequest) {
+  const content = generateDecisionEmailContent(req);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 묶음 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
+export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): { to: string; subject: string; body: string } | null {
   const list = (Array.isArray(reqs) ? reqs : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
-  if (list.length === 0) return;
+  if (list.length === 0) return null;
   const first = list[0];
+  if (!first.email) return null;
+  const cat = spaceCategoryLabel(first);
 
   const approvedList = list.filter((r) => r.status === "승인");
   const rejectedList = list.filter((r) => r.status === "반려");
   const pendingCount = list.length - approvedList.length - rejectedList.length;
 
-  let displayStatus = "검토중";
+  let displayStatus = "접수";
   if (approvedList.length === list.length) displayStatus = "승인";
   else if (rejectedList.length === list.length) displayStatus = "반려";
-  else if (pendingCount > 0) displayStatus = "검토중";
+  else if (pendingCount > 0) displayStatus = "접수";
   else displayStatus = "부분처리";
 
-  const subject = isGallery(first)
-    ? `[${displayStatus}] 우리동네 갤러리 대관 신청 결과 (${first.requestId})`
-    : `[${displayStatus}] 강의실 대관 신청 결과 (${first.requestId})`;
+  const subject = `[${displayStatus}] ${cat} 대관 신청 결과 (${first.requestId})`;
 
   const base = getBaseEnv();
   const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(first.requestId)}`;
@@ -280,6 +328,7 @@ export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
   const feeBasis = feeAvailable ? approvedList : list;
   const bundleFee = feeAvailable ? computeFeesForBundle(feeBasis) : null;
   const feeTitleNote = feeAvailable && approvedList.length < list.length ? ` (승인 ${approvedList.length}회 기준)` : "";
+  const eqText = !isGallery(first) ? `- ${getRoomCategory(first) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(first)}\n` : "";
   const feeBlock = bundleFee
     ?
 `[이용 요금${feeTitleNote}]
@@ -296,9 +345,9 @@ export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
 - 대표 신청번호: ${first.requestId}
-- ${isGallery(first) ? "공간" : "강의실"}: ${first.roomName}
+- 공간(${cat}): ${first.roomName}
 - ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}
-- 처리상태: ${displayStatus}
+${eqText}- 처리상태: ${displayStatus}
 
 [${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]
 ${sessions}
@@ -308,7 +357,7 @@ ${sessions}
     ? `\n반려된 회차가 있습니다. (사유는 위 회차별 현황에 함께 표기했습니다.)\n`
     : "\n";
 
-  const text =
+  const body =
     header +
     "\n" +
     (feeAvailable ? feeBlock + "\n" : "") +
@@ -319,5 +368,16 @@ ${resultUrl}
 감사합니다.
 `;
 
-  await maybeSend({ to: first.email, subject, text });
+  return { to: first.email, subject, body };
+}
+
+export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
+  const content = generateBatchDecisionEmailContent(reqs);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 관리자가 수정한 내용으로 메일을 발송합니다 */
+export async function sendCustomDecisionEmail(to: string, subject: string, body: string) {
+  await maybeSend({ to, subject, text: body });
 }

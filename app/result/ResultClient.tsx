@@ -51,7 +51,12 @@ type ResultPayload =
       batchSize?: number;
       sessions?: SessionInfo[];
 
+      // 장비 정보
+      equipmentDetails?: { key: string; label: string; feeKRW: number }[];
+
       // 금액/할인
+      rentalFeeKRW: number;
+      equipmentFeeKRW: number;
       totalFeeKRW: number;
       discountRatePct: number;
       discountAmountKRW: number;
@@ -70,6 +75,14 @@ type ResultPayload =
       decidedBy: string;
       rejectReason: string;
       cancelable: boolean;
+
+      // 갤러리 전시 기간 정보
+      startDate?: string;
+      endDate?: string;
+      galleryExhibitionDayCount?: number;
+      galleryWeekdayCount?: number;
+      gallerySaturdayCount?: number;
+      galleryPrepDate?: string;
     }
   | { ok: false; message: string };
 
@@ -189,7 +202,16 @@ export default function ResultClient() {
 
   const dateLabel = useMemo(() => {
     if (!data || !data.ok) return "";
-    if (!isBatch) return isGallery ? `${data.date} (일 단위)` : `${data.date} ${data.startTime}-${data.endTime}`;
+
+    // 갤러리: startDate ~ endDate (N일)
+    if (isGallery) {
+      const sd = data.startDate || data.date;
+      const ed = data.endDate || data.date;
+      const days = data.galleryExhibitionDayCount ?? (sessions.length || 1);
+      return sd === ed ? `${sd} (${days}일)` : `${sd} ~ ${ed} (${days}일)`;
+    }
+
+    if (!isBatch) return `${data.date} ${data.startTime}-${data.endTime}`;
 
     const list = sessions.length
       ? sessions
@@ -199,16 +221,16 @@ export default function ResultClient() {
     const last = list[list.length - 1];
 
     if (list.length === 1) {
-      return isGallery ? `${first.date} (총 1일)` : `${first.date} ${first.startTime}-${first.endTime} (총 1회)`;
+      return `${first.date} ${first.startTime}-${first.endTime} (총 1회)`;
     }
 
     const range = first.date === last.date ? first.date : `${first.date} ~ ${last.date}`;
-    return `${range} (총 ${list.length}${isGallery ? "일" : "회"})`;
+    return `${range} (총 ${list.length}회)`;
   }, [data, isBatch, sessions, isGallery]);
 
   return (
     <div>
-      <SiteHeader title="예약 내역 조회" backHref="/" backLabel="홈" />
+      <SiteHeader title="신청 결과 조회" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
         <Card pad="lg" className="space-y-5">
@@ -258,7 +280,6 @@ export default function ResultClient() {
                         <th className="px-3 py-4">예약일시</th>
                         <th className="px-3 py-4">승인상태</th>
                         <th className="px-3 py-4">예약상태</th>
-                        <th className="px-3 py-4">결제상태</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -268,9 +289,14 @@ export default function ResultClient() {
                             <div className="h-14 w-20 flex-none rounded border border-slate-200 bg-slate-100" aria-hidden="true" />
                             <div className="text-left">
                               <div className="font-semibold text-slate-900">{data.spaceCategoryText || "-"}</div>
-                              {isBatch && (
+                              {isGallery && (data.galleryExhibitionDayCount ?? 0) > 0 && (
                                 <div className="mt-1 text-xs text-slate-600">
-                                  묶음 {sessions.length || data.batchSize || 1}{isGallery ? "일" : "회"}
+                                  전시 {data.galleryExhibitionDayCount}일
+                                </div>
+                              )}
+                              {!isGallery && isBatch && (
+                                <div className="mt-1 text-xs text-slate-600">
+                                  묶음 {sessions.length || data.batchSize || 1}회
                                 </div>
                               )}
                             </div>
@@ -280,14 +306,17 @@ export default function ResultClient() {
                           <div className="font-semibold text-slate-900">{data.roomName}</div>
                         </td>
                         <td className="px-3 py-5">
-                          <div className="font-semibold text-slate-900">{isBatch && sessions.length > 1 ? dateLabel : data.date}</div>
-                          {!isBatch && !isGallery && (
+                          <div className="font-semibold text-slate-900">{dateLabel}</div>
+                          {isGallery && (data.galleryWeekdayCount ?? 0) + (data.gallerySaturdayCount ?? 0) > 0 && (
+                            <div className="mt-1 text-xs text-slate-600">
+                              평일 {data.galleryWeekdayCount ?? 0}일 · 토 {data.gallerySaturdayCount ?? 0}일
+                              {data.galleryPrepDate ? ` · 준비일 1일` : ""}
+                            </div>
+                          )}
+                          {!isGallery && !isBatch && (
                             <div className="mt-1 text-slate-700">
                               {data.startTime} ~ {data.endTime}
                             </div>
-                          )}
-                          {!isBatch && isGallery && (
-                            <div className="mt-1 text-xs text-slate-600">일 단위(하루 전체)</div>
                           )}
                         </td>
                         <td className="px-3 py-5">
@@ -296,9 +325,6 @@ export default function ResultClient() {
                         <td className="px-3 py-5">
                           <OutlinedBadge variant={badgeVariant(data.reservationStatusText)}>{data.reservationStatusText}</OutlinedBadge>
                         </td>
-                        <td className="px-3 py-5">
-                          <OutlinedBadge variant={badgeVariant(data.paymentStatusText)}>{data.paymentStatusText}</OutlinedBadge>
-                        </td>
                       </tr>
                     </tbody>
                   </table>
@@ -306,7 +332,7 @@ export default function ResultClient() {
 
                 <div className="flex items-center justify-end px-3 py-6">
                   <div className="text-lg font-bold text-slate-900">
-                    결제하실 금액 : {formatKRW(data.payableFeeKRW)}
+                    최종 금액 : {formatKRW(data.payableFeeKRW)}
                   </div>
                 </div>
               </div>
@@ -319,22 +345,22 @@ export default function ResultClient() {
 
               {rejectedOnly && <Notice variant="danger">반려 사유: {data.rejectReason || "-"}</Notice>}
 
-              {/* 예약정보 */}
+              {/* 신청 정보 */}
               <section>
                 <div className="mb-4 flex items-center gap-2">
                   <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">⏰</span>
-                  <h3 className="text-lg font-bold text-slate-900">예약정보</h3>
+                  <h3 className="text-lg font-bold text-slate-900">신청 정보</h3>
                 </div>
                 <div className="overflow-x-auto border-t-2 border-slate-900">
                   <table className="w-full text-sm">
                     <tbody>
-                      <Row label="예약번호" value={data.requestId} />
-                      <Row label="예약등록일시" value={data.createdAt || "-"} />
-                      <Row label="사업명" value={data.orgName || "-"} />
-                      <Row label="신청자 이름" value={data.applicantName || "-"} />
+                      <Row label="신청번호" value={data.requestId} />
+                      <Row label="신청일시" value={data.createdAt || "-"} />
+                      <Row label="단체명" value={data.orgName || "-"} />
+                      <Row label="성명" value={data.applicantName || "-"} />
                       <Row label="연락처" value={data.phone || "-"} />
-                      <Row label="인원수" value={Number.isFinite(data.headcount) ? `${data.headcount}명` : "-"} />
-                      <Row label="요청사항" value={data.purpose || ""} />
+                      <Row label="인원" value={Number.isFinite(data.headcount) ? `${data.headcount}명` : "-"} />
+                      <Row label="사용 목적" value={data.purpose || ""} />
                     </tbody>
                   </table>
                 </div>
@@ -354,7 +380,16 @@ export default function ResultClient() {
                           <th className="w-48 bg-slate-50 px-4 py-4 text-left font-semibold">예약상태</th>
                           <td className="px-4 py-4">
                             <span className="text-red-600">
-                              ※ 예약이 {(data.decidedBy || "").includes("사용자") ? "사용자취소" : "취소"} 되었습니다.
+                              ※ 예약이 {(data.decidedBy || "").includes("사용자") ? "사용자에 의해 취소" : "취소"} 되었습니다.
+                            </span>
+                          </td>
+                        </tr>
+                      ) : data.status === "반려" ? (
+                        <tr className="border-b border-slate-200">
+                          <th className="w-48 bg-slate-50 px-4 py-4 text-left font-semibold">예약상태</th>
+                          <td className="px-4 py-4">
+                            <span className="text-red-600">
+                              ※ 신청이 반려 되었습니다.
                             </span>
                           </td>
                         </tr>
@@ -388,13 +423,41 @@ export default function ResultClient() {
                 </div>
               </section>
 
+              {/* 장비 사용 */}
+              {data.equipmentDetails && data.equipmentDetails.length > 0 && (
+                <section>
+                  <div className="mb-4 flex items-center gap-2">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">🎬</span>
+                    <h3 className="text-lg font-bold text-slate-900">{isGallery ? "장비" : data.roomId === "media" ? "촬영장비" : "기자재"}</h3>
+                  </div>
+                  <div className="overflow-x-auto border-t-2 border-slate-900">
+                    <table className="w-full text-sm">
+                      <tbody>
+                        {data.equipmentDetails.map((eq) => (
+                          <tr key={eq.key} className="border-b border-slate-200">
+                            <th className="w-48 bg-slate-50 px-4 py-3 text-left font-semibold">{eq.label}</th>
+                            <td className="px-4 py-3 text-slate-900 tabular-nums">{formatKRW(eq.feeKRW)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </section>
+              )}
+
               {/* 금액 상세 */}
               <section className="space-y-2">
                 <div className="text-base font-semibold text-slate-900">금액 상세</div>
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-2">
                   <div>
-                    <span className="text-slate-600">총액</span>: <b>{formatKRW(data.totalFeeKRW)}</b>
+                    <span className="text-slate-600">대관료</span>: <b>{formatKRW(data.rentalFeeKRW ?? 0)}</b>
                     {data.feeBasis === "approved" && <div className="mt-1 text-xs text-slate-500">* 승인된 회차 기준 금액</div>}
+                  </div>
+                  <div>
+                    <span className="text-slate-600">장비 사용료</span>: <b>{(data.equipmentFeeKRW ?? 0) > 0 ? formatKRW(data.equipmentFeeKRW) : "-"}</b>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">총액</span>: <b>{formatKRW(data.totalFeeKRW)}</b>
                   </div>
                   <div>
                     <span className="text-slate-600">할인</span>: <b>{data.discountAmountKRW > 0 ? `${data.discountRatePct.toFixed(2)}% (${formatKRW(data.discountAmountKRW)})` : "-"}</b>
@@ -409,8 +472,8 @@ export default function ResultClient() {
                 </div>
               </section>
 
-              {/* 묶음 회차 목록 */}
-              {isBatch && sessions.length > 1 && (
+              {/* 묶음 회차 목록 (갤러리 1행 형식에서는 표시 안함) */}
+              {isBatch && !isGallery && sessions.length > 1 && (
                 <section>
                   <div className="mb-2 text-base font-semibold text-slate-900">회차 목록</div>
                   <div className="overflow-x-auto rounded-xl border border-slate-200">

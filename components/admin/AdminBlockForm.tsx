@@ -4,7 +4,6 @@ import { useEffect, useMemo, useRef, useState } from "react";
 
 import Button from "@/components/ui/Button";
 import { FieldHelp, FieldLabel, Input, Select } from "@/components/ui/Field";
-// Notice는 Settings 상단 안내 영역에서만 사용 (개별 폼에서는 헬퍼텍스트로 통일)
 
 import { operatingRangesForDate } from "@/lib/operating";
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
@@ -19,6 +18,8 @@ type Props = {
   resetAfterSuccess: boolean;
   onCreate: (payload: Omit<BlockTime, "id">) => Promise<string | void>;
   onToast?: (t: ToastState) => void;
+  spaceLabel?: string;
+  category?: string;
 };
 
 function pad2(n: number) {
@@ -31,22 +32,25 @@ function minToHm(min: number) {
   return `${pad2(h)}:${pad2(m)}`;
 }
 
-export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess, onCreate, onToast }: Props) {
+export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess, onCreate, onToast, spaceLabel = "강의실", category }: Props) {
   const formRef = useRef<HTMLFormElement | null>(null);
+  const isGalleryCategory = category === "gallery";
 
   const [roomId, setRoomId] = useState<string>(rooms[0]?.id ?? "all");
   const [date, setDate] = useState<string>("");
+  const [endDate, setEndDate] = useState<string>("");
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
 
-  const isGallery = roomId === "gallery";
+  const isGallery = isGalleryCategory || roomId === "gallery";
 
   const galleryHours = useMemo(() => {
     if (!date) return null;
     const dow = dayOfWeek(date);
     if (dow === 0) return null;
+    if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
     if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
-    return { startTime: "10:00", endTime: "18:00" };
+    return { startTime: "09:00", endTime: "18:00" };
   }, [date]);
 
   const ranges = useMemo(() => {
@@ -104,7 +108,11 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [date, startOptions, endOptions, isGallery, galleryHours]);
 
-  const canSubmit = isGallery ? Boolean(date) && Boolean(galleryHours) : Boolean(date) && Boolean(startTime) && Boolean(endTime);
+  const canSubmit = isGalleryCategory
+    ? Boolean(date) && Boolean(endDate) && endDate >= date
+    : isGallery
+      ? Boolean(date) && Boolean(galleryHours)
+      : Boolean(date) && Boolean(startTime) && Boolean(endTime);
 
   const showAllWarning = roomId === "all";
 
@@ -114,21 +122,42 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
     const form = formRef.current;
     if (!form) return;
     const fd = new FormData(form);
+    const reason = String(fd.get("reason") ?? "").trim();
 
     try {
+      if (isGalleryCategory) {
+        // 갤러리: 날짜 범위 기반 차단 (endDate 포함)
+        const createdId = await onCreate({
+          roomId,
+          date,
+          endDate,
+          startTime: "09:00",
+          endTime: "18:00",
+          reason: reason || "내부 대관"
+        });
+
+        if (resetAfterSuccess) {
+          form.reset();
+          setRoomId(rooms[0]?.id ?? "all");
+          setDate("");
+          setEndDate("");
+        }
+        return createdId;
+      }
+
+      // 일반 모드
       const createdId = await onCreate({
         roomId,
         date,
         startTime,
         endTime,
-        reason: String(fd.get("reason") ?? "")
+        reason: reason || ""
       });
 
       if (resetAfterSuccess) {
         form.reset();
         setRoomId(rooms[0]?.id ?? "all");
         setDate("");
-        // start/end 는 date 변경에 의해 자동 초기화
       }
 
       return createdId;
@@ -137,10 +166,61 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
     }
   }
 
+  // 갤러리 카테고리: 날짜 범위 전용 폼
+  if (isGalleryCategory) {
+    return (
+      <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-12">
+        {rooms.length > 1 && (
+          <div className="md:col-span-3">
+            <FieldLabel>{spaceLabel}</FieldLabel>
+            <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </Select>
+          </div>
+        )}
+
+        <div className={rooms.length > 1 ? "md:col-span-3" : "md:col-span-4"}>
+          <FieldLabel>시작일 *</FieldLabel>
+          <Input type="date" name="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+
+        <div className={rooms.length > 1 ? "md:col-span-3" : "md:col-span-4"}>
+          <FieldLabel>종료일 *</FieldLabel>
+          <Input
+            type="date"
+            name="endDate"
+            required
+            value={endDate}
+            min={date || undefined}
+            onChange={(e) => setEndDate(e.target.value)}
+          />
+          {date && endDate && endDate < date && (
+            <FieldHelp className="text-xs text-red-600">종료일은 시작일 이후여야 합니다.</FieldHelp>
+          )}
+        </div>
+
+        <div className={rooms.length > 1 ? "md:col-span-3" : "md:col-span-4"}>
+          <FieldLabel>사유</FieldLabel>
+          <Input name="reason" placeholder="예: 내부 강좌 / 전시 준비" />
+          <FieldHelp>내부(강사·수강생) 대관 일정 등</FieldHelp>
+        </div>
+
+        <div className="md:col-span-12">
+          <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+            {isSubmitting ? "등록 중..." : "내부 대관 일정 추가"}
+          </Button>
+        </div>
+      </form>
+    );
+  }
+
+  // 일반(강의실/스튜디오) 모드: 기존 시간 기반 폼
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-12">
       <div className="md:col-span-3">
-        <FieldLabel>강의실</FieldLabel>
+        <FieldLabel>{spaceLabel}</FieldLabel>
         <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
           {rooms.map((r) => (
             <option key={r.id} value={r.id}>
@@ -150,7 +230,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
         </Select>
         {showAllWarning ? (
           <FieldHelp className="text-xs text-red-600">
-            전체 선택 시 모든 강의실에 동일한 차단시간이 적용됩니다.
+            전체 선택 시 모든 {spaceLabel}에 동일한 차단시간이 적용됩니다.
           </FieldHelp>
         ) : null}
       </div>

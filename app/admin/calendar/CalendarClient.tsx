@@ -125,16 +125,12 @@ function statusBadge(status?: RequestStatus) {
     return <span className={cn(base, "border-emerald-200 bg-emerald-50 text-emerald-700")}>{status}</span>;
   }
 
-  if (status === "접수" || status === "검토중") {
+  if (status === "접수") {
     return <span className={cn(base, "border-amber-200 bg-amber-50 text-amber-800")}>{status}</span>;
   }
 
   if (status === "반려" || status === "취소") {
     return <span className={cn(base, "border-rose-200 bg-rose-50 text-rose-700")}>{status}</span>;
-  }
-
-  if (status === "완료") {
-    return <span className={cn(base, "border-slate-200 bg-slate-100 text-slate-700")}>{status}</span>;
   }
 
   return <span className={cn(base, "border-gray-200 bg-gray-50 text-gray-700")}>{status}</span>;
@@ -232,10 +228,8 @@ export default function CalendarClient({
       "active",
       "승인",
       "접수",
-      "검토중",
       "반려",
       "취소",
-      "완료",
       "all",
     ]);
     const safeStatus = allowedStatus.has(rawStatus) ? rawStatus : "active";
@@ -480,7 +474,7 @@ export default function CalendarClient({
           </div>
 
           <div>
-            <label className="text-sm font-medium">강의실</label>
+            <label className="text-sm font-medium">{category === "lecture" ? "강의실" : "공간"}</label>
             <select
               value={roomId}
               onChange={(e) => setRoomId(e.target.value)}
@@ -501,13 +495,11 @@ export default function CalendarClient({
               onChange={(e) => setStatus(e.target.value)}
               className="mt-1 w-full rounded-xl border px-3 py-2"
             >
-              <option value="active">예약 진행(접수/검토중/승인)</option>
+              <option value="active">예약 진행(접수/승인)</option>
               <option value="승인">승인</option>
               <option value="접수">접수</option>
-              <option value="검토중">검토중</option>
               <option value="반려">반려</option>
               <option value="취소">취소</option>
-              <option value="완료">완료</option>
               <option value="all">전체</option>
             </select>
           </div>
@@ -687,7 +679,7 @@ export default function CalendarClient({
             <span className="h-2 w-2 rounded-full bg-emerald-500" /> 승인
           </span>
           <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-amber-400" /> 접수/검토중
+            <span className="h-2 w-2 rounded-full bg-amber-400" /> 접수
           </span>
           <span className="inline-flex items-center gap-2">
             <span className="h-2 w-2 rounded-full bg-indigo-400" /> 정규수업

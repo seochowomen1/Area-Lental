@@ -1,7 +1,7 @@
 import type { RentalRequest } from "@/lib/types";
-import { toMinutes } from "@/lib/datetime";
+import { toMinutes, dayOfWeek } from "@/lib/datetime";
 import { ROOMS_BY_ID } from "@/lib/space";
-import { EQUIPMENT_FEE_KRW } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, LECTURE_EQUIPMENT_LABELS, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 
 export type FeeBreakdown = {
   durationHours: number;
@@ -29,6 +29,7 @@ export function computeDurationHours(startTime: string, endTime: string): number
 
 export function computeBaseTotalKRW(
   req: Pick<RentalRequest, "roomId" | "startTime" | "endTime" | "equipment" | "date" | "isPrepDay">
+    & Partial<Pick<RentalRequest, "batchId" | "startDate" | "endDate" | "galleryWeekdayCount" | "gallerySaturdayCount" | "galleryExhibitionDayCount">>
 ): {
   durationHours: number;
   hourlyFeeKRW: number;
@@ -37,12 +38,21 @@ export function computeBaseTotalKRW(
   totalFeeKRW: number;
 } {
   if (req.roomId === "gallery") {
-    // 우리동네 갤러리: 일 단위 과금
-    const dow = new Date(`${req.date}T00:00:00+09:00`).getDay();
+    // ── 갤러리 단건(1행) 형식: 저장된 일수 통계로 전체 요금 계산 ──
+    // batchId 없이 startDate/endDate + 일수 통계가 있으면 새 1행 형식
+    if (
+      !req.batchId &&
+      req.startDate && req.endDate &&
+      ((req.galleryWeekdayCount ?? 0) > 0 || (req.gallerySaturdayCount ?? 0) > 0 || (req.galleryExhibitionDayCount ?? 0) > 0)
+    ) {
+      const rentalFeeKRW = (req.galleryWeekdayCount ?? 0) * 20000 + (req.gallerySaturdayCount ?? 0) * 10000;
+      return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW: 0, totalFeeKRW: rentalFeeKRW };
+    }
+    // ── 기존 다행(배치) 형식: 개별 일자로 1일분 요금 ──
+    const dow = dayOfWeek(req.date);
     const isSaturday = dow === 6;
     const isSunday = dow === 0;
     const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? 10000 : 20000;
-    // 갤러리는 장비/할인 불가 → 장비비 0 고정
     const equipmentFeeKRW = 0;
     const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
     return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };
@@ -54,13 +64,60 @@ export function computeBaseTotalKRW(
 
   const rentalFeeKRW = Math.round(hourlyFeeKRW * durationHours);
 
-  const equipmentFeeKRW =
-    (req.equipment?.laptop ? EQUIPMENT_FEE_KRW.laptop : 0) +
-    (req.equipment?.projector ? EQUIPMENT_FEE_KRW.projector : 0) +
-    (req.equipment?.audio ? EQUIPMENT_FEE_KRW.audio : 0);
+  const isStudio = room?.category === "studio";
+  const equipmentFeeKRW = isStudio
+    ? (req.equipment?.mirrorless ? STUDIO_EQUIPMENT_FEE_KRW.mirrorless : 0) +
+      (req.equipment?.camcorder ? STUDIO_EQUIPMENT_FEE_KRW.camcorder : 0) +
+      (req.equipment?.wirelessMic ? STUDIO_EQUIPMENT_FEE_KRW.wirelessMic : 0) +
+      (req.equipment?.pinMic ? STUDIO_EQUIPMENT_FEE_KRW.pinMic : 0) +
+      (req.equipment?.rodeMic ? STUDIO_EQUIPMENT_FEE_KRW.rodeMic : 0) +
+      (req.equipment?.electronicBoard ? STUDIO_EQUIPMENT_FEE_KRW.electronicBoard : 0)
+    : (req.equipment?.laptop ? EQUIPMENT_FEE_KRW.laptop : 0) +
+      (req.equipment?.projector ? EQUIPMENT_FEE_KRW.projector : 0) +
+      (req.equipment?.audio ? EQUIPMENT_FEE_KRW.audio : 0);
 
   const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
   return { durationHours, hourlyFeeKRW, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };
+}
+
+/**
+ * 선택된 장비 상세 목록 (라벨 + 개별 요금)
+ */
+export function getSelectedEquipmentDetails(
+  equipment: RentalRequest["equipment"],
+  roomCategory?: "lecture" | "studio" | "gallery"
+): { key: string; label: string; feeKRW: number }[] {
+  if (!equipment) return [];
+  const cat = roomCategory ?? "lecture";
+  if (cat === "gallery") return [];
+
+  const result: { key: string; label: string; feeKRW: number }[] = [];
+
+  if (cat === "studio") {
+    for (const [key, fee] of Object.entries(STUDIO_EQUIPMENT_FEE_KRW)) {
+      if ((equipment as Record<string, boolean | undefined>)[key]) {
+        result.push({ key, label: STUDIO_EQUIPMENT_LABELS[key as keyof typeof STUDIO_EQUIPMENT_LABELS], feeKRW: fee });
+      }
+    }
+  } else {
+    for (const [key, fee] of Object.entries(EQUIPMENT_FEE_KRW)) {
+      if ((equipment as Record<string, boolean | undefined>)[key]) {
+        result.push({ key, label: LECTURE_EQUIPMENT_LABELS[key as keyof typeof LECTURE_EQUIPMENT_LABELS], feeKRW: fee });
+      }
+    }
+  }
+
+  return result;
+}
+
+/**
+ * 선택된 장비 라벨 목록 (요금 없이 이름만)
+ */
+export function getSelectedEquipmentLabels(
+  equipment: RentalRequest["equipment"],
+  roomCategory?: "lecture" | "studio" | "gallery"
+): string[] {
+  return getSelectedEquipmentDetails(equipment, roomCategory).map((e) => e.label);
 }
 
 export function clamp(n: number, min: number, max: number) {

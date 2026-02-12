@@ -18,7 +18,7 @@ export type BatchSessionRow = {
 
 export default function BatchSessionSelector({ sessions }: { sessions: BatchSessionRow[] }) {
   const ids = useMemo(() => sessions.map((s) => s.requestId), [sessions]);
-  const pendingIds = useMemo(() => sessions.filter((s) => s.status === "검토중" || s.status === "접수").map((s) => s.requestId), [sessions]);
+  const pendingIds = useMemo(() => sessions.filter((s) => s.status === "접수").map((s) => s.requestId), [sessions]);
 
   const [selected, setSelected] = useState<Set<string>>(() => new Set());
 

@@ -42,6 +42,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const url = new URL(req.url);
   const rawCategory = url.searchParams.get("category");
   const category = normalizeRoomCategory(rawCategory);
@@ -70,8 +71,8 @@ export async function GET(req: Request) {
 
   const rows = filtered.map((r) => {
     const fee = computeFeesForRequest(r);
-    const eq = (r as any).equipment ?? { laptop: false, projector: false, audio: false };
-    const atts = Array.isArray((r as any).attachments) ? (r as any).attachments : [];
+    const eq = r.equipment ?? { laptop: false, projector: false, audio: false };
+    const atts = Array.isArray(r.attachments) ? r.attachments : [];
     const isGallery = r.roomId === "gallery";
 
     const isBatch = !!r.batchId;
@@ -134,4 +135,8 @@ export async function GET(req: Request) {
       "content-disposition": 'attachment; filename="rental_requests.xlsx"'
     }
   });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

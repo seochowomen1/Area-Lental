@@ -17,7 +17,12 @@ export default function SpaceListPage({
 }) {
   const category = normalizeRoomCategory(searchParams?.category);
   const rooms = getRoomsByCategory(searchParams?.category);
-  const floors = category === "studio" ? FLOORS.filter((f) => f.id === "5") : FLOORS;
+  const isGallery = category === "gallery";
+  const floors = category === "studio"
+    ? FLOORS.filter((f) => f.id === "5")
+    : isGallery
+      ? FLOORS.filter((f) => f.id === "4")
+      : FLOORS;
 
   return (
     <div>
@@ -25,7 +30,7 @@ export default function SpaceListPage({
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
 
-        <OperatingHoursNotice />
+        <OperatingHoursNotice roomId={isGallery ? "gallery" : undefined} />
 
         <section className="mt-8">
           <SpaceFloorTabs floors={floors} rooms={rooms} />

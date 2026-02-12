@@ -48,6 +48,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
+  try {
   const url = new URL(req.url);
   const requestId = (url.searchParams.get("requestId") ?? "").trim();
   if (!requestId) {
@@ -68,8 +69,8 @@ export async function GET(req: Request) {
   // 갤러리 묶음의 경우 첫 회차가 준비일일 수 있으므로 대표 정보는 '전시일'을 우선 사용합니다.
   const repInfo = sessions.find((s) => !s.isPrepDay) ?? representative;
   const isGallery = repInfo.roomId === "gallery";
-  const eq = (repInfo as any).equipment ?? { laptop: false, projector: false, audio: false };
-  const atts = Array.isArray((repInfo as any).attachments) ? (repInfo as any).attachments : [];
+  const eq = repInfo.equipment ?? { laptop: false, projector: false, audio: false };
+  const atts = Array.isArray(repInfo.attachments) ? repInfo.attachments : [];
 
   const bundle = hasMultiple ? analyzeBundle(sessions) : null;
   const basisSessions = isBatchId ? pickFeeBasisSessions(sessions) : sessions;
@@ -139,7 +140,7 @@ export async function GET(req: Request) {
   aoa.push([
     "이용시간",
     isGallery
-      ? "일 단위(하루 전체) / 운영시간 자동(평일 10:00~18:00, 토 09:00~13:00)"
+      ? "일 단위(하루 전체) / 운영시간 자동(평일 09:00~18:00, 화 야간 ~20:00, 토 09:00~13:00)"
       : hasMultiple
         ? "회차별 상이(아래 회차표 참고)"
         : `${repInfo.startTime} ~ ${repInfo.endTime}`,
@@ -217,7 +218,7 @@ export async function GET(req: Request) {
     wrapCells.push(XLSX.utils.encode_cell({ r: gTitleRow, c: 1 }));
 
     const gPurposeRow = aoa.length;
-    aoa.push(["전시목적", repInfo.exhibitionPurpose || "", "", "", "", "", "", ""]);
+    aoa.push(["전시 목적", repInfo.exhibitionPurpose || "", "", "", "", "", "", ""]);
     merges.push({ s: { r: gPurposeRow, c: 1 }, e: { r: gPurposeRow, c: 7 } });
     wrapCells.push(XLSX.utils.encode_cell({ r: gPurposeRow, c: 1 }));
 
@@ -227,7 +228,7 @@ export async function GET(req: Request) {
     wrapCells.push(XLSX.utils.encode_cell({ r: gGenreRow, c: 1 }));
 
     const gAwareRow = aoa.length;
-    aoa.push(["인지경로", repInfo.awarenessPath || "", "", "", "", "", "", ""]);
+    aoa.push(["인지 경로", repInfo.awarenessPath || "", "", "", "", "", "", ""]);
     merges.push({ s: { r: gAwareRow, c: 1 }, e: { r: gAwareRow, c: 7 } });
     wrapCells.push(XLSX.utils.encode_cell({ r: gAwareRow, c: 1 }));
 
@@ -337,4 +338,8 @@ export async function GET(req: Request) {
       "content-disposition": `attachment; filename=\"${filename}\"`
     }
   });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

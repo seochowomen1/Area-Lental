@@ -62,14 +62,29 @@ export async function GET(req: Request) {
       db.getClassSchedules()
     ]);
 
-    const conflictStatuses: RequestStatus[] = ["접수", "검토중", "승인"];
+    const conflictStatuses: RequestStatus[] = ["접수", "승인"];
 
-    const sameRoomSameDate = requests.filter(
-      (r) => r.roomId === roomId && r.date === date && conflictStatuses.includes(r.status)
-    );
+    const sameRoomSameDate = requests.filter((r) => {
+      if (r.roomId !== roomId) return false;
+      if (!conflictStatuses.includes(r.status)) return false;
+      // 갤러리 1행 형식: 날짜 범위 체크
+      if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+        if (date >= r.startDate && date <= r.endDate && dayOfWeek(date) !== 0) return true;
+        if (r.galleryPrepDate && date === r.galleryPrepDate) return true;
+        return false;
+      }
+      // 기존 형식: 개별 날짜 매칭
+      return r.date === date;
+    });
 
     // ✅ "전체(all)"로 등록된 차단/정규수업은 모든 강의실에 적용
-    const sameRoomBlocks = blocks.filter((b) => (b.roomId === roomId || b.roomId === "all") && b.date === date);
+    // endDate가 있는 블록(갤러리 날짜 범위)은 date가 [b.date, b.endDate] 범위인지 확인
+    const sameRoomBlocks = blocks.filter((b) => {
+      if (b.roomId !== roomId && b.roomId !== "all") return false;
+      const blockStart = b.date;
+      const blockEnd = b.endDate || b.date;
+      return date >= blockStart && date <= blockEnd;
+    });
 
     const dow = dayOfWeek(date);
     const sameRoomSchedules = schedules
@@ -77,8 +92,16 @@ export async function GET(req: Request) {
       .filter((s) => inRangeYmd(date, s.effectiveFrom || undefined, s.effectiveTo || undefined));
 
     const slots: Slot[] = baseSlots.map((s) => {
-      const byRequest = sameRoomSameDate.some((r) => overlaps(r.startTime, r.endTime, s.start, s.end));
-      const byBlock = sameRoomBlocks.some((b) => overlaps(b.startTime, b.endTime, s.start, s.end));
+      const byRequest = sameRoomSameDate.some((r) => {
+        // 갤러리 1행 형식: 날짜 범위 내이면 전일 차단
+        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
+        return overlaps(r.startTime, r.endTime, s.start, s.end);
+      });
+      // 갤러리 블록(내부 대관 등 날짜 범위)은 전일 차단으로 처리
+      const byBlock = sameRoomBlocks.some((b) => {
+        if (roomId === "gallery" && b.endDate) return true;
+        return overlaps(b.startTime, b.endTime, s.start, s.end);
+      });
       const bySchedule = sameRoomSchedules.some((sc) => overlaps(sc.startTime, sc.endTime, s.start, s.end));
 
       return {
@@ -104,10 +127,11 @@ export async function GET(req: Request) {
     };
 
     return NextResponse.json(payload, { status: 200 });
-  } catch (e: any) {
+  } catch (e: unknown) {
+    const err = e instanceof Error ? e : new Error(String(e));
     logger.error("가용 시간 조회 중 오류 발생", {
-      error: e?.message ?? String(e),
-      stack: process.env.NODE_ENV === "development" ? e?.stack : undefined
+      error: err.message,
+      stack: process.env.NODE_ENV === "development" ? err.stack : undefined
     });
 
     // UX: /space 화면에서 "서버 오류"로 끝나지 않도록 200 + 안내 메시지로 흡수

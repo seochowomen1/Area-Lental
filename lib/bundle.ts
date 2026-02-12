@@ -21,7 +21,7 @@ export type BundleDisplay = {
   totalCount: number;
 };
 
-const PENDING: RequestStatus[] = ["접수", "검토중"];
+const PENDING: RequestStatus[] = ["접수"];
 
 export function analyzeBundle(list: RentalRequest[]): BundleDisplay {
   const items = Array.isArray(list) ? list.filter(Boolean) : [];
@@ -45,14 +45,14 @@ export function analyzeBundle(list: RentalRequest[]): BundleDisplay {
   if (kind === "allApproved") displayStatus = "승인";
   else if (kind === "allRejected") displayStatus = "반려";
   else if (kind === "partialFinal") displayStatus = "부분처리";
-  else if (kind === "inProgress") displayStatus = "검토중";
+  else if (kind === "inProgress") displayStatus = "접수";
   else if (kind === "allPending") displayStatus = unique.size === 1 ? items[0]?.status ?? "접수" : "접수";
 
   let statusForFilter: RequestStatus = items[0]?.status ?? "접수";
   if (totalCount === 0) statusForFilter = "접수";
   else if (unique.size === 1) statusForFilter = items[0].status;
   else if (rejectedCount > 0) statusForFilter = "반려";
-  else statusForFilter = "검토중";
+  else statusForFilter = "접수";
 
   return {
     displayStatus,

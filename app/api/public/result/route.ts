@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
-import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
+import { computeFeesForBundle, computeFeesForRequest, getSelectedEquipmentDetails } from "@/lib/pricing";
+import { normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
@@ -35,15 +36,19 @@ function approvalLabel(status: string, decidedBy?: string) {
     if ((decidedBy ?? "").includes("사용자")) return "사용자취소";
     return "예약취소";
   }
-  if (status === "완료") return "승인완료";
   return "승인대기";
 }
 
 function paymentLabel(status: string) {
-  return status === "완료" ? "결제완료" : "미결제";
+  return status === "승인" ? "결제대기" : "미결제";
 }
 
-function reservationLabel() {
+function reservationLabel(status: string, decidedBy?: string) {
+  if (status === "취소") {
+    if ((decidedBy ?? "").includes("사용자")) return "사용자취소";
+    return "예약취소";
+  }
+  if (status === "반려") return "반려";
   return "신청완료";
 }
 
@@ -52,6 +57,7 @@ function roomMeta(roomId: string) {
 }
 
 export async function POST(req: Request) {
+  try {
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
@@ -109,15 +115,15 @@ export async function POST(req: Request) {
   const meta = roomMeta(representative.roomId);
 
   const approvalStatusText = approvalLabel(overallStatus, overallDecidedBy);
-  const reservationStatusText = reservationLabel();
+  const reservationStatusText = reservationLabel(overallStatus, overallDecidedBy);
   const paymentStatusText = paymentLabel(overallStatus);
 
   const payableFeeKRW = feeAvailable ? fee.finalFeeKRW : estimateFee.finalFeeKRW;
 
   // 사용자 취소 가능 여부
-  // - 이미 취소/완료된 건이 포함되면 불가
+  // - 이미 취소된 건이 포함되면 불가
   // - 묶음이면 전체 기준으로 판단
-  const cancelable = sessions.every((s) => !["취소", "완료"].includes(s.status));
+  const cancelable = !["취소", "반려"].includes(overallStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
   return NextResponse.json({
     ok: true,
@@ -150,7 +156,7 @@ export async function POST(req: Request) {
     statusKind: isBatch ? bundle!.kind : "single",
     approvedCount: isBatch ? bundle!.approvedCount : (representative.status === "승인" ? 1 : 0),
     rejectedCount: isBatch ? bundle!.rejectedCount : (representative.status === "반려" ? 1 : 0),
-    pendingCount: isBatch ? bundle!.pendingCount : (["접수", "검토중"].includes(representative.status) ? 1 : 0),
+    pendingCount: isBatch ? bundle!.pendingCount : (representative.status === "접수" ? 1 : 0),
     feeAvailable,
     feeBasis: feeAvailable ? (usingApprovedBasis ? "approved" : "all") : "none",
     sessions: sessions.map((s) => ({
@@ -165,7 +171,15 @@ export async function POST(req: Request) {
       rejectReason: s.rejectReason ?? ""
     })),
 
+    // 장비 정보
+    equipmentDetails: getSelectedEquipmentDetails(
+      representative.equipment,
+      normalizeRoomCategory(meta?.category)
+    ),
+
     // 금액/할인/최종
+    rentalFeeKRW: fee.rentalFeeKRW,
+    equipmentFeeKRW: fee.equipmentFeeKRW,
     totalFeeKRW: fee.totalFeeKRW,
     discountRatePct: fee.discountRatePct,
     discountAmountKRW: fee.discountAmountKRW,
@@ -179,6 +193,20 @@ export async function POST(req: Request) {
     cancelable,
 
     // 반려 사유(묶음은 대표/첫회차 기준)
-    rejectReason: overallStatus === "반려" && approvedSessions.length === 0 ? (representative.rejectReason ?? "") : ""
+    rejectReason: overallStatus === "반려" && approvedSessions.length === 0 ? (representative.rejectReason ?? "") : "",
+
+    // 갤러리 전시 기간 정보
+    ...(representative.roomId === "gallery" ? {
+      startDate: representative.startDate ?? "",
+      endDate: representative.endDate ?? "",
+      galleryExhibitionDayCount: representative.galleryExhibitionDayCount ?? 0,
+      galleryWeekdayCount: representative.galleryWeekdayCount ?? 0,
+      gallerySaturdayCount: representative.gallerySaturdayCount ?? 0,
+      galleryPrepDate: representative.galleryPrepDate ?? "",
+    } : {}),
   });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

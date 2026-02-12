@@ -25,25 +25,33 @@ export const RequestInputSchema = z.object({
   startTime: z.string().regex(/^\d{2}:\d{2}$/),
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
-  applicantName: z.string().min(2).max(30),
-  birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  address: z.string().min(2).max(200),
-  phone: z.string().min(9).max(20),
-  email: z.string().email(),
+  applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
+  birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+  address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
+  phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
+  email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
 
-  orgName: z.string().min(1).max(80),
-  headcount: z.coerce.number().int().min(1).max(500),
+  orgName: z.string().min(1, "단체명을 입력해 주세요.").max(80),
+  headcount: z.coerce.number({ invalid_type_error: "인원 수를 입력해 주세요." }).int().min(1, "인원은 1명 이상이어야 합니다.").max(500),
 
   laptop: CheckboxBoolean.default(false),
   projector: CheckboxBoolean.default(false),
   audio: CheckboxBoolean.default(false),
 
-  purpose: z.string().min(5).max(1000),
+  /** E-스튜디오 촬영장비 */
+  mirrorless: CheckboxBoolean.default(false),
+  camcorder: CheckboxBoolean.default(false),
+  wirelessMic: CheckboxBoolean.default(false),
+  pinMic: CheckboxBoolean.default(false),
+  rodeMic: CheckboxBoolean.default(false),
+  electronicBoard: CheckboxBoolean.default(false),
+
+  purpose: z.string().min(5, "사용 목적은 5자 이상 입력해 주세요.").max(1000),
 
   privacyAgree: CheckboxBoolean,
   pledgeAgree: CheckboxBoolean,
   pledgeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-  pledgeName: z.string().min(2).max(30)
+  pledgeName: z.string().min(2, "서약자 성명은 2자 이상 입력해 주세요.").max(30)
 }).superRefine((v, ctx) => {
   if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
   if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "대관 규정 서약 동의는 필수입니다." });
@@ -94,19 +102,25 @@ export const GalleryRequestInputSchema = z
     startTime: z.string().regex(/^\d{2}:\d{2}$/),
     endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
-    applicantName: z.string().min(2).max(30),
-    birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    address: z.string().min(2).max(200),
-    phone: z.string().min(9).max(20),
-    email: z.string().email(),
+    applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
+    birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+    address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
+    phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
+    email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
 
-    orgName: z.string().min(1).max(80),
-    headcount: z.coerce.number().int().min(1).max(500),
+    orgName: z.string().min(1, "단체명을 입력해 주세요.").max(80),
+    headcount: z.coerce.number({ invalid_type_error: "인원 수를 입력해 주세요." }).int().min(1, "인원은 1명 이상이어야 합니다.").max(500),
 
     // 갤러리는 장비 옵션 불가(항상 false)
     laptop: CheckboxBoolean.default(false),
     projector: CheckboxBoolean.default(false),
     audio: CheckboxBoolean.default(false),
+    mirrorless: CheckboxBoolean.default(false),
+    camcorder: CheckboxBoolean.default(false),
+    wirelessMic: CheckboxBoolean.default(false),
+    pinMic: CheckboxBoolean.default(false),
+    rodeMic: CheckboxBoolean.default(false),
+    electronicBoard: CheckboxBoolean.default(false),
 
     // 갤러리 전용 필드는 서버 저장 확장 시 활용(현재는 추가 데이터로 전달 가능)
     startDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "시작일 형식을 확인해 주세요."),
@@ -117,13 +131,16 @@ export const GalleryRequestInputSchema = z
     awarenessPath: z.string().max(200).optional(),
     specialNotes: z.string().max(1000).optional(),
 
+    // 철수시간 (종료일 당일, 17:00 이전 필수)
+    galleryRemovalTime: z.string().regex(/^\d{2}:\d{2}$/, "철수 시간을 선택해 주세요."),
+
     // 호환: 관리자 확인용 텍스트(갤러리 전용 필드를 합쳐서 구성)
-    purpose: z.string().min(1).max(2000),
+    purpose: z.string().min(1, "사용 목적을 입력해 주세요.").max(2000),
 
     privacyAgree: CheckboxBoolean,
     pledgeAgree: CheckboxBoolean,
     pledgeDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    pledgeName: z.string().min(2).max(30)
+    pledgeName: z.string().min(2, "서약자 성명은 2자 이상 입력해 주세요.").max(30)
   })
   .superRefine((v, ctx) => {
     if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
@@ -146,6 +163,14 @@ export const GalleryRequestInputSchema = z
     // 장비 옵션 완전 차단
     if (v.laptop || v.projector || v.audio) {
       ctx.addIssue({ code: "custom", path: ["laptop"], message: "갤러리 신청은 장비 옵션을 선택할 수 없습니다." });
+    }
+
+    // 철수시간: 17:00 이전 필수
+    if (v.galleryRemovalTime) {
+      const rmMin = toMinutes(v.galleryRemovalTime);
+      if (Number.isFinite(rmMin) && rmMin > toMinutes("17:00")) {
+        ctx.addIssue({ code: "custom", path: ["galleryRemovalTime"], message: "철수 시간은 17:00 이전으로 설정해 주세요." });
+      }
     }
   });
 

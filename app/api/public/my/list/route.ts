@@ -39,15 +39,28 @@ function roomMeta(roomId: string) {
 }
 
 export async function GET(req: Request) {
+  try {
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
+  const emailParam = (searchParams.get("email") ?? "").toString().trim().toLowerCase();
 
-  const verified = verifyApplicantLinkToken(token);
-  if (!verified.ok) {
-    return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
+  let email = "";
+
+  // 토큰 인증 또는 이메일 직접 조회
+  if (token) {
+    const verified = verifyApplicantLinkToken(token);
+    if (!verified.ok) {
+      return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
+    }
+    email = verified.email;
+  } else if (emailParam && emailParam.includes("@")) {
+    email = emailParam;
+  } else {
+    return NextResponse.json(
+      { ok: false, message: "토큰 또는 이메일이 필요합니다." },
+      { status: 400 }
+    );
   }
-
-  const email = verified.email;
   const db = getDatabase();
   const all = await db.getAllRequests();
   const mine = all.filter((r) => (r.email ?? "").toLowerCase() === email);
@@ -83,13 +96,17 @@ export async function GET(req: Request) {
 
       const meta = roomMeta(rep.roomId);
       const isGallery = rep.roomId === "gallery";
+      const galleryDays = isGallery ? (rep.galleryExhibitionDayCount ?? sessions.length) : 0;
       const firstDateTime = isGallery
-        ? (isBatch && sessions.length > 0 && rep.startDate && rep.endDate
-            ? `${rep.startDate} ~ ${rep.endDate} (일 단위)`
+        ? (rep.startDate && rep.endDate
+            ? `${rep.startDate} ~ ${rep.endDate} (${galleryDays}일)`
             : `${rep.date} (일 단위)`)
         : `${rep.date} ${rep.startTime}-${rep.endTime}`;
-      const past = sessions.every((s) => isPast(s, nowYmd, nowMin));
-      const cancelable = sessions.every((s) => !["취소", "완료"].includes(s.status));
+      // 갤러리 1행 형식: endDate 기준으로 과거 판단
+      const past = isGallery && !isBatch && rep.endDate
+        ? rep.endDate < nowYmd
+        : sessions.every((s) => isPast(s, nowYmd, nowMin));
+      const cancelable = !["취소", "반려"].includes(displayStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
       return {
         key,
@@ -117,8 +134,13 @@ export async function GET(req: Request) {
     })
     .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
 
-  const current = groups.filter((g) => !g.past);
-  const past = groups.filter((g) => g.past);
+  const current = groups.filter((g) => !g.past && !["취소", "반려"].includes(g.status));
+  const past = groups.filter((g) => g.past && !["취소", "반려"].includes(g.status));
+  const cancelled = groups.filter((g) => ["취소", "반려"].includes(g.status));
 
-  return NextResponse.json({ ok: true, email, current, past });
+  return NextResponse.json({ ok: true, email, current, past, cancelled });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 500 });
+  }
 }

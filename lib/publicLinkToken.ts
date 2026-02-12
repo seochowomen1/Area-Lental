@@ -30,13 +30,19 @@ function timingSafeEqualString(a: string, b: string) {
 }
 
 function getTokenSecret(): string {
-  // 운영에서는 반드시 별도 secret을 설정하는 것을 권장합니다.
-  // 로컬 개발 편의: 없으면 ADMIN_PASSWORD 또는 fallback 사용
-  return (
-    process.env.PUBLIC_LINK_SECRET ||
-    process.env.ADMIN_PASSWORD ||
-    "dev-secret-change-me"
-  ).toString();
+  if (process.env.PUBLIC_LINK_SECRET) {
+    return process.env.PUBLIC_LINK_SECRET;
+  }
+  if (process.env.ADMIN_PASSWORD) {
+    if (process.env.NODE_ENV === "production") {
+      console.warn("[SECURITY] PUBLIC_LINK_SECRET 미설정 - ADMIN_PASSWORD를 대신 사용합니다. 운영 환경에서는 별도 설정을 권장합니다.");
+    }
+    return process.env.ADMIN_PASSWORD;
+  }
+  if (process.env.NODE_ENV === "production") {
+    console.error("[SECURITY] PUBLIC_LINK_SECRET과 ADMIN_PASSWORD 모두 미설정입니다. 토큰 보안이 보장되지 않습니다.");
+  }
+  return "dev-secret-change-me";
 }
 
 export function createApplicantLinkToken(args: {

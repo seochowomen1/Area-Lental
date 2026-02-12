@@ -10,13 +10,13 @@ export type GallerySessionInput = {
 
 // 우리동네 갤러리 운영시간(서버 기준)
 // - 평일: 09:00~18:00
-// - 화요일: 18:00~21:00
+// - 화요일: 09:00~18:00 + 야간 18:00~20:00 → 통합 09:00~20:00
 // - 토요일: 09:00~13:00
 // - 일요일: 휴관
 export function galleryOperatingWindow(dateYmd: string): GalleryOperatingWindow | null {
   const dow = dayOfWeek(dateYmd); // 0 Sun ... 6 Sat
   if (dow === 0) return null;
-  if (dow === 2) return { startTime: "18:00", endTime: "21:00" };
+  if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
   if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
   return { startTime: "09:00", endTime: "18:00" };
 }
@@ -36,7 +36,7 @@ export function validateGalleryOperatingHours(dateYmd: string, startTime: string
   if (ws <= s && e <= we) return { ok: true as const };
 
   const dow = dayOfWeek(dateYmd);
-  if (dow === 2) return { ok: false as const, message: "화요일 운영시간(18:00~21:00) 내에서만 신청 가능합니다." };
+  if (dow === 2) return { ok: false as const, message: "화요일 운영시간(09:00~20:00) 내에서만 신청 가능합니다." };
   if (dow === 6) return { ok: false as const, message: "토요일 운영시간(09:00~13:00) 내에서만 신청 가능합니다." };
   return { ok: false as const, message: "평일 운영시간(09:00~18:00) 내에서만 신청 가능합니다." };
 }
@@ -81,4 +81,39 @@ export function buildGallerySessionsFromPeriod(startDate: string, endDate: strin
   if (!hasExhibitionDay) return [];
 
   return sessions;
+}
+
+/**
+ * 갤러리 전시 기간의 통계(일수, 요금)를 한번에 계산합니다.
+ * - 준비일, 평일, 토요일 카운트
+ * - 총 대관료 계산 (평일 20,000원/일, 토 10,000원/일, 준비일 무료)
+ */
+export function computeGalleryStats(startDate: string, endDate: string): {
+  prepDate: string | null;
+  weekdayCount: number;
+  saturdayCount: number;
+  exhibitionDayCount: number;
+  totalFeeKRW: number;
+} {
+  const sessions = buildGallerySessionsFromPeriod(startDate, endDate);
+  const prep = sessions.find((s) => s.isPrepDay);
+  const exhibition = sessions.filter((s) => !s.isPrepDay);
+
+  let weekdayCount = 0;
+  let saturdayCount = 0;
+  for (const s of exhibition) {
+    const dow = dayOfWeek(s.date);
+    if (dow === 6) saturdayCount++;
+    else if (dow >= 1 && dow <= 5) weekdayCount++;
+  }
+
+  const totalFeeKRW = weekdayCount * 20000 + saturdayCount * 10000;
+
+  return {
+    prepDate: prep?.date ?? null,
+    weekdayCount,
+    saturdayCount,
+    exhibitionDayCount: exhibition.length,
+    totalFeeKRW,
+  };
 }
