@@ -32,7 +32,7 @@ export async function GET(req: Request) {
     const sorted = sessions.slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
     content = generateBatchDecisionEmailContent(sorted);
   } else {
-    content = generateDecisionEmailContent(current);
+    content = await generateDecisionEmailContent(current);
   }
 
   if (!content) {

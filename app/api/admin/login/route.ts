@@ -3,14 +3,19 @@ import crypto from "crypto";
 
 import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE } from "@/lib/adminConstants";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { logger } from "@/lib/logger";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** 로그인: IP당 15분 내 5회 시도 제한 */
+/** 로그인 Rate Limit: IP당 15분 내 5회 시도 제한 */
 const LOGIN_MAX_ATTEMPTS = 5;
 const LOGIN_WINDOW_MS = 15 * 60 * 1000;
+
+/** 글로벌 Rate Limit: 모든 IP 합산 1분 내 20회 (분산 브루트포스 방지) */
+const LOGIN_GLOBAL_MAX = 20;
+const LOGIN_GLOBAL_WINDOW_MS = 60 * 1000;
 
 function tokenFor(adminPassword: string) {
   return crypto
@@ -19,22 +24,42 @@ function tokenFor(adminPassword: string) {
     .digest("hex");
 }
 
+/** 타이밍 공격 방어: 비밀번호 비교 시간 차이로 정보가 누출되지 않도록 방지 */
+function constantTimeCompare(a: string, b: string): boolean {
+  const bufA = Buffer.from(a.padEnd(256, "\0"));
+  const bufB = Buffer.from(b.padEnd(256, "\0"));
+  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
+}
+
 export async function POST(req: Request) {
   try {
-  // Rate limit 체크
   const ip = getClientIp(req);
+
+  // Rate limit 체크 (IP별)
   const rl = rateLimit("login", ip, LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS);
   if (!rl.allowed) {
+    logger.warn("관리자 로그인 Rate Limit 초과", { ip });
     return NextResponse.json(
       { ok: false, message: `너무 많은 로그인 시도입니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
       { status: 429 }
     );
   }
 
+  // 글로벌 Rate limit (분산 브루트포스 방지)
+  const rlGlobal = rateLimit("login-global", "all", LOGIN_GLOBAL_MAX, LOGIN_GLOBAL_WINDOW_MS);
+  if (!rlGlobal.allowed) {
+    logger.warn("관리자 로그인 글로벌 Rate Limit 초과", { ip });
+    return NextResponse.json(
+      { ok: false, message: `시스템 보호를 위해 잠시 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const adminPw = process.env.ADMIN_PASSWORD;
   if (!adminPw) {
+    // 환경변수 미설정 정보를 외부에 노출하지 않음
     return NextResponse.json(
-      { ok: false, message: "ADMIN_PASSWORD 환경변수가 설정되지 않았습니다." },
+      { ok: false, message: "서버 설정 오류입니다." },
       { status: 500 }
     );
   }
@@ -56,7 +81,13 @@ export async function POST(req: Request) {
     nextPath = (form?.get("next") ?? "/admin").toString();
   }
 
-  if (password !== adminPw) {
+  // Open Redirect 방지: /admin으로 시작하는 경로만 허용
+  if (!nextPath.startsWith("/admin")) {
+    nextPath = "/admin";
+  }
+
+  if (!constantTimeCompare(password, adminPw)) {
+    logger.warn("관리자 로그인 실패", { ip });
     return NextResponse.json(
       { ok: false, message: "비밀번호가 올바르지 않습니다." },
       { status: 401 }
@@ -68,11 +99,13 @@ export async function POST(req: Request) {
   const isProduction = process.env.NODE_ENV === "production";
   res.cookies.set(ADMIN_COOKIE_NAME, token, {
     httpOnly: true,
-    sameSite: "lax",
+    sameSite: "strict",
     secure: isProduction,
     path: "/",
-    maxAge: 24 * 60 * 60, // 24시간 후 자동 만료
+    maxAge: 8 * 60 * 60, // 8시간 후 자동 만료 (보안 강화: 24h→8h)
   });
+
+  logger.info("관리자 로그인 성공", { ip });
   return res;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
@@ -82,6 +115,6 @@ export async function POST(req: Request) {
 
 export async function DELETE() {
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, path: "/", maxAge: 0 });
+  res.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
   return res;
 }

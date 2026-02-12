@@ -852,3 +852,125 @@ export async function deleteBlock(id: string): Promise<void> {
     }
   });
 }
+
+/* ── 이메일 템플릿 (Google Sheets 저장) ── */
+
+const SHEET_EMAIL_TEMPLATES = "email_templates";
+
+type EmailTemplateRow = {
+  category: string;
+  status: string;
+  subject: string;
+  body: string;
+};
+
+/**
+ * email_templates 시트가 없으면 자동으로 생성(헤더 포함)합니다.
+ */
+async function ensureEmailTemplatesSheet(): Promise<void> {
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID });
+  const exists = meta.data.sheets?.some(
+    (s) => s.properties?.title === SHEET_EMAIL_TEMPLATES
+  );
+  if (exists) return;
+
+  // 시트 생성
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [
+        { addSheet: { properties: { title: SHEET_EMAIL_TEMPLATES } } },
+      ],
+    },
+  });
+
+  // 헤더 작성
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A1:D1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [["category", "status", "subject", "body"]] },
+  });
+}
+
+/**
+ * 이메일 템플릿 전체를 Google Sheets에서 읽어옵니다.
+ */
+export async function getEmailTemplates(): Promise<EmailTemplateRow[]> {
+  if (isMockMode()) {
+    const { mock_getEmailTemplates } = await import("./mockdb");
+    return mock_getEmailTemplates();
+  }
+
+  const env = requireGoogleEnv();
+  await ensureEmailTemplatesSheet();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+  });
+
+  const rows = (res.data.values ?? []) as string[][];
+  if (rows.length <= 1) return [];
+
+  return rows.slice(1).filter((r) => r[0] && r[1]).map((r) => ({
+    category: r[0],
+    status: r[1],
+    subject: r[2] ?? "",
+    body: r[3] ?? "",
+  }));
+}
+
+/**
+ * 특정 카테고리+상태의 이메일 템플릿을 저장(있으면 업데이트, 없으면 추가)합니다.
+ */
+export async function saveEmailTemplate(
+  category: string,
+  status: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  if (isMockMode()) {
+    const { mock_saveEmailTemplate } = await import("./mockdb");
+    return mock_saveEmailTemplate(category, status, subject, body);
+  }
+
+  const env = requireGoogleEnv();
+  await ensureEmailTemplatesSheet();
+
+  const { sheets } = getGoogleClient();
+
+  // 기존 행 검색
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+  });
+  const rows = (res.data.values ?? []) as string[][];
+
+  const rowIndex = rows.findIndex(
+    (r, i) => i > 0 && r[0] === category && r[1] === status,
+  );
+
+  if (rowIndex >= 0) {
+    // 기존 행 업데이트
+    const rowNumber = rowIndex + 1;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_EMAIL_TEMPLATES}!A${rowNumber}:D${rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[category, status, subject, body]] },
+    });
+  } else {
+    // 새 행 추가
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[category, status, subject, body]] },
+    });
+  }
+}

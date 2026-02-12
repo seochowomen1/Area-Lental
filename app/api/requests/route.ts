@@ -16,6 +16,7 @@ import {
 } from "@/lib/mail";
 import { logger } from "@/lib/logger";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import type { RequestStatus } from "@/lib/types";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
@@ -62,8 +63,31 @@ function BufferToStream(buffer: Buffer) {
   return stream;
 }
 
+/** 대관 신청: IP당 1분 내 5건, 1시간 내 20건 제한 */
+const REQUEST_MAX_PER_MIN = 5;
+const REQUEST_WINDOW_MIN_MS = 60 * 1000;
+const REQUEST_MAX_PER_HOUR = 20;
+const REQUEST_WINDOW_HOUR_MS = 60 * 60 * 1000;
+
 export async function POST(req: Request) {
   try {
+    // ✅ Rate Limiting: 악의적 대량 예약 방지
+    const ip = getClientIp(req);
+    const rlMin = rateLimit("request-min", ip, REQUEST_MAX_PER_MIN, REQUEST_WINDOW_MIN_MS);
+    if (!rlMin.allowed) {
+      return NextResponse.json(
+        { ok: false, code: "RATE_LIMIT", message: `요청이 너무 많습니다. ${rlMin.retryAfterSeconds}초 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
+    const rlHour = rateLimit("request-hour", ip, REQUEST_MAX_PER_HOUR, REQUEST_WINDOW_HOUR_MS);
+    if (!rlHour.allowed) {
+      return NextResponse.json(
+        { ok: false, code: "RATE_LIMIT", message: `시간당 신청 횟수를 초과했습니다. ${rlHour.retryAfterSeconds}초 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
+
     const isMock = isMockMode();
     const db = getDatabase();
 

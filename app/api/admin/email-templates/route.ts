@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { loadTemplates, saveTemplates, type AllTemplates, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
+import { loadTemplates, saveTemplates, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -12,7 +12,7 @@ export async function GET() {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  const templates = loadTemplates();
+  const templates = await loadTemplates();
   return NextResponse.json({ ok: true, templates });
 }
 
@@ -46,12 +46,7 @@ export async function PUT(req: Request) {
       return NextResponse.json({ ok: false, message: "제목과 본문을 입력해주세요." }, { status: 400 });
     }
 
-    const all = loadTemplates();
-    if (!all[category]) {
-      (all as AllTemplates)[category] = {};
-    }
-    all[category][status] = { subject, body: templateBody };
-    saveTemplates(all);
+    await saveTemplates(category, status, subject, templateBody);
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

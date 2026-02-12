@@ -233,7 +233,7 @@ ${sessions}
 }
 
 /** 단일 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
-export function generateDecisionEmailContent(req: RentalRequest): { to: string; subject: string; body: string } | null {
+export async function generateDecisionEmailContent(req: RentalRequest): Promise<{ to: string; subject: string; body: string } | null> {
   if (!req.email) return null;
   const cat = spaceCategoryLabel(req);
   const catId = getRoomCategory(req) as TemplateCategory;
@@ -253,7 +253,7 @@ export function generateDecisionEmailContent(req: RentalRequest): { to: string; 
 
   // 커스텀 템플릿 사용
   if (["승인", "반려", "취소"].includes(status)) {
-    const template = getTemplate(catId, status);
+    const template = await getTemplate(catId, status);
     const vars: Record<string, string> = {
       "신청번호": req.requestId,
       "공간": req.roomName,
@@ -289,7 +289,7 @@ ${resultUrl}
 }
 
 export async function sendApplicantDecisionEmail(req: RentalRequest) {
-  const content = generateDecisionEmailContent(req);
+  const content = await generateDecisionEmailContent(req);
   if (!content) return;
   await maybeSend({ to: content.to, subject: content.subject, text: content.body });
 }

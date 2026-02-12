@@ -6,10 +6,15 @@ import { ROOMS } from "@/lib/space";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 내 예약 목록: IP당 1분 내 20회 제한 */
+const LIST_MAX_PER_MIN = 20;
+const LIST_WINDOW_MS = 60 * 1000;
 
 function sortSessions(list: RentalRequest[]) {
   return list
@@ -40,6 +45,16 @@ function roomMeta(roomId: string) {
 
 export async function GET(req: Request) {
   try {
+  // Rate Limiting
+  const ip = getClientIp(req);
+  const rl = rateLimit("my-list", ip, LIST_MAX_PER_MIN, LIST_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `요청이 너무 많습니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
   const emailParam = (searchParams.get("email") ?? "").toString().trim().toLowerCase();

@@ -39,6 +39,10 @@ export interface Database {
   getBlocks(): Promise<BlockedSlot[]>;
   addBlock(block: Omit<BlockedSlot, "id">): Promise<BlockedSlot>;
   deleteBlock(id: string): Promise<void>;
+
+  // 이메일 템플릿 관련
+  getEmailTemplates(): Promise<{ category: string; status: string; subject: string; body: string }[]>;
+  saveEmailTemplate(category: string, status: string, subject: string, body: string): Promise<void>;
 }
 
 /**
@@ -106,6 +110,16 @@ class MockDatabase implements Database {
     const { mock_deleteBlock } = await this.mockdb;
     return mock_deleteBlock(id);
   }
+
+  async getEmailTemplates() {
+    const { mock_getEmailTemplates } = await this.mockdb;
+    return mock_getEmailTemplates();
+  }
+
+  async saveEmailTemplate(category: string, status: string, subject: string, body: string) {
+    const { mock_saveEmailTemplate } = await this.mockdb;
+    return mock_saveEmailTemplate(category, status, subject, body);
+  }
 }
 
 /**
@@ -172,6 +186,16 @@ class SheetsDatabase implements Database {
   async deleteBlock(id: string) {
     const { deleteBlock } = await this.sheets;
     return deleteBlock(id);
+  }
+
+  async getEmailTemplates() {
+    const { getEmailTemplates } = await this.sheets;
+    return getEmailTemplates();
+  }
+
+  async saveEmailTemplate(category: string, status: string, subject: string, body: string) {
+    const { saveEmailTemplate } = await this.sheets;
+    return saveEmailTemplate(category, status, subject, body);
   }
 }
 

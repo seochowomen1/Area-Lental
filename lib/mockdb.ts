@@ -4,10 +4,18 @@ import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus } from "@/l
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
 
+type EmailTemplateRow = {
+  category: string;
+  status: string;
+  subject: string;
+  body: string;
+};
+
 type MockDB = {
   requests: RentalRequest[];
   schedules: ClassSchedule[];
   blocks: BlockTime[];
+  emailTemplates?: EmailTemplateRow[];
 };
 
 // Vercel 서버리스에서는 process.cwd()가 읽기 전용이므로 /tmp 사용
@@ -321,5 +329,31 @@ export async function mock_addBlock(b: Omit<BlockTime, "id">): Promise<BlockTime
 export async function mock_deleteBlock(id: string): Promise<void> {
   const db = ensureDb();
   db.blocks = db.blocks.filter(b => b.id !== id);
+  saveDb(db);
+}
+
+/* ── 이메일 템플릿 (Mock) ── */
+
+export async function mock_getEmailTemplates(): Promise<EmailTemplateRow[]> {
+  const db = ensureDb();
+  return db.emailTemplates ?? [];
+}
+
+export async function mock_saveEmailTemplate(
+  category: string,
+  status: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const db = ensureDb();
+  if (!db.emailTemplates) db.emailTemplates = [];
+  const idx = db.emailTemplates.findIndex(
+    (t) => t.category === category && t.status === status,
+  );
+  if (idx >= 0) {
+    db.emailTemplates[idx] = { category, status, subject, body };
+  } else {
+    db.emailTemplates.push({ category, status, subject, body });
+  }
   saveDb(db);
 }

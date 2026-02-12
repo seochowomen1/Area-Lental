@@ -6,10 +6,15 @@ import { normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 조회: IP당 1분 내 30회 제한 */
+const RESULT_MAX_PER_MIN = 30;
+const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
 
@@ -58,6 +63,16 @@ function roomMeta(roomId: string) {
 
 export async function POST(req: Request) {
   try {
+  // Rate Limiting
+  const ip = getClientIp(req);
+  const rl = rateLimit("result", ip, RESULT_MAX_PER_MIN, RESULT_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `요청이 너무 많습니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();

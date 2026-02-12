@@ -4,10 +4,15 @@ import { dayOfWeek, inRangeYmd, overlaps, todayYmdSeoul } from "@/lib/datetime";
 import { buildHourSlotsForDate, explainNoAvailability } from "@/lib/operating";
 import { logger } from "@/lib/logger";
 import type { RequestStatus } from "@/lib/types";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 가용시간 조회: IP당 1분 내 60회 제한 */
+const AVAIL_MAX_PER_MIN = 60;
+const AVAIL_WINDOW_MS = 60 * 1000;
 
 type Slot = { start: string; end: string; available: boolean };
 
@@ -25,6 +30,16 @@ type AvailabilityResponse = {
 
 export async function GET(req: Request) {
   try {
+    // Rate Limiting
+    const ip = getClientIp(req);
+    const rl = rateLimit("availability", ip, AVAIL_MAX_PER_MIN, AVAIL_WINDOW_MS);
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, message: `요청이 너무 많습니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.`, slots: [], totalSlots: 0, availableSlots: 0, roomId: "", date: "", reasonCode: "RATE_LIMIT", reasonMessage: "요청이 너무 많습니다." },
+        { status: 429 }
+      );
+    }
+
     const { searchParams } = new URL(req.url);
     const roomId = String(searchParams.get("roomId") ?? "").trim();
     const date = String(searchParams.get("date") ?? "").trim();

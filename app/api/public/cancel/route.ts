@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 취소: IP당 15분 내 10회 제한 */
+const CANCEL_MAX_ATTEMPTS = 10;
+const CANCEL_WINDOW_MS = 15 * 60 * 1000;
 
 function normalizeEmail(email: string) {
   return (email ?? "").toString().trim().toLowerCase();
@@ -12,6 +17,16 @@ function normalizeEmail(email: string) {
 
 export async function POST(req: Request) {
   try {
+  // Rate Limiting
+  const ip = getClientIp(req);
+  const rl = rateLimit("cancel", ip, CANCEL_MAX_ATTEMPTS, CANCEL_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `요청이 너무 많습니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();

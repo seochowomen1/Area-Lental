@@ -2,17 +2,14 @@
  * 이메일 템플릿 관리
  *
  * 카테고리별(강의실/E-스튜디오/갤러리) + 상태별(승인/반려/취소) 이메일 본문 템플릿을
- * data/email-templates.json에 저장·로드합니다.
+ * Google Sheets(email_templates 시트)에 저장·로드합니다.
  *
  * 변수 치환:
  *   {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}},
  *   {{요금정보}}, {{반려사유}}, {{조회링크}}
  */
 
-import fs from "fs";
-import path from "path";
-
-const TEMPLATE_FILE = path.join(process.cwd(), "data", "email-templates.json");
+import { getDatabase } from "./database";
 
 export type TemplateCategory = "lecture" | "studio" | "gallery";
 export type TemplateStatus = "승인" | "반려" | "취소";
@@ -105,43 +102,50 @@ export function getDefaultTemplates(): AllTemplates {
   };
 }
 
-export function loadTemplates(): AllTemplates {
-  try {
-    if (fs.existsSync(TEMPLATE_FILE)) {
-      const raw = fs.readFileSync(TEMPLATE_FILE, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<AllTemplates>;
-      const defaults = getDefaultTemplates();
+/**
+ * Google Sheets에서 이메일 템플릿을 로드합니다.
+ * DB에 저장된 값이 없으면 기본 템플릿을 반환합니다.
+ */
+export async function loadTemplates(): Promise<AllTemplates> {
+  const defaults = getDefaultTemplates();
 
-      // Merge with defaults to fill any missing fields
-      for (const cat of ["lecture", "studio", "gallery"] as TemplateCategory[]) {
-        if (!parsed[cat]) continue;
-        for (const st of ["승인", "반려", "취소"] as TemplateStatus[]) {
-          if (parsed[cat]![st]) {
-            defaults[cat][st] = {
-              subject: parsed[cat]![st]!.subject || defaults[cat][st]!.subject,
-              body: parsed[cat]![st]!.body || defaults[cat][st]!.body,
-            };
-          }
-        }
-      }
-      return defaults;
+  try {
+    const db = getDatabase();
+    const rows = await db.getEmailTemplates();
+
+    for (const row of rows) {
+      const cat = row.category as TemplateCategory;
+      const st = row.status as TemplateStatus;
+      if (!defaults[cat]) continue;
+      if (!["승인", "반려", "취소"].includes(st)) continue;
+
+      defaults[cat][st] = {
+        subject: row.subject || defaults[cat][st]!.subject,
+        body: row.body || defaults[cat][st]!.body,
+      };
     }
   } catch {
-    // ignore
+    // DB 연결 실패 시 기본 템플릿 반환
   }
-  return getDefaultTemplates();
+
+  return defaults;
 }
 
-export function saveTemplates(templates: AllTemplates): void {
-  const dir = path.dirname(TEMPLATE_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(templates, null, 2), "utf-8");
+/**
+ * 특정 카테고리+상태의 이메일 템플릿을 Google Sheets에 저장합니다.
+ */
+export async function saveTemplates(
+  category: TemplateCategory,
+  status: TemplateStatus,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const db = getDatabase();
+  await db.saveEmailTemplate(category, status, subject, body);
 }
 
-export function getTemplate(category: TemplateCategory, status: TemplateStatus): EmailTemplate {
-  const all = loadTemplates();
+export async function getTemplate(category: TemplateCategory, status: TemplateStatus): Promise<EmailTemplate> {
+  const all = await loadTemplates();
   return all[category]?.[status] ?? defaultTemplateFor(status);
 }
 

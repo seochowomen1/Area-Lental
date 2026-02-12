@@ -904,7 +904,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH}>철수시간</th>
                   <td className={TD} colSpan={3}>
                     {req.galleryRemovalTime
-                      ? `종료일 ${req.galleryRemovalTime}까지`
+                      ? `종료일(${req.endDate ?? req.date}) ${req.galleryRemovalTime}까지`
                       : "-"}
                   </td>
                 </tr>
@@ -1247,6 +1247,14 @@ export default async function AdminRequestFormPage({
                     {room?.name ?? req.roomId} ({categoryLabel})
                   </td>
                 </tr>
+                {isGallery && req.galleryRemovalTime && (
+                  <tr>
+                    <th className={TH}>철수시간</th>
+                    <td className={TD} colSpan={3}>
+                      종료일({req.endDate ?? req.date}) {req.galleryRemovalTime}까지
+                    </td>
+                  </tr>
+                )}
                 <tr>
                   <th className={TH}>서약 동의</th>
                   <td className={TD} colSpan={3}>
