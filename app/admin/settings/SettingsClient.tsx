@@ -279,12 +279,12 @@ export default function SettingsClient(props: {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                {isGallery ? "내부 대관 일정" : "내부 대관 일정 (수동 차단)"}
+                {isGallery ? "내부 대관 일정" : "내부 대관 일정 / 수동 차단"}
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {isGallery
                   ? "내부(강사·수강생) 대관 일정을 등록하면 외부 대관 신청이 차단됩니다"
-                  : "특정 날짜/시간을 수동으로 차단합니다"}
+                  : "시간 단위 또는 일 단위로 특정 날짜/기간의 대관 신청을 차단합니다"}
               </p>
             </div>
             <button
@@ -316,7 +316,7 @@ export default function SettingsClient(props: {
             <thead className="border-b bg-slate-50/80 text-left text-xs font-semibold text-slate-600">
               <tr>
                 <th className="px-5 py-3">{spaceLabel}</th>
-                <th className="px-5 py-3">{isGallery ? "기간" : "날짜"}</th>
+                <th className="px-5 py-3">{isGallery ? "기간" : "날짜/기간"}</th>
                 {!isGallery && <th className="px-5 py-3">시간</th>}
                 <th className="px-5 py-3">사유</th>
                 <th className="px-5 py-3 text-right">관리</th>
@@ -324,7 +324,9 @@ export default function SettingsClient(props: {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedBlocks.length ? (
-                sortedBlocks.map((b) => (
+                sortedBlocks.map((b) => {
+                  const isDayBlock = !isGallery && b.endDate;
+                  return (
                   <tr key={b.id} className={`transition hover:bg-slate-50/50 ${highlightRowClass(b.id)}`}>
                     <td className="px-5 py-3 font-medium">{props.rooms.find((r) => r.id === b.roomId)?.name ?? b.roomId}</td>
                     <td className="px-5 py-3 tabular-nums">
@@ -333,6 +335,11 @@ export default function SettingsClient(props: {
                           {b.date}
                           {b.endDate && b.endDate !== b.date ? ` ~ ${b.endDate}` : ""}
                         </span>
+                      ) : isDayBlock ? (
+                        <span>
+                          {b.date} ~ {b.endDate}
+                          <span className="ml-1.5 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">일 단위</span>
+                        </span>
                       ) : (
                         <>
                           {b.date}
@@ -340,7 +347,13 @@ export default function SettingsClient(props: {
                         </>
                       )}
                     </td>
-                    {!isGallery && <td className="px-5 py-3">{renderBlockTime(b)}</td>}
+                    {!isGallery && (
+                      <td className="px-5 py-3">
+                        {isDayBlock
+                          ? <span className="font-semibold text-slate-900">하루 전체</span>
+                          : renderBlockTime(b)}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-slate-600">{b.reason || <span className="text-slate-400">-</span>}</td>
                     <td className="px-5 py-3 text-right">
                       <button
@@ -353,7 +366,8 @@ export default function SettingsClient(props: {
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td className="px-5 py-8 text-center text-slate-400" colSpan={isGallery ? 4 : 5}>

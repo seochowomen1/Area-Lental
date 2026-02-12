@@ -76,26 +76,33 @@ export async function POST(req: Request) {
     if (!roomId) return jsonError("대상을 선택해 주세요.", 400, "VALIDATION");
     if (!isYmd(date)) return jsonError("날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)", 400, "VALIDATION");
 
-    // 갤러리 날짜 범위 차단 모드
-    if (isGallery && isYmd(endDateRaw)) {
+    // 날짜 범위 차단 모드 (갤러리 + 비갤러리 일 단위 차단)
+    if (isYmd(endDateRaw)) {
       if (endDateRaw < date) return jsonError("종료일은 시작일 이후여야 합니다.", 400, "VALIDATION");
 
       const db = getDatabase();
       const existingBlocks = await db.getBlocks();
 
-      // 범위 내 기존 갤러리 블록 겹침 체크
+      // 범위 내 기존 블록 겹침 체크 (같은 room 또는 all)
       const rangeConflict = existingBlocks.some((b) => {
-        if (b.roomId !== roomId && b.roomId !== "all") return false;
+        const roomOverlap = b.roomId === "all" || roomId === "all" || b.roomId === roomId;
+        if (!roomOverlap) return false;
         const bStart = b.date;
         const bEnd = b.endDate || b.date;
-        // 두 범위 [date, endDate] 과 [bStart, bEnd] 가 겹치는지 체크
-        return bStart <= endDateRaw && bEnd >= date;
+        if (b.endDate) {
+          // 날짜 범위 블록끼리 겹침 체크
+          return bStart <= endDateRaw && bEnd >= date;
+        }
+        // 단일 날짜 시간 블록: 해당 날짜가 새 범위 내에 있는지
+        return b.date >= date && b.date <= endDateRaw;
       });
       if (rangeConflict) {
         return jsonError("이미 등록된 일정과 기간이 겹칩니다.", 409, "CONFLICT");
       }
 
-      const item = { roomId, date, endDate: endDateRaw, startTime: "09:00", endTime: "18:00", reason };
+      const blockStartTime = isGallery ? "09:00" : "00:00";
+      const blockEndTime = isGallery ? "18:00" : "23:59";
+      const item = { roomId, date, endDate: endDateRaw, startTime: blockStartTime, endTime: blockEndTime, reason };
       const result = await db.addBlock(item);
       return NextResponse.json({ ok: true, created: result });
     }

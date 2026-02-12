@@ -33,16 +33,19 @@ function getTokenSecret(): string {
   if (process.env.PUBLIC_LINK_SECRET) {
     return process.env.PUBLIC_LINK_SECRET;
   }
-  if (process.env.ADMIN_PASSWORD) {
-    if (process.env.NODE_ENV === "production") {
-      console.warn("[SECURITY] PUBLIC_LINK_SECRET 미설정 - ADMIN_PASSWORD를 대신 사용합니다. 운영 환경에서는 별도 설정을 권장합니다.");
+  // 운영 환경에서는 반드시 별도의 PUBLIC_LINK_SECRET 설정 필요
+  if (process.env.NODE_ENV === "production") {
+    if (process.env.ADMIN_PASSWORD) {
+      console.error("[SECURITY] PUBLIC_LINK_SECRET 미설정 — 운영 환경에서는 ADMIN_PASSWORD와 다른 별도 시크릿을 설정해 주세요.");
+      return process.env.ADMIN_PASSWORD;
     }
+    throw new Error("[SECURITY] PUBLIC_LINK_SECRET이 설정되지 않았습니다. 운영 환경에서 필수 환경변수입니다.");
+  }
+  // 개발 환경 전용 폴백
+  if (process.env.ADMIN_PASSWORD) {
     return process.env.ADMIN_PASSWORD;
   }
-  if (process.env.NODE_ENV === "production") {
-    console.error("[SECURITY] PUBLIC_LINK_SECRET과 ADMIN_PASSWORD 모두 미설정입니다. 토큰 보안이 보장되지 않습니다.");
-  }
-  return "dev-secret-change-me";
+  return "dev-local-only-insecure";
 }
 
 export function createApplicantLinkToken(args: {

@@ -570,14 +570,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // 개발 환경에서는 상세 에러 메시지 포함
-    const isDev = process.env.NODE_ENV === 'development';
     return NextResponse.json(
       {
         ok: false,
         code: "SERVER_ERROR",
-        message: isDev ? `서버 오류: ${err.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        ...((isDev ? { stack: err.stack } : {}))
+        message: "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       },
       { status: 500 }
     );

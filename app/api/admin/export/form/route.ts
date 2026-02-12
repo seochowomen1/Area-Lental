@@ -272,7 +272,7 @@ export async function GET(req: Request) {
 
   // Consent / pledge
   pushSection("[동의/서약]");
-  aoa.push(["개인정보 동의", repInfo.privacyAgree ? "동의" : "미동의", "", "", "서약 동의", repInfo.pledgeAgree ? "동의" : "미동의", "", ""]);
+  aoa.push(["개인정보 동의", repInfo.privacyAgree ? "동의" : "미동의", "", "", "", "", "", ""]);
   aoa.push(["서약일", repInfo.pledgeDate || "", "", "", "서약자", repInfo.pledgeName || "", "", ""]);
   pushBlank();
 

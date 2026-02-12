@@ -527,7 +527,6 @@ export default async function AdminRequestFormPage({
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
@@ -806,7 +805,6 @@ export default async function AdminRequestFormPage({
               <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
                 <span>신청 일시: {consentDate}</span>
                 <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
@@ -1124,7 +1122,6 @@ export default async function AdminRequestFormPage({
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
