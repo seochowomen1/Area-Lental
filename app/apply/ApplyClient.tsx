@@ -9,7 +9,7 @@ import { RequestInputSchema, type RequestInput } from "@/lib/schema";
 import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
 import { operatingRangesForDate, isTuesdayNightOverlap } from "@/lib/operating";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
-import { FLOORS } from "@/lib/floors";
+import { FLOORS, FLOORS_WITH_ALL } from "@/lib/floors";
 import { getRoom } from "@/lib/space";
 import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
@@ -82,8 +82,8 @@ export default function ApplyClient() {
   const birthMonthRef = useRef<HTMLInputElement>(null);
   const birthDayRef = useRef<HTMLInputElement>(null);
 
-  const [floorId, setFloorId] = useState<"4" | "5" | "6" | "7">("4");
-  const floor = useMemo(() => FLOORS.find((f) => f.id === floorId)!, [floorId]);
+  const [floorId, setFloorId] = useState<"all" | "4" | "5" | "6" | "7">("all");
+  const floor = useMemo(() => FLOORS_WITH_ALL.find((f) => f.id === floorId)!, [floorId]);
   const [roomId, setRoomId] = useState<string>(floor.rooms[0].id);
 
   const {
@@ -779,7 +779,7 @@ export default function ApplyClient() {
                   onChange={(e) => setFloorId(e.target.value as any)}
                   disabled={prefillLocked}
                 >
-                  {FLOORS.map((f) => (
+                  {FLOORS_WITH_ALL.map((f) => (
                     <option key={f.id} value={f.id}>
                       {f.name}
                     </option>
