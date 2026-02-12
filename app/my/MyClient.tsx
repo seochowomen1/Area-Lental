@@ -46,6 +46,23 @@ function clearSavedToken() {
   try { localStorage.removeItem(STORAGE_KEY); } catch {}
 }
 
+function StatusBadge({ status }: { status: string }) {
+  const colorMap: Record<string, string> = {
+    "접수": "bg-blue-50 text-blue-700 border-blue-200",
+    "승인": "bg-green-50 text-green-700 border-green-200",
+    "반려": "bg-red-50 text-red-700 border-red-200",
+    "취소": "bg-orange-50 text-orange-700 border-orange-200",
+  };
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold whitespace-nowrap",
+      colorMap[status] ?? "bg-slate-50 text-slate-700 border-slate-200",
+    )}>
+      {status}
+    </span>
+  );
+}
+
 type Props = {
   token: string;
   initialEmail?: string;
@@ -57,7 +74,6 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<ApiResp | null>(null);
 
-  // 인증 수단: URL토큰 > localStorage토큰 > 이메일 직접 조회
   const [activeToken, setActiveToken] = useState(urlToken);
   const [activeEmail, setActiveEmail] = useState(initialEmail);
 
@@ -71,7 +87,6 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
       setActiveToken(saved);
       return;
     }
-    // 이메일 파라미터가 있으면 바로 조회
     if (initialEmail) {
       setActiveEmail(initialEmail);
     }
@@ -79,7 +94,6 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
 
   const hasAuth = !!activeToken || !!activeEmail;
 
-  // 데이터 fetch
   useEffect(() => {
     if (!activeToken && !activeEmail) return;
 
@@ -95,7 +109,6 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
       .then((r) => r.json())
       .then((j: ApiResp) => {
         setResp(j);
-        // 토큰 인증 실패 시 localStorage 정리
         if (!j.ok && activeToken && !urlToken) {
           clearSavedToken();
           setActiveToken("");
@@ -117,11 +130,16 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
     return resp;
   }, [resp]);
 
+  /** 현재 + 지난 + 취소/반려 모두 통합 (날짜 내림차순 정렬) */
+  const allRows = useMemo(() => {
+    if (!view || !view.ok) return [];
+    return [...view.current, ...view.past, ...view.cancelled];
+  }, [view]);
+
   function handleSearch(e: React.FormEvent) {
     e.preventDefault();
     const v = email.trim();
     if (!v) return;
-    // 이전 상태 초기화 후 이메일로 조회
     setResp(null);
     setActiveToken("");
     setActiveEmail(v);
@@ -136,13 +154,13 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
   }
 
   const showResults = hasAuth && (loading || resp);
+  const isCancelled = (s: string) => s === "반려" || s === "취소";
 
   return (
     <div>
       <SiteHeader title="내 신청 조회" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto max-w-6xl px-4 py-8">
-        {/* 이메일 검색 폼 - 항상 표시 (토큰 인증이 아닌 경우) */}
         {!activeToken && (
           <div className="mb-8 max-w-2xl">
             <Card>
@@ -177,7 +195,6 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
           </div>
         )}
 
-        {/* 결과 영역 */}
         {showResults && (
           <div>
             {loading ? (
@@ -203,136 +220,71 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                 </div>
               </Notice>
             ) : view && view.ok ? (
-              <div className="space-y-8">
+              <div className="space-y-6">
                 <Notice title="조회 완료" variant="success">
-                  <b>{view.email}</b> 계정의 신청 내역입니다.
+                  <b>{view.email}</b> 계정의 신청 내역입니다. (총 {allRows.length}건)
                 </Notice>
 
-                <section>
-                  <h2 className="text-lg font-bold text-slate-900">현재 신청</h2>
-                  <div className="mt-4 grid gap-3">
-                    {view.current.length === 0 ? (
-                      <div className="text-sm text-slate-600">현재 신청 내역이 없습니다.</div>
-                    ) : (
-                      view.current.map((g) => (
-                        <Card key={g.key} className="p-0">
-                          <div className="p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-slate-900">{g.roomName}</div>
-                                <div className="mt-1 text-xs text-slate-600">{g.roomFloor ? `${g.roomFloor}층 · ` : ""}{g.dateTime}</div>
-                                <div className="mt-2 text-xs text-slate-700">
-                                  상태: <span className="font-semibold">{g.status}</span>
-                                  {g.feeIsEstimated ? <span className="ml-2 text-slate-500">(예상금액)</span> : null}
+                {allRows.length === 0 ? (
+                  <div className="text-sm text-slate-600">신청 내역이 없습니다.</div>
+                ) : (
+                  <div className="overflow-x-auto rounded-xl border border-slate-200">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-600">
+                          <th className="px-4 py-3">공간</th>
+                          <th className="px-4 py-3">일시</th>
+                          <th className="px-4 py-3 text-center">상태</th>
+                          <th className="px-4 py-3 text-right">금액</th>
+                          <th className="px-4 py-3 text-center">상세</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {allRows.map((g) => (
+                          <tr
+                            key={g.key}
+                            className={cn(
+                              "transition-colors hover:bg-slate-50",
+                              isCancelled(g.status) && "opacity-60",
+                            )}
+                          >
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-slate-900">{g.roomName}</div>
+                              {g.roomFloor && (
+                                <div className="mt-0.5 text-xs text-slate-500">{g.roomFloor}층</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-slate-700">
+                              <div>{g.dateTime}</div>
+                              {g.isBatch && (
+                                <div className="mt-0.5 text-xs text-slate-500">
+                                  {g.roomId === "gallery" ? `${g.sessions.length}일` : `${g.sessions.length}회차`}
                                 </div>
-                                <div className="mt-1 text-xs text-slate-700">
-                                  금액: <span className="font-semibold">{(g.payableFeeKRW ?? 0).toLocaleString()}원</span>
-                                </div>
-                              </div>
-
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <StatusBadge status={g.status} />
+                            </td>
+                            <td className="px-4 py-3 text-right whitespace-nowrap tabular-nums text-slate-900">
+                              {(g.payableFeeKRW ?? 0).toLocaleString()}원
+                              {g.feeIsEstimated && (
+                                <div className="text-xs text-slate-400">(예상)</div>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-center">
                               <button
                                 type="button"
                                 onClick={() => openResult(g.requestId)}
-                                className={cn(BUTTON_BASE, BUTTON_VARIANT.outline, "rounded-full px-4 py-2 text-sm")}
+                                className="inline-flex items-center rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-700 hover:bg-slate-50 transition"
                               >
-                                상세조회
+                                조회
                               </button>
-                            </div>
-
-                            {g.isBatch ? (
-                              <details className="mt-4">
-                                <summary className="cursor-pointer text-xs font-medium text-slate-700">{g.roomId === "gallery" ? "전시일 보기" : "회차 보기"}</summary>
-                                <div className="mt-2 space-y-1 text-xs text-slate-600">
-                                  {g.sessions.map((s) => (
-                                    <div key={s.requestId} className="flex justify-between gap-3 rounded-md border border-slate-200 px-3 py-2">
-                                      <div>
-                                        {s.seq
-                                          ? `${s.seq}${g.roomId === "gallery" ? "일" : "회차"} · `
-                                          : ""}
-                                        {g.roomId === "gallery"
-                                          ? `${s.date} (일 단위)`
-                                          : `${s.date} ${s.startTime}-${s.endTime}`}
-                                      </div>
-                                      <div className="font-medium text-slate-700">{s.status}</div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </details>
-                            ) : null}
-                          </div>
-                        </Card>
-                      ))
-                    )}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                </section>
-
-                <section>
-                  <h2 className="text-lg font-bold text-slate-900">지난 신청</h2>
-                  <div className="mt-4 grid gap-3">
-                    {view.past.length === 0 ? (
-                      <div className="text-sm text-slate-600">내역이 없습니다.</div>
-                    ) : (
-                      view.past.map((g) => (
-                        <Card key={g.key} className="p-0">
-                          <div className="p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-slate-900">{g.roomName}</div>
-                                <div className="mt-1 text-xs text-slate-600">{g.roomFloor ? `${g.roomFloor}층 · ` : ""}{g.dateTime}</div>
-                                <div className="mt-2 text-xs text-slate-700">
-                                  상태: <span className="font-semibold">{g.status}</span>
-                                </div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => openResult(g.requestId)}
-                                className={cn(BUTTON_BASE, BUTTON_VARIANT.outline, "rounded-full px-4 py-2 text-sm")}
-                              >
-                                상세조회
-                              </button>
-                            </div>
-                          </div>
-                        </Card>
-                      ))
-                    )}
-                  </div>
-                </section>
-
-                {view.cancelled.length > 0 && (
-                  <section>
-                    <h2 className="text-lg font-bold text-slate-900">취소 · 반려</h2>
-                    <div className="mt-4 grid gap-3">
-                      {view.cancelled.map((g) => (
-                        <Card key={g.key} className="p-0 opacity-70">
-                          <div className="p-4">
-                            <div className="flex flex-wrap items-start justify-between gap-3">
-                              <div>
-                                <div className="text-sm font-semibold text-slate-900">{g.roomName}</div>
-                                <div className="mt-1 text-xs text-slate-600">{g.roomFloor ? `${g.roomFloor}층 · ` : ""}{g.dateTime}</div>
-                                <div className="mt-2 text-xs">
-                                  <span className={cn(
-                                    "inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-semibold",
-                                    g.status === "반려" ? "border-red-300 text-red-700 bg-red-50" : "border-orange-300 text-orange-700 bg-orange-50"
-                                  )}>
-                                    {g.status}
-                                  </span>
-                                </div>
-                              </div>
-
-                              <button
-                                type="button"
-                                onClick={() => openResult(g.requestId)}
-                                className={cn(BUTTON_BASE, BUTTON_VARIANT.outline, "rounded-full px-4 py-2 text-sm")}
-                              >
-                                상세조회
-                              </button>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  </section>
                 )}
               </div>
             ) : null}
