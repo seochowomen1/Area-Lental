@@ -16,6 +16,45 @@ async function tokenFor(adminPassword: string) {
   return toHex(digest);
 }
 
+/* ── 페이지뷰 남용 방지용 Edge Rate Limiter ──────────────────────── */
+type RLEntry = { count: number; resetAt: number };
+const pageRLStore = new Map<string, RLEntry>();
+const PAGE_RL_MAX = 120;          // IP당 최대 요청 수
+const PAGE_RL_WINDOW = 60_000;    // 1분 윈도우
+
+function getIp(req: NextRequest): string {
+  return (
+    req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    req.headers.get("x-real-ip") ||
+    req.headers.get("cf-connecting-ip") ||
+    req.ip ||
+    "unknown"
+  );
+}
+
+function pageRateLimit(ip: string): { ok: boolean; retryAfter?: number } {
+  const now = Date.now();
+
+  // 주기적 정리 (1% 확률)
+  if (Math.random() < 0.01) {
+    for (const [k, v] of pageRLStore) {
+      if (v.resetAt <= now) pageRLStore.delete(k);
+    }
+  }
+
+  const entry = pageRLStore.get(ip);
+  if (!entry || entry.resetAt <= now) {
+    pageRLStore.set(ip, { count: 1, resetAt: now + PAGE_RL_WINDOW });
+    return { ok: true };
+  }
+  if (entry.count < PAGE_RL_MAX) {
+    entry.count += 1;
+    return { ok: true };
+  }
+  return { ok: false, retryAfter: Math.ceil((entry.resetAt - now) / 1000) };
+}
+/* ────────────────────────────────────────────────────────────────── */
+
 function withSecurityHeaders(res: NextResponse) {
   res.headers.set("X-Frame-Options", "DENY");
   res.headers.set("X-Content-Type-Options", "nosniff");
@@ -42,6 +81,18 @@ function withSecurityHeaders(res: NextResponse) {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // ── 페이지뷰 남용 방지: 모든 페이지/API 요청에 IP rate limit 적용 ──
+  const ip = getIp(req);
+  const rl = pageRateLimit(ip);
+  if (!rl.ok) {
+    return withSecurityHeaders(
+      new NextResponse("요청이 너무 많습니다. 잠시 후 다시 시도해 주세요.", {
+        status: 429,
+        headers: { "Retry-After": String(rl.retryAfter ?? 60) },
+      })
+    );
+  }
 
   // 보안 헤더는 모든 라우트에 적용
   if (!pathname.startsWith("/admin") && !pathname.startsWith("/api/admin")) {
@@ -82,5 +133,11 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/api/admin/:path*"],
+  matcher: [
+    /*
+     * 정적 에셋(_next, favicon 등)을 제외한 모든 페이지/API에 적용
+     * → 보안 헤더 + 페이지뷰 rate limit
+     */
+    "/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 };

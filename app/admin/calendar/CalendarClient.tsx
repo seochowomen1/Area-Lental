@@ -229,14 +229,7 @@ export default function CalendarClient({
 
     // status
     const rawStatus = String(sp.get("status") ?? "").trim();
-    const allowedStatus = new Set([
-      "active",
-      "승인",
-      "접수",
-      "반려",
-      "취소",
-      "all",
-    ]);
+    const allowedStatus = new Set(["active", "승인", "접수"]);
     const safeStatus = allowedStatus.has(rawStatus) ? rawStatus : "active";
 
     // flags
@@ -501,11 +494,8 @@ export default function CalendarClient({
               className="mt-1 w-full rounded-xl border px-3 py-2"
             >
               <option value="active">예약 진행(접수/승인)</option>
-              <option value="승인">승인</option>
-              <option value="접수">접수</option>
-              <option value="반려">반려</option>
-              <option value="취소">취소</option>
-              <option value="all">전체</option>
+              <option value="승인">승인만</option>
+              <option value="접수">접수만</option>
             </select>
           </div>
 
@@ -633,14 +623,12 @@ export default function CalendarClient({
 
                 <div className="mt-1 space-y-0.5">
                   {preview.map((it) => {
-                    // 색상: request(승인/접수/반려·취소), schedule, block
+                    // 색상: request(승인/접수), schedule, block
                     const colorCls =
                       it.kind === "request"
                         ? it.status === "승인"
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                          : it.status === "접수"
-                            ? "border-amber-200 bg-amber-50 text-amber-900"
-                            : "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-amber-200 bg-amber-50 text-amber-900"
                         : it.kind === "schedule"
                           ? "border-indigo-200 bg-indigo-50 text-indigo-800"
                           : "border-gray-200 bg-gray-50 text-gray-700";
@@ -698,9 +686,6 @@ export default function CalendarClient({
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm bg-amber-100 border border-amber-300" /> 접수
-          </span>
-          <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-rose-100 border border-rose-300" /> 반려/취소
           </span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm bg-indigo-100 border border-indigo-300" /> 정규수업
