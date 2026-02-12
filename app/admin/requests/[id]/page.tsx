@@ -33,6 +33,18 @@ function categoryAccent(cat: RoomCategory) {
   return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
 }
 
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
 function sortSessions(list: RentalRequest[]) {
   return list
     .slice()
@@ -303,9 +315,12 @@ export default async function AdminRequestDetail({
                 </InfoRow>
                 <InfoRow label="철거일">
                   {req.endDate ?? req.date}
-                  {req.galleryRemovalTime
-                    ? <span className="ml-1 font-medium text-orange-700">{req.galleryRemovalTime}까지 철수</span>
-                    : <span className="ml-1 text-gray-400">철수 시간 미지정</span>}
+                  {(() => {
+                    const removalTime = resolveGalleryRemovalTime(req);
+                    return removalTime
+                      ? <span className="ml-1 font-medium text-orange-700">{removalTime}까지 철수</span>
+                      : <span className="ml-1 text-gray-400">철수 시간 미지정</span>;
+                  })()}
                 </InfoRow>
               </>
             ) : (

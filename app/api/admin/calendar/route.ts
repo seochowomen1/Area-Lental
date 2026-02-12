@@ -6,6 +6,18 @@ import { galleryOperatingWindow } from "@/lib/gallery";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
 
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -199,7 +211,7 @@ export async function GET(req: Request) {
             phone: r.phone,
             headcount: r.headcount,
             isPrepDay: true,
-            galleryRemovalTime: r.galleryRemovalTime,
+            galleryRemovalTime: resolveGalleryRemovalTime(r),
             galleryEndDate: r.endDate,
           });
         }
@@ -228,7 +240,7 @@ export async function GET(req: Request) {
           phone: r.phone,
           headcount: r.headcount,
           isPrepDay: false,
-          galleryRemovalTime: r.galleryRemovalTime,
+          galleryRemovalTime: resolveGalleryRemovalTime(r),
           galleryEndDate: r.endDate,
         });
       }
@@ -259,7 +271,7 @@ export async function GET(req: Request) {
       batchSeq: r.batchSeq,
       batchSize: r.batchSize,
       isPrepDay: r.isPrepDay,
-      galleryRemovalTime: r.galleryRemovalTime,
+      galleryRemovalTime: resolveGalleryRemovalTime(r),
       galleryEndDate: r.endDate,
     });
   }
