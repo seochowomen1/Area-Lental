@@ -298,6 +298,12 @@ export default async function AdminRequestDetail({
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)
                   {galleryPrepDate ? <span className="ml-1 text-gray-500">/ 준비일 {galleryPrepDate}</span> : null}
                 </InfoRow>
+                <InfoRow label="철거일">
+                  {req.endDate ?? req.date}
+                  {req.galleryRemovalTime
+                    ? <span className="ml-1 font-medium text-orange-700">{req.galleryRemovalTime}까지 철수</span>
+                    : <span className="ml-1 text-gray-400">철수 시간 미지정</span>}
+                </InfoRow>
               </>
             ) : (
               <>

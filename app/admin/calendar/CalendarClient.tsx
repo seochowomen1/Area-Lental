@@ -640,8 +640,10 @@ export default function CalendarClient({
                         // 갤러리: 전시상태 / 접수자
                         if (it.isPrepDay) {
                           label = `전시준비 / ${it.applicantName ?? ""}`;
-                        } else if (it.galleryEndDate && it.date === it.galleryEndDate && it.galleryRemovalTime) {
-                          label = `철거일(${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`;
+                        } else if (it.galleryEndDate && it.date === it.galleryEndDate) {
+                          label = it.galleryRemovalTime
+                            ? `철거일(~${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`
+                            : `철거일 / ${it.applicantName ?? ""}`;
                         } else {
                           label = `전시일 / ${it.applicantName ?? ""}`;
                         }
@@ -728,8 +730,10 @@ export default function CalendarClient({
                 if (it.roomId === "gallery") {
                   if (it.isPrepDay) {
                     detailMain = `전시준비 / ${it.applicantName ?? ""}`;
-                  } else if (it.galleryEndDate && it.date === it.galleryEndDate && it.galleryRemovalTime) {
-                    detailMain = `철거일(${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`;
+                  } else if (it.galleryEndDate && it.date === it.galleryEndDate) {
+                    detailMain = it.galleryRemovalTime
+                      ? `철거일(~${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`
+                      : `철거일 / ${it.applicantName ?? ""}`;
                   } else {
                     detailMain = `전시일 / ${it.applicantName ?? ""}`;
                   }
