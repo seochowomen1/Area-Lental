@@ -192,9 +192,6 @@ export default async function AdminRequestFormPage({
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
-              <p className="text-[10px] text-gray-500 print:text-[8px]">
-                [별첨1]
-              </p>
               <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
                 서초여성가족플라자 서초센터
               </h1>
@@ -540,8 +537,6 @@ export default async function AdminRequestFormPage({
 
             {/* ── 푸터 ── */}
             <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
-              <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
-              <p>*대관규정 서약서 별도 첨부</p>
               {req.requestId && (
                 <p className="mt-0.5 text-gray-400">
                   신청번호: {req.requestId} | 출력일: {printDate}
@@ -820,8 +815,6 @@ export default async function AdminRequestFormPage({
 
             {/* ── 푸터 ── */}
             <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
-              <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
-              <p>*대관규정 서약서 별도 첨부</p>
               {req.requestId && (
                 <p className="mt-0.5 text-gray-400">
                   신청번호: {req.requestId} | 출력일: {printDate}
@@ -838,9 +831,6 @@ export default async function AdminRequestFormPage({
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
-              <p className="text-[10px] text-gray-500 print:text-[8px]">
-                [별첨1]
-              </p>
               <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
                 서초여성가족플라자 서초센터
               </h1>
@@ -1141,8 +1131,6 @@ export default async function AdminRequestFormPage({
 
             {/* ── 푸터 ── */}
             <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
-              <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
-              <p>*대관규정 서약서 별도 첨부</p>
               {req.requestId && (
                 <p className="mt-0.5 text-gray-400">
                   신청번호: {req.requestId} | 출력일: {printDate}
@@ -1290,7 +1278,6 @@ export default async function AdminRequestFormPage({
           </div>
 
           <div className="mt-2 text-[10px] text-gray-500 print:text-[8px]">
-            <p>*문의 : 서초여성가족플라자 서초센터 02-522-5291</p>
             {req.requestId && (
               <p className="mt-0.5 text-gray-400">
                 신청번호: {req.requestId} | 출력일: {printDate}
