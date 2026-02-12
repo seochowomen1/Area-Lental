@@ -271,6 +271,12 @@ export default function ApplyGalleryClient() {
     setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
   }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, setValue]);
 
+  // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
+  useEffect(() => {
+    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes });
+    setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
+  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, setValue]);
+
   const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate), [startDate, endDate]);
 
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
