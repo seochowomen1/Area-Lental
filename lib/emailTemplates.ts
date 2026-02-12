@@ -189,6 +189,11 @@ export async function getTemplate(_category: TemplateCategory | string, status: 
   return all[status] ?? defaultTemplateFor(status);
 }
 
+/** 변수 값 내의 {{...}} 패턴을 무력화하여 재귀 치환 방지 */
+function sanitizeValue(value: string): string {
+  return value.replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }");
+}
+
 /** 변수를 실제 값으로 치환합니다 */
 export function renderTemplate(
   template: EmailTemplate,
@@ -197,8 +202,10 @@ export function renderTemplate(
   function replace(text: string) {
     let result = text;
     for (const [key, value] of Object.entries(vars)) {
-      result = result.replaceAll(`{{${key}}}`, value);
+      result = result.replaceAll(`{{${key}}}`, sanitizeValue(value));
     }
+    // 미치환 변수 제거 (사용되지 않는 플레이스홀더 정리)
+    result = result.replace(/\{\{[^}]+\}\}/g, "");
     return result;
   }
   return {

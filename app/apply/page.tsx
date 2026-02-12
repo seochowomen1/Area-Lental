@@ -7,9 +7,14 @@
 //
 // The actual UI/logic lives in ApplyClient (Client Component).
 
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import ApplyClient from "./ApplyClient";
 import ApplyGalleryClient from "./ApplyGalleryClient";
+
+export const metadata: Metadata = {
+  title: "대관 신청서 작성",
+};
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,7 +29,7 @@ export default function ApplyPage({
   const isGallery = roomId === "gallery" || category === "gallery";
 
   return (
-    <Suspense>
+    <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-gray-400">로딩 중...</div>}>
       {isGallery ? <ApplyGalleryClient /> : <ApplyClient />}
     </Suspense>
   );

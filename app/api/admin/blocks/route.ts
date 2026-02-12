@@ -144,11 +144,13 @@ export async function POST(req: Request) {
       return jsonError("이미 등록된 차단 시간과 겹칩니다.", 409, "CONFLICT");
     }
 
-    // 2) 정규수업과 겹침 방지(적용 기간 포함)
+    // 2) 정규수업과 겹침 방지(적용 기간 포함, 미설정 시 무제한)
     const dow = dayOfWeek(date);
     const scheduleConflict = (existingSchedules as ClassSchedule[]).some((s) => {
       if (s.dayOfWeek !== dow) return false;
-      const effectiveOverlap = s.effectiveFrom <= date && s.effectiveTo >= date;
+      const sFrom = s.effectiveFrom || "0000-00-00";
+      const sTo = s.effectiveTo || "9999-12-31";
+      const effectiveOverlap = sFrom <= date && sTo >= date;
       if (!effectiveOverlap) return false;
       const roomOverlap = s.roomId === "all" || roomId === "all" || s.roomId === roomId;
       if (!roomOverlap) return false;

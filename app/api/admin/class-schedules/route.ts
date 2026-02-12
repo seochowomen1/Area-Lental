@@ -83,8 +83,10 @@ export async function POST(req: Request) {
     // 중복/겹침 방지
     const hasConflict = existing.some((s) => {
       if (s.dayOfWeek !== dayOfWeek) return false;
-      // 적용 기간이 겹치는 경우만 체크
-      const effectiveOverlap = s.effectiveFrom <= effectiveTo && s.effectiveTo >= effectiveFrom;
+      // 적용 기간이 겹치는 경우만 체크 (미설정 시 무제한으로 간주)
+      const sFrom = s.effectiveFrom || "0000-00-00";
+      const sTo = s.effectiveTo || "9999-12-31";
+      const effectiveOverlap = sFrom <= effectiveTo && sTo >= effectiveFrom;
       if (!effectiveOverlap) return false;
       // 'all'은 모든 공간에 적용
       const roomOverlap = s.roomId === "all" || roomId === "all" || s.roomId === roomId;

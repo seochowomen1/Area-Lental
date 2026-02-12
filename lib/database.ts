@@ -9,6 +9,29 @@ import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus } from ".
 import { isMockMode } from "./env";
 
 /**
+ * 간단한 인메모리 TTL 캐시
+ * Serverless 환경에서 동일 인스턴스 내 반복 호출을 줄여줍니다.
+ */
+class TtlCache<T> {
+  private data: T | null = null;
+  private expiresAt = 0;
+  constructor(private ttlMs: number) {}
+
+  get(): T | null {
+    if (this.data !== null && Date.now() < this.expiresAt) return this.data;
+    return null;
+  }
+  set(value: T) {
+    this.data = value;
+    this.expiresAt = Date.now() + this.ttlMs;
+  }
+  invalidate() {
+    this.data = null;
+    this.expiresAt = 0;
+  }
+}
+
+/**
  * 데이터베이스 인터페이스
  */
 export interface Database {
@@ -134,10 +157,17 @@ class MockDatabase implements Database {
  */
 class SheetsDatabase implements Database {
   private sheets = import("./sheets");
+  private requestsCache = new TtlCache<RentalRequest[]>(10_000); // 10초 TTL
+  private schedulesCache = new TtlCache<ClassSchedule[]>(30_000); // 30초 TTL
+  private blocksCache = new TtlCache<BlockedSlot[]>(30_000); // 30초 TTL
 
   async getAllRequests() {
+    const cached = this.requestsCache.get();
+    if (cached) return cached;
     const { getAllRequests } = await this.sheets;
-    return getAllRequests();
+    const result = await getAllRequests();
+    this.requestsCache.set(result);
+    return result;
   }
 
   async getRequestById(id: string) {
@@ -151,51 +181,67 @@ class SheetsDatabase implements Database {
   }
 
   async appendRequest(input: Parameters<Database["appendRequest"]>[0]) {
+    this.requestsCache.invalidate();
     const { appendRequest } = await this.sheets;
     return appendRequest(input);
   }
 
   async appendRequestsBatch(inputs: Array<Parameters<Database["appendRequest"]>[0]>) {
+    this.requestsCache.invalidate();
     const { appendRequestsBatch } = await this.sheets;
     return appendRequestsBatch(inputs);
   }
 
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
+    this.requestsCache.invalidate();
     const { updateRequestStatus } = await this.sheets;
     return updateRequestStatus(args);
   }
 
   async deleteRequests(requestIds: string[]) {
+    this.requestsCache.invalidate();
     const { deleteRequests } = await this.sheets;
     return deleteRequests(requestIds);
   }
 
   async getClassSchedules() {
+    const cached = this.schedulesCache.get();
+    if (cached) return cached;
     const { getClassSchedules } = await this.sheets;
-    return getClassSchedules();
+    const result = await getClassSchedules();
+    this.schedulesCache.set(result);
+    return result;
   }
 
   async addClassSchedule(schedule: Omit<ClassSchedule, "id">) {
+    this.schedulesCache.invalidate();
     const { addClassSchedule } = await this.sheets;
     return addClassSchedule(schedule);
   }
 
   async deleteClassSchedule(id: string) {
+    this.schedulesCache.invalidate();
     const { deleteClassSchedule } = await this.sheets;
     return deleteClassSchedule(id);
   }
 
   async getBlocks() {
+    const cached = this.blocksCache.get();
+    if (cached) return cached;
     const { getBlocks } = await this.sheets;
-    return getBlocks();
+    const result = await getBlocks();
+    this.blocksCache.set(result);
+    return result;
   }
 
   async addBlock(block: Omit<BlockedSlot, "id">) {
+    this.blocksCache.invalidate();
     const { addBlock } = await this.sheets;
     return addBlock(block);
   }
 
   async deleteBlock(id: string) {
+    this.blocksCache.invalidate();
     const { deleteBlock } = await this.sheets;
     return deleteBlock(id);
   }
