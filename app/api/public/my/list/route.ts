@@ -132,6 +132,7 @@ export async function GET(req: Request) {
         roomName: rep.roomName,
         roomFloor: meta?.floor ?? "",
         dateTime: firstDateTime,
+        createdAt: rep.createdAt ?? "",
         status: displayStatus,
         payableFeeKRW: fee.finalFeeKRW,
         feeIsEstimated: !feeAvailable,
@@ -147,7 +148,7 @@ export async function GET(req: Request) {
         })),
       };
     })
-    .sort((a, b) => a.dateTime.localeCompare(b.dateTime));
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 
   const current = groups.filter((g) => !g.past && !["취소", "반려"].includes(g.status));
   const past = groups.filter((g) => g.past && !["취소", "반려"].includes(g.status));

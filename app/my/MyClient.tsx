@@ -17,6 +17,7 @@ type MyListGroup = {
   roomName: string;
   roomFloor: string;
   dateTime: string;
+  createdAt: string;
   status: string;
   payableFeeKRW: number;
   feeIsEstimated: boolean;
@@ -31,6 +32,23 @@ type MyListGroup = {
     status: string;
   }>;
 };
+
+/** ISO 날짜 → "YYYY.MM.DD HH:MM" (KST) */
+function fmtCreatedAt(iso: string): string {
+  if (!iso) return "-";
+  try {
+    const dt = new Date(iso);
+    const kst = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+    const y = kst.getUTCFullYear();
+    const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(kst.getUTCDate()).padStart(2, "0");
+    const h = String(kst.getUTCHours()).padStart(2, "0");
+    const min = String(kst.getUTCMinutes()).padStart(2, "0");
+    return `${y}.${m}.${d} ${h}:${min}`;
+  } catch {
+    return iso;
+  }
+}
 
 type ApiResp =
   | { ok: false; message: string }
@@ -233,7 +251,8 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-600">
                           <th className="px-4 py-3">공간</th>
-                          <th className="px-4 py-3">일시</th>
+                          <th className="px-4 py-3">대관 일시</th>
+                          <th className="px-4 py-3">신청 일시</th>
                           <th className="px-4 py-3 text-center">상태</th>
                           <th className="px-4 py-3 text-right">금액</th>
                           <th className="px-4 py-3 text-center">상세</th>
@@ -261,6 +280,9 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                                   {g.roomId === "gallery" ? `${g.sessions.length}일` : `${g.sessions.length}회차`}
                                 </div>
                               )}
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-slate-500 text-xs">
+                              {fmtCreatedAt(g.createdAt)}
                             </td>
                             <td className="px-4 py-3 text-center">
                               <StatusBadge status={g.status} />
