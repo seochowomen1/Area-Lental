@@ -22,7 +22,7 @@ export default function SpaceListPage({
     ? FLOORS.filter((f) => f.id === "5")
     : isGallery
       ? FLOORS.filter((f) => f.id === "4")
-      : FLOORS;
+      : [{ id: "all" as const, label: "전체" }, ...FLOORS];
 
   return (
     <div>

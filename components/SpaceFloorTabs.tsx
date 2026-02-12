@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import type { Floor, SpaceRoom } from "@/lib/space";
+import type { SpaceRoom } from "@/lib/space";
 import { cn } from "@/lib/cn";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
@@ -69,16 +69,21 @@ function RoomCard({ room }: { room: SpaceRoom }) {
   );
 }
 
+type FloorTab = { id: string; label: string };
+
 export default function SpaceFloorTabs({
   floors,
   rooms,
 }: {
-  floors: Floor[];
+  floors: FloorTab[];
   rooms: SpaceRoom[];
 }) {
   const [selected, setSelected] = useState(floors[0]?.id ?? "4");
 
-  const filtered = useMemo(() => rooms.filter((r) => r.floor === selected), [rooms, selected]);
+  const filtered = useMemo(
+    () => selected === "all" ? rooms : rooms.filter((r) => r.floor === selected),
+    [rooms, selected],
+  );
 
   return (
     <div>
