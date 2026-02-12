@@ -1,18 +1,18 @@
 /**
  * 이메일 템플릿 관리
  *
- * 카테고리별(강의실/E-스튜디오/갤러리) + 상태별(승인/반려/취소) 이메일 본문 템플릿을
+ * 카테고리별(강의실/E-스튜디오/갤러리) + 상태별(접수/승인/반려/취소) 이메일 본문 템플릿을
  * Google Sheets(email_templates 시트)에 저장·로드합니다.
  *
  * 변수 치환:
  *   {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}},
- *   {{요금정보}}, {{반려사유}}, {{조회링크}}
+ *   {{요금정보}}, {{반려사유}}, {{조회링크}}, {{장비정보}}
  */
 
 import { getDatabase } from "./database";
 
 export type TemplateCategory = "lecture" | "studio" | "gallery";
-export type TemplateStatus = "승인" | "반려" | "취소";
+export type TemplateStatus = "접수" | "승인" | "반려" | "취소";
 
 export type EmailTemplate = {
   subject: string;
@@ -22,10 +22,23 @@ export type EmailTemplate = {
 export type AllTemplates = Record<TemplateCategory, Partial<Record<TemplateStatus, EmailTemplate>>>;
 
 const DEFAULT_SUBJECT: Record<TemplateStatus, string> = {
+  "접수": "[신청완료] {{카테고리}} 대관 신청 ({{신청번호}})",
   "승인": "[승인] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
   "반려": "[반려] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
   "취소": "[취소] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
 };
+
+const DEFAULT_BODY_RECEIVED = `안녕하세요. 서초여성가족플라자 서초센터입니다.
+
+{{카테고리}} 대관 신청이 정상적으로 완료되었습니다.
+담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
+
+- 신청번호: {{신청번호}}
+- 공간({{카테고리}}): {{공간}}
+- 일시: {{일시}}
+{{장비정보}}
+
+감사합니다.`;
 
 const DEFAULT_BODY_APPROVED = `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
@@ -74,7 +87,9 @@ function defaultTemplateFor(status: TemplateStatus): EmailTemplate {
   return {
     subject: DEFAULT_SUBJECT[status],
     body:
-      status === "승인"
+      status === "접수"
+        ? DEFAULT_BODY_RECEIVED
+        : status === "승인"
         ? DEFAULT_BODY_APPROVED
         : status === "반려"
         ? DEFAULT_BODY_REJECTED
@@ -82,23 +97,14 @@ function defaultTemplateFor(status: TemplateStatus): EmailTemplate {
   };
 }
 
+const ALL_STATUSES: TemplateStatus[] = ["접수", "승인", "반려", "취소"];
+
 export function getDefaultTemplates(): AllTemplates {
+  const makeCategory = () => Object.fromEntries(ALL_STATUSES.map((s) => [s, defaultTemplateFor(s)])) as Record<TemplateStatus, EmailTemplate>;
   return {
-    lecture: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
-    studio: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
-    gallery: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
+    lecture: makeCategory(),
+    studio: makeCategory(),
+    gallery: makeCategory(),
   };
 }
 
@@ -117,7 +123,7 @@ export async function loadTemplates(): Promise<AllTemplates> {
       const cat = row.category as TemplateCategory;
       const st = row.status as TemplateStatus;
       if (!defaults[cat]) continue;
-      if (!["승인", "반려", "취소"].includes(st)) continue;
+      if (!ALL_STATUSES.includes(st)) continue;
 
       defaults[cat][st] = {
         subject: row.subject || defaults[cat][st]!.subject,

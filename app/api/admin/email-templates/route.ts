@@ -39,7 +39,7 @@ export async function PUT(req: Request) {
     if (!["lecture", "studio", "gallery"].includes(category)) {
       return NextResponse.json({ ok: false, message: "잘못된 카테고리입니다." }, { status: 400 });
     }
-    if (!["승인", "반려", "취소"].includes(status)) {
+    if (!["접수", "승인", "반려", "취소"].includes(status)) {
       return NextResponse.json({ ok: false, message: "잘못된 상태입니다." }, { status: 400 });
     }
     if (!subject || !templateBody) {

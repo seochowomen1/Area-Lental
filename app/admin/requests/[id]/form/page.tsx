@@ -42,6 +42,18 @@ function sortSessions(list: RentalRequest[]) {
     );
 }
 
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
 /* ── Shared table cell styles (compact for A4) ── */
 const TH =
   "border border-gray-400 bg-gray-50 px-2 py-1 text-left text-[11px] font-bold text-gray-900 whitespace-nowrap print:px-1.5 print:py-0.5 print:text-[9px]";
@@ -903,9 +915,12 @@ export default async function AdminRequestFormPage({
                 <tr>
                   <th className={TH}>철수시간</th>
                   <td className={TD} colSpan={3}>
-                    {req.galleryRemovalTime
-                      ? `종료일(${req.endDate ?? req.date}) ${req.galleryRemovalTime}까지`
-                      : "-"}
+                    {(() => {
+                      const rt = resolveGalleryRemovalTime(req);
+                      return rt
+                        ? `종료일(${req.endDate ?? req.date}) ${rt}까지`
+                        : "-";
+                    })()}
                   </td>
                 </tr>
                 <tr>
@@ -1247,14 +1262,6 @@ export default async function AdminRequestFormPage({
                     {room?.name ?? req.roomId} ({categoryLabel})
                   </td>
                 </tr>
-                {isGallery && req.galleryRemovalTime && (
-                  <tr>
-                    <th className={TH}>철수시간</th>
-                    <td className={TD} colSpan={3}>
-                      종료일({req.endDate ?? req.date}) {req.galleryRemovalTime}까지
-                    </td>
-                  </tr>
-                )}
                 <tr>
                   <th className={TH}>서약 동의</th>
                   <td className={TD} colSpan={3}>

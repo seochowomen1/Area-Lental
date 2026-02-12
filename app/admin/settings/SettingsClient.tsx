@@ -381,11 +381,11 @@ export default function SettingsClient(props: {
 /* ── 이메일 템플릿 편집 섹션 ── */
 
 type EmailTemplate = { subject: string; body: string };
-type TemplateStatus = "승인" | "반려" | "취소";
+type TemplateStatus = "접수" | "승인" | "반려" | "취소";
 
-const STATUS_OPTIONS: TemplateStatus[] = ["승인", "반려", "취소"];
+const STATUS_OPTIONS: TemplateStatus[] = ["접수", "승인", "반려", "취소"];
 
-const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}";
+const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}, {{장비정보}}";
 
 function EmailTemplateSection({
   category,
@@ -465,7 +465,7 @@ function EmailTemplateSection({
           <div>
             <h2 className="text-base font-bold text-slate-900">메일 템플릿</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              승인/반려/취소 시 표시되는 메일 기본 내용을 수정합니다
+              접수/승인/반려/취소 시 발송되는 메일 기본 내용을 수정합니다
             </p>
           </div>
           <button

@@ -201,6 +201,7 @@ export async function mock_appendRequestsBatch(
       galleryExhibitionDayCount: input.galleryExhibitionDayCount,
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
+      galleryRemovalTime: input.galleryRemovalTime,
 
       applicantName: input.applicantName,
       birth: input.birth,

@@ -189,21 +189,24 @@ ${sessions}
 
 export async function sendApplicantReceivedEmail(req: RentalRequest) {
   const cat = spaceCategoryLabel(req);
-  const subject = `[신청완료] ${cat} 대관 신청 (${req.requestId})`;
-  const eqText = !isGallery(req) ? `\n- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}` : "";
-  const text =
-`안녕하세요. 서초여성가족플라자 서초센터입니다.
+  const catId = getRoomCategory(req) as TemplateCategory;
+  const eqLine = !isGallery(req) ? `- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}` : "";
 
-${cat} 대관 신청이 정상적으로 완료되었습니다.
-담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
-
-- 신청번호: ${req.requestId}
-- 공간(${cat}): ${req.roomName}
-- ${isGallery(req) ? "전시기간" : "일시"}: ${formatWhenSingle(req)}${eqText}
-
-감사합니다.
-`;
-  await maybeSend({ to: req.email, subject, text });
+  const template = await getTemplate(catId, "접수");
+  const vars: Record<string, string> = {
+    "신청번호": req.requestId,
+    "공간": req.roomName,
+    "카테고리": cat,
+    "일시": formatWhenSingle(req),
+    "신청자": req.applicantName,
+    "상태": "접수",
+    "장비정보": eqLine,
+    "요금정보": "",
+    "반려사유": "",
+    "조회링크": "",
+  };
+  const rendered = renderTemplate(template, vars);
+  await maybeSend({ to: req.email, subject: rendered.subject, text: rendered.body });
 }
 
 export async function sendApplicantReceivedEmailBatch(reqs: RentalRequest[]) {
@@ -211,25 +214,26 @@ export async function sendApplicantReceivedEmailBatch(reqs: RentalRequest[]) {
   if (list.length === 0) return;
   const first = list[0];
   const cat = spaceCategoryLabel(first);
-  const subject = `[신청완료] ${cat} 대관 신청 (${first.requestId})`;
+  const catId = getRoomCategory(first) as TemplateCategory;
   const sessions = list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n");
-  const eqText = !isGallery(first) ? `\n- ${getRoomCategory(first) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(first)}` : "";
-  const text =
-`안녕하세요. 서초여성가족플라자 서초센터입니다.
+  const eqLine = !isGallery(first) ? `- ${getRoomCategory(first) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(first)}` : "";
+  const sessionsBlock = `[${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]\n${sessions}`;
 
-${cat} 대관 신청이 정상적으로 완료되었습니다.
-담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
-
-- 대표 신청번호: ${first.requestId}
-- 공간(${cat}): ${first.roomName}
-- ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}${eqText}
-
-[${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]
-${sessions}
-
-감사합니다.
-`;
-  await maybeSend({ to: first.email, subject, text });
+  const template = await getTemplate(catId, "접수");
+  const vars: Record<string, string> = {
+    "신청번호": first.requestId,
+    "공간": first.roomName,
+    "카테고리": cat,
+    "일시": `${list.length}${isGallery(first) ? "일" : "회"}\n\n${sessionsBlock}`,
+    "신청자": first.applicantName,
+    "상태": "접수",
+    "장비정보": eqLine,
+    "요금정보": "",
+    "반려사유": "",
+    "조회링크": "",
+  };
+  const rendered = renderTemplate(template, vars);
+  await maybeSend({ to: first.email, subject: rendered.subject, text: rendered.body });
 }
 
 /** 단일 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
@@ -252,7 +256,8 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
 - 최종금액: ${formatKRW(fee.finalFeeKRW)}`;
 
   // 커스텀 템플릿 사용
-  if (["승인", "반려", "취소"].includes(status)) {
+  if (["접수", "승인", "반려", "취소"].includes(status)) {
+    const eqLine = !isGallery(req) ? `- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}` : "";
     const template = await getTemplate(catId, status);
     const vars: Record<string, string> = {
       "신청번호": req.requestId,
@@ -264,6 +269,7 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
       "요금정보": req.status === "승인" ? feeBlock : "",
       "반려사유": req.rejectReason || "(사유 미입력)",
       "조회링크": resultUrl,
+      "장비정보": eqLine,
     };
     const rendered = renderTemplate(template, vars);
     return { to: req.email, subject: rendered.subject, body: rendered.body };
