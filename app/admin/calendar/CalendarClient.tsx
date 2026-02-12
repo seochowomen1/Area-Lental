@@ -29,11 +29,16 @@ type CalendarItem = {
   status?: RequestStatus;
   applicantName?: string;
   phone?: string;
+  headcount?: number;
   batchId?: string;
   batchSeq?: number;
   batchSize?: number;
   /** 우리동네 갤러리: 준비(세팅)일 여부 */
   isPrepDay?: boolean;
+  /** 갤러리 철거 시간 */
+  galleryRemovalTime?: string;
+  /** 갤러리 전시 마지막 날짜 */
+  galleryEndDate?: string;
   reason?: string;
 };
 
@@ -626,47 +631,59 @@ export default function CalendarClient({
                   ) : null}
                 </div>
 
-                <div className="mt-2 space-y-1">
-                  {preview.map((it) => (
-                    <div
-                      key={it.id}
-                      className={cn(
-                        "truncate rounded-lg border px-2 py-1 text-[11px]",
-                        it.kind === "request"
-                          ? it.status === "승인"
-                            ? "border-emerald-200 bg-emerald-50 text-emerald-800"
-                            : "border-amber-200 bg-amber-50 text-amber-900"
-                          : it.kind === "schedule"
-                            ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                            : "border-gray-200 bg-gray-50 text-gray-700"
-                      )}
-                      title={
-                        it.kind === "request"
-                          ? it.roomId === "gallery"
-                            ? `하루 전체 ${it.roomName} (${it.isPrepDay ? "준비일" : "전시일"}) (${it.status}) ${it.applicantName ?? ""}`
-                            : `${it.startTime}-${it.endTime} ${it.roomName} (${it.status}) ${it.applicantName ?? ""}`
-                          : it.kind === "block" && it.roomId === "gallery"
-                            ? `하루 전체 ${it.roomName} ${it.title}`
-                            : `${it.startTime}-${it.endTime} ${it.roomName} ${it.title}`
+                <div className="mt-1 space-y-0.5">
+                  {preview.map((it) => {
+                    // 색상: request(승인/접수/반려·취소), schedule, block
+                    const colorCls =
+                      it.kind === "request"
+                        ? it.status === "승인"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+                          : it.status === "접수"
+                            ? "border-amber-200 bg-amber-50 text-amber-900"
+                            : "border-rose-200 bg-rose-50 text-rose-700"
+                        : it.kind === "schedule"
+                          ? "border-indigo-200 bg-indigo-50 text-indigo-800"
+                          : "border-gray-200 bg-gray-50 text-gray-700";
+
+                    // 표시 텍스트 생성
+                    let label = "";
+                    if (it.kind === "request") {
+                      if (it.roomId === "gallery") {
+                        // 갤러리: 전시상태 / 접수자
+                        if (it.isPrepDay) {
+                          label = `전시준비 / ${it.applicantName ?? ""}`;
+                        } else if (it.galleryEndDate && it.date === it.galleryEndDate && it.galleryRemovalTime) {
+                          label = `철거일(${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`;
+                        } else {
+                          label = `전시일 / ${it.applicantName ?? ""}`;
+                        }
+                      } else {
+                        // 강의실/E-스튜디오: 시작시간 접수자 인원
+                        label = `${it.startTime} ${it.applicantName ?? ""} ${it.headcount ? it.headcount + "명" : ""}`;
                       }
-                    >
-                      <span className="font-semibold">
-                        {it.roomId === "gallery" && (it.kind === "block" || it.kind === "request") ? "하루 전체" : it.startTime}
-                      </span>{" "}
-                      {it.roomName}
-                      {it.kind === "request" ? (
-                        it.roomId === "gallery" ? (
-                          <span className="ml-1">· {it.isPrepDay ? "준비일" : "전시일"} · {it.status}</span>
-                        ) : (
-                          <span className="ml-1">· {it.status}</span>
-                        )
-                      ) : (
-                        <span className="ml-1">· {it.title}</span>
-                      )}
-                    </div>
-                  ))}
+                    } else if (it.kind === "schedule") {
+                      label = `${it.startTime} ${it.title}`;
+                    } else {
+                      // block
+                      if (it.roomId === "gallery") {
+                        label = `내부대관`;
+                      } else {
+                        label = `${it.startTime} ${it.title}`;
+                      }
+                    }
+
+                    return (
+                      <div
+                        key={it.id}
+                        className={cn("truncate rounded px-1.5 py-0.5 text-[10px] leading-tight", colorCls)}
+                        title={label}
+                      >
+                        {label}
+                      </div>
+                    );
+                  })}
                   {more > 0 ? (
-                    <div className="text-[11px] text-gray-500">+{more}건 더보기</div>
+                    <div className="text-[10px] text-gray-500">+{more}건</div>
                   ) : null}
                 </div>
               </button>
@@ -674,18 +691,22 @@ export default function CalendarClient({
           })}
         </div>
 
-        <div className="mt-4 flex flex-wrap gap-2 text-xs text-gray-600">
-          <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-emerald-500" /> 승인
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-gray-600">
+          <span className="font-semibold text-gray-700">범례</span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-emerald-100 border border-emerald-300" /> 승인
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-amber-400" /> 접수
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-amber-100 border border-amber-300" /> 접수
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-indigo-400" /> 정규수업
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-rose-100 border border-rose-300" /> 반려/취소
           </span>
-          <span className="inline-flex items-center gap-2">
-            <span className="h-2 w-2 rounded-full bg-gray-400" /> 차단시간
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-indigo-100 border border-indigo-300" /> 정규수업
+          </span>
+          <span className="inline-flex items-center gap-1.5">
+            <span className="h-2.5 w-2.5 rounded-sm bg-gray-100 border border-gray-300" /> 차단
           </span>
         </div>
       </div>
@@ -711,20 +732,62 @@ export default function CalendarClient({
         ) : (
           <div className="mt-4 divide-y rounded-xl border">
             {selectedItems.map((it) => {
-              const time = it.roomId === "gallery" && (it.kind === "block" || it.kind === "request")
-                ? "하루 전체"
-                : `${it.startTime}-${it.endTime}`;
               const bundleText = it.kind === "request" && it.batchId
                 ? `묶음 ${it.batchSeq ?? "?"}/${it.batchSize ?? "?"}`
                 : null;
 
+              // 상세 패널 왼쪽 텍스트 (캘린더 셀과 동일 포맷)
+              let detailMain = "";
+              let detailSub = "";
+              if (it.kind === "request") {
+                if (it.roomId === "gallery") {
+                  if (it.isPrepDay) {
+                    detailMain = `전시준비 / ${it.applicantName ?? ""}`;
+                  } else if (it.galleryEndDate && it.date === it.galleryEndDate && it.galleryRemovalTime) {
+                    detailMain = `철거일(${it.galleryRemovalTime}) / ${it.applicantName ?? ""}`;
+                  } else {
+                    detailMain = `전시일 / ${it.applicantName ?? ""}`;
+                  }
+                  detailSub = it.phone ? `${it.phone}` : "";
+                } else {
+                  detailMain = `${it.startTime}-${it.endTime} ${it.applicantName ?? ""} ${it.headcount ? it.headcount + "명" : ""}`;
+                  detailSub = it.phone ? `${it.phone}` : "";
+                }
+              } else if (it.kind === "schedule") {
+                detailMain = `${it.startTime}-${it.endTime} ${it.title}`;
+              } else {
+                if (it.roomId === "gallery") {
+                  detailMain = `내부대관`;
+                  detailSub = it.reason ?? "";
+                } else {
+                  detailMain = `${it.startTime}-${it.endTime} ${it.title}`;
+                  detailSub = it.reason ?? "";
+                }
+              }
+
+              // 상태별 왼쪽 라인 색상
+              const lineCls =
+                it.kind === "request"
+                  ? it.status === "승인"
+                    ? "border-l-emerald-400"
+                    : it.status === "접수"
+                      ? "border-l-amber-400"
+                      : "border-l-rose-400"
+                  : it.kind === "schedule"
+                    ? "border-l-indigo-400"
+                    : "border-l-gray-400";
+
+              // request ID에서 원본 requestId 추출 (갤러리 ":prep", ":2026-02-20" 접미사 제거)
+              const linkId = it.kind === "request"
+                ? it.id.replace(/:prep$/, "").replace(/:\d{4}-\d{2}-\d{2}$/, "")
+                : it.id;
+
               return (
-                <div key={it.id} className="flex flex-col gap-2 p-3 md:flex-row md:items-center md:justify-between">
+                <div key={it.id} className={cn("flex flex-col gap-2 border-l-4 p-3 md:flex-row md:items-center md:justify-between", lineCls)}>
                   <div className="flex min-w-0 items-start gap-3">
-                    <div className="w-24 shrink-0 text-sm font-semibold text-gray-900">{time}</div>
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="truncate text-sm font-semibold text-gray-900">{it.roomName}</div>
+                        <div className="text-sm font-semibold text-gray-900">{it.roomName}</div>
                         {it.kind === "request" ? statusBadge(it.status) : kindBadge(it.kind)}
                         {bundleText ? (
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
@@ -732,34 +795,15 @@ export default function CalendarClient({
                           </span>
                         ) : null}
                       </div>
-
-                      <div className="mt-1 text-xs text-gray-600">
-                        {it.kind === "request" ? (
-                          <>
-                            <span className="font-medium">{it.applicantName}</span>
-                            {it.phone ? <span className="ml-2">({it.phone})</span> : null}
-                            {it.roomId === "gallery" ? (
-                              <span className="ml-2">· {it.isPrepDay ? "준비일" : "전시일"}</span>
-                            ) : null}
-                          </>
-                        ) : it.kind === "block" ? (
-                          <>
-                            <span className="font-medium">{it.title}</span>
-                            {it.reason ? <span className="ml-2">· {it.reason}</span> : null}
-                          </>
-                        ) : (
-                          <>
-                            <span className="font-medium">{it.title}</span>
-                          </>
-                        )}
-                      </div>
+                      <div className="mt-1 text-sm text-gray-800">{detailMain}</div>
+                      {detailSub ? <div className="mt-0.5 text-xs text-gray-500">{detailSub}</div> : null}
                     </div>
                   </div>
 
                   <div className="flex shrink-0 items-center gap-2">
                     {it.kind === "request" ? (
                       <Link
-                        href={`/admin/requests/${encodeURIComponent(it.id)}?category=${encodeURIComponent(category)}`}
+                        href={`/admin/requests/${encodeURIComponent(linkId)}?category=${encodeURIComponent(category)}`}
                         className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
                       >
                         상세 보기

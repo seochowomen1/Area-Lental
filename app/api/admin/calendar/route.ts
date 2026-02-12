@@ -27,11 +27,16 @@ export type CalendarItem = {
   status?: RequestStatus;
   applicantName?: string;
   phone?: string;
+  headcount?: number;
   batchId?: string;
   batchSeq?: number;
   batchSize?: number;
   /** 우리동네 갤러리: 준비(세팅)일 여부 */
   isPrepDay?: boolean;
+  /** 갤러리 철거 시간 */
+  galleryRemovalTime?: string;
+  /** 갤러리 전시 마지막 날짜 */
+  galleryEndDate?: string;
 
   // block/schedule 전용
   reason?: string;
@@ -192,7 +197,10 @@ export async function GET(req: Request) {
             status: r.status,
             applicantName: r.applicantName,
             phone: r.phone,
+            headcount: r.headcount,
             isPrepDay: true,
+            galleryRemovalTime: r.galleryRemovalTime,
+            galleryEndDate: r.endDate,
           });
         }
       }
@@ -218,7 +226,10 @@ export async function GET(req: Request) {
           status: r.status,
           applicantName: r.applicantName,
           phone: r.phone,
+          headcount: r.headcount,
           isPrepDay: false,
+          galleryRemovalTime: r.galleryRemovalTime,
+          galleryEndDate: r.endDate,
         });
       }
       continue;
@@ -243,10 +254,13 @@ export async function GET(req: Request) {
       status: r.status,
       applicantName: r.applicantName,
       phone: r.phone,
+      headcount: r.headcount,
       batchId: r.batchId,
       batchSeq: r.batchSeq,
       batchSize: r.batchSize,
-      isPrepDay: r.isPrepDay
+      isPrepDay: r.isPrepDay,
+      galleryRemovalTime: r.galleryRemovalTime,
+      galleryEndDate: r.endDate,
     });
   }
 
