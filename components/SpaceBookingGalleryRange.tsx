@@ -85,18 +85,20 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     return diffDaysInclusive(startDate, endDate);
   }, [startDate, endDate]);
 
-  // 기본 준비일 계산: 시작일 이전 1일(일요일이면 직전 영업일)
+  // 기본 준비일 계산: 시작일 이전 1일(일요일·예약 마감일이면 직전 영업일)
   const defaultPrepDate = useMemo(() => {
     if (!isYmd(startDate)) return "";
     let prepYmd = dateToYmdLocal(new Date(toDateLocal(startDate).getFullYear(), toDateLocal(startDate).getMonth(), toDateLocal(startDate).getDate() - 1));
-    while (isYmd(prepYmd) && dayOfWeekLocal(prepYmd) === 0) {
+    let safety = 0;
+    while (isYmd(prepYmd) && safety++ < 30) {
+      if (dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd)) break;
       const d = toDateLocal(prepYmd);
       d.setDate(d.getDate() - 1);
       prepYmd = dateToYmdLocal(d);
     }
-    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0) return prepYmd;
+    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd)) return prepYmd;
     return "";
-  }, [startDate]);
+  }, [startDate, bookedDates]);
 
   // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {

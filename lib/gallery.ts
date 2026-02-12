@@ -49,9 +49,9 @@ function addDaysYmd(dateYmd: string, deltaDays: number): string {
 
 /**
  * 전시 시작일 기준으로 선택 가능한 준비일 후보를 반환합니다.
- * 일요일(휴관)은 제외하며, 기본 3개까지 반환합니다.
+ * 일요일(휴관)은 제외하며, 기본 7개까지 반환합니다.
  */
-export function getAvailablePrepDates(startDate: string, count = 3): string[] {
+export function getAvailablePrepDates(startDate: string, count = 7): string[] {
   const dates: string[] = [];
   let cur = addDaysYmd(startDate, -1);
   let safety = 0;
