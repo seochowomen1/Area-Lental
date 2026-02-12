@@ -372,13 +372,13 @@ export default function SettingsClient(props: {
         )}
       </section>
 
-      {/* 이메일 템플릿 섹션 */}
-      <EmailTemplateSection category={props.category ?? "lecture"} onToast={(t) => setToast(t)} />
+      {/* 이메일 템플릿 섹션 (통합 — 모든 공간 공통) */}
+      <EmailTemplateSection onToast={(t) => setToast(t)} />
     </div>
   );
 }
 
-/* ── 이메일 템플릿 편집 섹션 ── */
+/* ── 이메일 템플릿 편집 섹션 (통합) ── */
 
 type EmailTemplate = { subject: string; body: string };
 type TemplateStatus = "접수" | "승인" | "반려" | "취소";
@@ -388,29 +388,25 @@ const STATUS_OPTIONS: TemplateStatus[] = ["접수", "승인", "반려", "취소"
 const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}, {{장비정보}}";
 
 function EmailTemplateSection({
-  category,
   onToast,
 }: {
-  category: string;
   onToast: (t: { type: "success" | "error"; message: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<TemplateStatus>("승인");
+  const [selectedStatus, setSelectedStatus] = useState<TemplateStatus>("접수");
   const [templates, setTemplates] = useState<Record<string, EmailTemplate> | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const catId = category === "studio" ? "studio" : category === "gallery" ? "gallery" : "lecture";
-
-  const loadTemplates = useCallback(async () => {
+  const loadTemplatesFn = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/email-templates");
       const data = await res.json();
-      if (data.ok && data.templates?.[catId]) {
-        setTemplates(data.templates[catId]);
-        const tpl = data.templates[catId][selectedStatus];
+      if (data.ok && data.templates) {
+        setTemplates(data.templates);
+        const tpl = data.templates[selectedStatus];
         if (tpl) {
           setSubject(tpl.subject);
           setBody(tpl.body);
@@ -420,13 +416,13 @@ function EmailTemplateSection({
     } catch {
       // ignore
     }
-  }, [catId, selectedStatus]);
+  }, [selectedStatus]);
 
   useEffect(() => {
     if (open && !loaded) {
-      loadTemplates();
+      loadTemplatesFn();
     }
-  }, [open, loaded, loadTemplates]);
+  }, [open, loaded, loadTemplatesFn]);
 
   useEffect(() => {
     if (templates && templates[selectedStatus]) {
@@ -441,11 +437,10 @@ function EmailTemplateSection({
       const res = await fetch("/api/admin/email-templates", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: catId, status: selectedStatus, subject, body }),
+        body: JSON.stringify({ status: selectedStatus, subject, body }),
       });
       const data = await res.json();
       if (data.ok) {
-        // Update local cache
         setTemplates((prev) => ({ ...prev, [selectedStatus]: { subject, body } }));
         onToast({ type: "success", message: `${selectedStatus} 메일 템플릿이 저장되었습니다.` });
       } else {
@@ -463,9 +458,9 @@ function EmailTemplateSection({
       <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">메일 템플릿</h2>
+            <h2 className="text-base font-bold text-slate-900">메일 템플릿 (통합)</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              접수/승인/반려/취소 시 발송되는 메일 기본 내용을 수정합니다
+              모든 공간에 공통으로 적용되는 접수/승인/반려/취소 메일 내용을 수정합니다
             </p>
           </div>
           <button
@@ -532,7 +527,7 @@ function EmailTemplateSection({
               {saving ? "저장 중..." : "템플릿 저장"}
             </button>
             <span className="text-xs text-slate-500">
-              * 저장 후 승인/반려/취소 시 해당 템플릿이 메일 팝업에 표시됩니다.
+              * 저장 후 해당 상태의 메일 발송 시 적용됩니다 (모든 공간 공통)
             </span>
           </div>
         </div>

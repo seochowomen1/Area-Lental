@@ -333,6 +333,15 @@ export async function mock_deleteBlock(id: string): Promise<void> {
   saveDb(db);
 }
 
+/* ── 삭제 (Mock) ── */
+
+export async function mock_deleteRequests(requestIds: string[]): Promise<void> {
+  const db = ensureDb();
+  const idsSet = new Set(requestIds);
+  db.requests = db.requests.filter(r => !idsSet.has(r.requestId));
+  saveDb(db);
+}
+
 /* ── 이메일 템플릿 (Mock) ── */
 
 export async function mock_getEmailTemplates(): Promise<EmailTemplateRow[]> {

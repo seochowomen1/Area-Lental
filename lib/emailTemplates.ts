@@ -1,8 +1,9 @@
 /**
- * 이메일 템플릿 관리
+ * 이메일 템플릿 관리 (통합)
  *
- * 카테고리별(강의실/E-스튜디오/갤러리) + 상태별(접수/승인/반려/취소) 이메일 본문 템플릿을
+ * 상태별(접수/승인/반려/취소) 이메일 본문 템플릿을
  * Google Sheets(email_templates 시트)에 저장·로드합니다.
+ * 공간 카테고리 구분 없이 하나의 템플릿 세트를 사용합니다.
  *
  * 변수 치환:
  *   {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}},
@@ -11,7 +12,6 @@
 
 import { getDatabase } from "./database";
 
-export type TemplateCategory = "lecture" | "studio" | "gallery";
 export type TemplateStatus = "접수" | "승인" | "반려" | "취소";
 
 export type EmailTemplate = {
@@ -19,7 +19,15 @@ export type EmailTemplate = {
   body: string;
 };
 
+export type UnifiedTemplates = Record<TemplateStatus, EmailTemplate>;
+
+// 하위 호환: 기존 TemplateCategory 타입 export (mail.ts 등에서 사용)
+export type TemplateCategory = "lecture" | "studio" | "gallery";
+// 하위 호환: 기존 AllTemplates 타입 export
 export type AllTemplates = Record<TemplateCategory, Partial<Record<TemplateStatus, EmailTemplate>>>;
+
+/** 통합 저장 시 사용하는 내부 카테고리 키 */
+const UNIFIED_CATEGORY = "common";
 
 const DEFAULT_SUBJECT: Record<TemplateStatus, string> = {
   "접수": "[신청완료] {{카테고리}} 대관 신청 ({{신청번호}})",
@@ -99,35 +107,43 @@ function defaultTemplateFor(status: TemplateStatus): EmailTemplate {
 
 const ALL_STATUSES: TemplateStatus[] = ["접수", "승인", "반려", "취소"];
 
+export function getDefaultUnifiedTemplates(): UnifiedTemplates {
+  return Object.fromEntries(ALL_STATUSES.map((s) => [s, defaultTemplateFor(s)])) as UnifiedTemplates;
+}
+
+/**
+ * 하위 호환용: 기존 API가 category별로 반환하는 형태 유지
+ * 내부적으로는 통합 템플릿 1세트를 모든 카테고리에 동일하게 제공
+ */
 export function getDefaultTemplates(): AllTemplates {
-  const makeCategory = () => Object.fromEntries(ALL_STATUSES.map((s) => [s, defaultTemplateFor(s)])) as Record<TemplateStatus, EmailTemplate>;
+  const unified = getDefaultUnifiedTemplates();
   return {
-    lecture: makeCategory(),
-    studio: makeCategory(),
-    gallery: makeCategory(),
+    lecture: { ...unified },
+    studio: { ...unified },
+    gallery: { ...unified },
   };
 }
 
 /**
  * Google Sheets에서 이메일 템플릿을 로드합니다.
- * DB에 저장된 값이 없으면 기본 템플릿을 반환합니다.
+ * "common" 카테고리로 저장된 통합 템플릿을 우선 사용하고,
+ * 없으면 기존 카테고리별 데이터에서 폴백합니다.
  */
-export async function loadTemplates(): Promise<AllTemplates> {
-  const defaults = getDefaultTemplates();
+export async function loadUnifiedTemplates(): Promise<UnifiedTemplates> {
+  const defaults = getDefaultUnifiedTemplates();
 
   try {
     const db = getDatabase();
     const rows = await db.getEmailTemplates();
 
+    // "common" 카테고리 템플릿 우선
     for (const row of rows) {
-      const cat = row.category as TemplateCategory;
+      if (row.category !== UNIFIED_CATEGORY) continue;
       const st = row.status as TemplateStatus;
-      if (!defaults[cat]) continue;
       if (!ALL_STATUSES.includes(st)) continue;
-
-      defaults[cat][st] = {
-        subject: row.subject || defaults[cat][st]!.subject,
-        body: row.body || defaults[cat][st]!.body,
+      defaults[st] = {
+        subject: row.subject || defaults[st].subject,
+        body: row.body || defaults[st].body,
       };
     }
   } catch {
@@ -138,21 +154,39 @@ export async function loadTemplates(): Promise<AllTemplates> {
 }
 
 /**
- * 특정 카테고리+상태의 이메일 템플릿을 Google Sheets에 저장합니다.
+ * 하위 호환: 기존 API 응답 형태 (category→status→template)
+ * 내부적으로 통합 템플릿을 모든 카테고리에 동일하게 반환
+ */
+export async function loadTemplates(): Promise<AllTemplates> {
+  const unified = await loadUnifiedTemplates();
+  return {
+    lecture: { ...unified },
+    studio: { ...unified },
+    gallery: { ...unified },
+  };
+}
+
+/**
+ * 통합 이메일 템플릿을 Google Sheets에 저장합니다.
+ * 항상 "common" 카테고리로 저장합니다.
  */
 export async function saveTemplates(
-  category: TemplateCategory,
+  _category: string,
   status: TemplateStatus,
   subject: string,
   body: string,
 ): Promise<void> {
   const db = getDatabase();
-  await db.saveEmailTemplate(category, status, subject, body);
+  await db.saveEmailTemplate(UNIFIED_CATEGORY, status, subject, body);
 }
 
-export async function getTemplate(category: TemplateCategory, status: TemplateStatus): Promise<EmailTemplate> {
-  const all = await loadTemplates();
-  return all[category]?.[status] ?? defaultTemplateFor(status);
+/**
+ * 특정 상태의 이메일 템플릿을 반환합니다.
+ * category 인자는 하위 호환을 위해 남겨두었으나 무시됩니다.
+ */
+export async function getTemplate(_category: TemplateCategory | string, status: TemplateStatus): Promise<EmailTemplate> {
+  const all = await loadUnifiedTemplates();
+  return all[status] ?? defaultTemplateFor(status);
 }
 
 /** 변수를 실제 값으로 치환합니다 */

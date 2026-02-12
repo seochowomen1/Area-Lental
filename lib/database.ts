@@ -29,6 +29,8 @@ export interface Database {
     discountAmountKRW?: number;
     discountReason?: string;
   }): Promise<RentalRequest>;
+  /** 반려/취소된 신청건 삭제 */
+  deleteRequests(requestIds: string[]): Promise<void>;
 
   // 정규 수업 일정 관련
   getClassSchedules(): Promise<ClassSchedule[]>;
@@ -79,6 +81,11 @@ class MockDatabase implements Database {
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
     const { mock_updateRequestStatus } = await this.mockdb;
     return mock_updateRequestStatus(args);
+  }
+
+  async deleteRequests(requestIds: string[]) {
+    const { mock_deleteRequests } = await this.mockdb;
+    return mock_deleteRequests(requestIds);
   }
 
   async getClassSchedules() {
@@ -156,6 +163,11 @@ class SheetsDatabase implements Database {
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
     const { updateRequestStatus } = await this.sheets;
     return updateRequestStatus(args);
+  }
+
+  async deleteRequests(requestIds: string[]) {
+    const { deleteRequests } = await this.sheets;
+    return deleteRequests(requestIds);
   }
 
   async getClassSchedules() {

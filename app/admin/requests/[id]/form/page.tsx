@@ -1262,15 +1262,6 @@ export default async function AdminRequestFormPage({
                     {room?.name ?? req.roomId} ({categoryLabel})
                   </td>
                 </tr>
-                <tr>
-                  <th className={TH}>서약 동의</th>
-                  <td className={TD} colSpan={3}>
-                    <span className="font-semibold">
-                      {req.pledgeAgree ? "■ 동의" : "□ 동의"} &nbsp;&nbsp;{" "}
-                      {req.pledgeAgree ? "□ 미동의" : "■ 미동의"}
-                    </span>
-                  </td>
-                </tr>
               </tbody>
             </table>
             <p className="mt-1 text-[9px] text-gray-500 print:text-[7px]">

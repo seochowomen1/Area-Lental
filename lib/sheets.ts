@@ -853,6 +853,58 @@ export async function deleteBlock(id: string): Promise<void> {
   });
 }
 
+/* ── 신청 삭제 ── */
+
+export async function deleteRequests(requestIds: string[]): Promise<void> {
+  if (isMockMode()) {
+    const { mock_deleteRequests } = await import("./mockdb");
+    return mock_deleteRequests(requestIds);
+  }
+
+  if (!requestIds.length) return;
+
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  // requestId 컬럼(A열) 조회
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:A`,
+  });
+  const col = (res.data.values ?? []) as string[][];
+
+  const idsSet = new Set(requestIds);
+  const rowIndicesToDelete: number[] = [];
+  for (let i = 1; i < col.length; i++) {
+    if (idsSet.has(col[i]?.[0])) {
+      rowIndicesToDelete.push(i);
+    }
+  }
+
+  if (!rowIndicesToDelete.length) return;
+
+  const sheetId = await getSheetIdByTitle(SHEET_REQUESTS);
+
+  // 아래에서 위로 삭제해야 인덱스가 밀리지 않음
+  rowIndicesToDelete.sort((a, b) => b - a);
+
+  const requests = rowIndicesToDelete.map((rowIndex) => ({
+    deleteDimension: {
+      range: {
+        sheetId,
+        dimension: "ROWS" as const,
+        startIndex: rowIndex,
+        endIndex: rowIndex + 1,
+      },
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: { requests },
+  });
+}
+
 /* ── 이메일 템플릿 (Google Sheets 저장) ── */
 
 const SHEET_EMAIL_TEMPLATES = "email_templates";

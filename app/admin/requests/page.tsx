@@ -2,9 +2,10 @@ import Link from "next/link";
 import { getDatabase } from "@/lib/database";
 import { statusLabel, REQUEST_ID_LABEL } from "@/lib/labels";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
-import { computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
+import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
+import RequestTable, { type TableRowData } from "./RequestTable";
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
@@ -84,20 +85,6 @@ function formatPeriod(items: RentalRequest[]) {
     : s.length > 1 ? `${s.length}회` : "";
 
   return { datePart, timePart, countPart };
-}
-
-/* 상태 뱃지 */
-function StatusBadge({ status }: { status: string }) {
-  const label = statusLabel(status as RequestStatus);
-  const base = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
-  let cls = "border-gray-200 bg-gray-50 text-gray-700";
-
-  if (status === "접수") cls = "border-amber-200 bg-amber-50 text-amber-800";
-  else if (status === "승인") cls = "border-emerald-200 bg-emerald-50 text-emerald-700";
-  else if (status === "반려") cls = "border-rose-200 bg-rose-50 text-rose-700";
-  else if (status === "취소") cls = "border-gray-200 bg-gray-100 text-gray-600";
-
-  return <span className={`${base} ${cls}`}>{label}</span>;
 }
 
 /* 카테고리 색상 매핑 */
@@ -221,6 +208,80 @@ export default async function AdminRequestsPage({
     : [];
 
   const totalCount = view === "items" ? filteredItems.length : filteredGroups.length;
+
+  // 테이블 행 데이터를 클라이언트 컴포넌트용으로 직렬화
+  const DELETABLE_STATUSES = new Set(["반려", "취소"]);
+
+  const tableRows: TableRowData[] = view === "group"
+    ? filteredGroups.map((g) => {
+        const rep = g.representative;
+        const isBatch = g.key.startsWith("batch:");
+        const hasMultiple = g.items.length > 1;
+        const feeBasis = isBatch ? pickFeeBasisSessions(g.items) : [rep];
+        const fee = isBatch ? computeFeesForBundle(feeBasis) : computeFeesForRequest(rep);
+        const usingApprovedBasis = isBatch && g.approvedCount > 0 && g.approvedCount < g.totalCount;
+        const p = formatPeriod(g.items);
+        const isDeletable = g.items.every((r) => DELETABLE_STATUSES.has(r.status));
+
+        return {
+          key: g.key,
+          requestIds: g.items.map((r) => r.requestId),
+          isDeletable,
+          primaryId: rep.requestId,
+          idLink: `/admin/requests/${encodeURIComponent(rep.requestId)}?category=${encodeURIComponent(category)}`,
+          extraCount: isBatch && hasMultiple ? g.items.length - 1 : 0,
+          roomName: rep.roomName,
+          dateDisplay: p.datePart,
+          timeDisplay: p.timePart,
+          countDisplay: p.countPart,
+          applicantName: rep.applicantName,
+          orgHeadcount: `${rep.orgName} / ${rep.headcount}명`,
+          status: g.groupStatus,
+          displayStatus: g.displayStatus,
+          isPartial: g.isPartial,
+          usingApprovedBasis,
+          approvedCount: g.approvedCount,
+          totalCount: g.totalCount,
+          totalFeeKRW: fee.totalFeeKRW,
+          discountRatePct: fee.discountRatePct,
+          discountAmountKRW: fee.discountAmountKRW,
+          finalFeeKRW: fee.finalFeeKRW,
+        };
+      })
+    : filteredItems.map((r) => {
+        const fee = computeFeesForRequest(r);
+        const dateDisplay =
+          r.roomId === "gallery"
+            ? r.startDate && r.endDate && !r.batchId
+              ? `${r.startDate} ~ ${r.endDate} (${r.galleryExhibitionDayCount ?? 0}일)`
+              : `${r.date} (${r.isPrepDay ? "준비일" : "전시일"})`
+            : `${r.date} ${r.startTime}-${r.endTime}`;
+
+        return {
+          key: r.requestId,
+          requestIds: [r.requestId],
+          isDeletable: DELETABLE_STATUSES.has(r.status),
+          primaryId: r.requestId,
+          idLink: `/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(category)}`,
+          extraCount: 0,
+          roomName: r.roomName,
+          dateDisplay,
+          timeDisplay: "",
+          countDisplay: "",
+          applicantName: r.applicantName,
+          orgHeadcount: `${r.orgName} / ${r.headcount}명`,
+          status: r.status,
+          displayStatus: r.status,
+          isPartial: false,
+          usingApprovedBasis: false,
+          approvedCount: 0,
+          totalCount: 0,
+          totalFeeKRW: fee.totalFeeKRW,
+          discountRatePct: fee.discountRatePct,
+          discountAmountKRW: fee.discountAmountKRW,
+          finalFeeKRW: fee.finalFeeKRW,
+        };
+      });
 
   const makeUrl = (nextView: ViewMode) => {
     const params = new URLSearchParams();
@@ -350,133 +411,13 @@ export default async function AdminRequestsPage({
         </form>
       </div>
 
-      {/* 테이블 */}
-      <div className="rounded-xl bg-white shadow">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="border-b bg-gray-50/80 text-left">
-              <tr>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">{REQUEST_ID_LABEL}</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">공간</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">일시</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">신청자</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">단체/인원</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">상태</th>
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">총액</th>
-                {!isGalleryCategory && <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">할인</th>}
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">최종금액</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {view === "items" &&
-                filteredItems.map((r) => {
-                  const fee = computeFeesForRequest(r);
-                  return (
-                    <tr key={r.requestId} className="transition hover:bg-gray-50/50">
-                      <td className="px-4 py-3">
-                        <Link
-                          className="font-medium text-[rgb(var(--brand-primary))] hover:underline"
-                          href={`/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(category)}`}
-                        >
-                          {r.requestId}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">{r.roomName}</td>
-                      <td className="px-4 py-3">
-                        {r.roomId === "gallery"
-                          ? (r.startDate && r.endDate && !r.batchId
-                              ? `${r.startDate} ~ ${r.endDate} (${r.galleryExhibitionDayCount ?? 0}일)`
-                              : `${r.date} (${r.isPrepDay ? "준비일" : "전시일"})`)
-                          : `${r.date} ${r.startTime}-${r.endTime}`}
-                      </td>
-                      <td className="px-4 py-3 font-medium">{r.applicantName}</td>
-                      <td className="px-4 py-3">
-                        {r.orgName} / {r.headcount}명
-                      </td>
-                      <td className="px-4 py-3"><StatusBadge status={r.status} /></td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">{formatKRW(fee.totalFeeKRW)}</td>
-                      {!isGalleryCategory && (
-                        <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
-                          {fee.discountAmountKRW > 0
-                            ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})`
-                            : "-"}
-                        </td>
-                      )}
-                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-semibold">{formatKRW(fee.finalFeeKRW)}</td>
-                    </tr>
-                  );
-                })}
-
-              {view === "group" &&
-                filteredGroups.map((g) => {
-                  const rep = g.representative;
-                  const isBatch = g.key.startsWith("batch:");
-                  const hasMultiple = g.items.length > 1;
-                  const feeBasis = isBatch ? pickFeeBasisSessions(g.items) : [rep];
-                  const fee = isBatch ? computeFeesForBundle(feeBasis) : computeFeesForRequest(rep);
-                  const usingApprovedBasis = isBatch && g.approvedCount > 0 && g.approvedCount < g.totalCount;
-                  const p = formatPeriod(g.items);
-
-                  return (
-                    <tr key={g.key} className="transition hover:bg-gray-50/50">
-                      <td className="px-4 py-3">
-                        <Link
-                          className="font-medium text-[rgb(var(--brand-primary))] hover:underline"
-                          href={`/admin/requests/${encodeURIComponent(rep.requestId)}?category=${encodeURIComponent(category)}`}
-                        >
-                          {rep.requestId}
-                        </Link>
-                        {isBatch && hasMultiple && <div className="mt-0.5 text-xs text-gray-500">외 {g.items.length - 1}건</div>}
-                      </td>
-                      <td className="px-4 py-3">{rep.roomName}</td>
-                      <td className="px-4 py-3">
-                        <div>
-                          {p.datePart} {p.countPart && <span className="ml-1 text-xs text-gray-500">({p.countPart})</span>}
-                        </div>
-                        <div className="text-xs text-gray-500">{p.timePart}</div>
-                      </td>
-                      <td className="px-4 py-3 font-medium">{rep.applicantName}</td>
-                      <td className="px-4 py-3">
-                        {rep.orgName} / {rep.headcount}명
-                      </td>
-                      <td className="px-4 py-3">
-                        <StatusBadge status={g.groupStatus} />
-                        {g.displayStatus === "부분처리" && (
-                          <div className="mt-1">
-                            <span className="inline-flex rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                              부분처리
-                            </span>
-                          </div>
-                        )}
-                        {usingApprovedBasis && <div className="mt-1 text-xs text-gray-500">승인 {g.approvedCount}/{g.totalCount}회</div>}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
-                        {formatKRW(fee.totalFeeKRW)}
-                        {usingApprovedBasis && <div className="mt-0.5 text-xs text-gray-500">(승인기준)</div>}
-                      </td>
-                      {!isGalleryCategory && (
-                        <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums">
-                          {fee.discountAmountKRW > 0
-                            ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})`
-                            : "-"}
-                        </td>
-                      )}
-                      <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-semibold">{formatKRW(fee.finalFeeKRW)}</td>
-                    </tr>
-                  );
-                })}
-
-              {!totalCount && (
-                <tr>
-                  <td colSpan={isGalleryCategory ? 8 : 9} className="px-4 py-12 text-center text-gray-400">
-                    조건에 맞는 신청이 없습니다.
-                  </td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* 테이블 (클라이언트 컴포넌트: 체크박스 + 선택 삭제) */}
+      <RequestTable
+        rows={tableRows}
+        isGalleryCategory={isGalleryCategory}
+        view={view}
+        idLabel={REQUEST_ID_LABEL}
+      />
     </div>
   );
 }
