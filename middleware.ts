@@ -61,12 +61,12 @@ function withSecurityHeaders(res: NextResponse) {
   res.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   res.headers.set("X-XSS-Protection", "1; mode=block");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
-  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
   res.headers.set(
     "Content-Security-Policy",
     [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+      "script-src 'self' 'unsafe-inline'",
       "style-src 'self' 'unsafe-inline'",
       "img-src 'self' data: blob: https:",
       "font-src 'self' data:",
@@ -116,7 +116,17 @@ export async function middleware(req: NextRequest) {
   const cookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
   const expected = await tokenFor(adminPw);
 
-  if (cookie && cookie === expected) return withSecurityHeaders(NextResponse.next());
+  // 타이밍 공격 방어: 일정한 비교 시간 보장
+  if (cookie) {
+    const enc = new TextEncoder();
+    const a = enc.encode(cookie.padEnd(128, "\0"));
+    const b = enc.encode(expected.padEnd(128, "\0"));
+    let match = a.length === b.length;
+    for (let i = 0; i < a.length && i < b.length; i++) {
+      match = match && a[i] === b[i];
+    }
+    if (match) return withSecurityHeaders(NextResponse.next());
+  }
 
   // API 라우트는 JSON 401 응답
   if (pathname.startsWith("/api/admin")) {

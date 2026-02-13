@@ -12,8 +12,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** 조회: IP당 1분 내 30회 제한 */
-const RESULT_MAX_PER_MIN = 30;
+/** 조회: IP당 1분 내 10회 제한 */
+const RESULT_MAX_PER_MIN = 10;
 const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
@@ -220,8 +220,7 @@ export async function POST(req: Request) {
       galleryPrepDate: representative.galleryPrepDate ?? "",
     } : {}),
   });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

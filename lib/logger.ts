@@ -65,14 +65,23 @@ class Logger {
    * 민감 정보를 로그에서 제거
    */
   sanitize(data: Record<string, unknown>): Record<string, unknown> {
-    const sensitive = ['password', 'token', 'secret', 'birth', 'privateKey'];
+    const sensitive = [
+      'password', 'token', 'secret', 'birth', 'privateKey',
+      'email', 'phone', 'applicantName', 'address',
+      'SMTP_PASS', 'ADMIN_PASSWORD', 'GOOGLE_SERVICE_ACCOUNT_JSON',
+    ];
     const sanitized = { ...data };
 
-    sensitive.forEach(key => {
-      if (sanitized[key]) {
-        sanitized[key] = '***';
+    for (const key of sensitive) {
+      if (sanitized[key] && typeof sanitized[key] === 'string') {
+        const val = sanitized[key] as string;
+        if (key === 'email' && val.includes('@')) {
+          sanitized[key] = val[0] + '***@' + val.split('@')[1];
+        } else {
+          sanitized[key] = '***';
+        }
       }
-    });
+    }
 
     return sanitized;
   }

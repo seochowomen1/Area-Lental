@@ -12,9 +12,13 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** 내 예약 목록: IP당 1분 내 20회 제한 */
-const LIST_MAX_PER_MIN = 20;
+/** 내 예약 목록: IP당 1분 내 10회 제한 */
+const LIST_MAX_PER_MIN = 10;
 const LIST_WINDOW_MS = 60 * 1000;
+
+/** 이메일 직접 조회 제한: 이메일당 15분 내 5회 */
+const EMAIL_DIRECT_MAX = 5;
+const EMAIL_DIRECT_WINDOW_MS = 15 * 60 * 1000;
 
 function sortSessions(list: RentalRequest[]) {
   return list
@@ -61,7 +65,7 @@ export async function GET(req: Request) {
 
   let email = "";
 
-  // 토큰 인증 또는 이메일 직접 조회
+  // 토큰 인증 우선, 이메일 직접 조회는 추가 Rate Limit 적용
   if (token) {
     const verified = verifyApplicantLinkToken(token);
     if (!verified.ok) {
@@ -69,6 +73,12 @@ export async function GET(req: Request) {
     }
     email = verified.email;
   } else if (emailParam && emailParam.includes("@")) {
+    // 이메일 직접 조회: 이메일 기반 추가 Rate Limit (열거 공격 방지)
+    const rlEmail = rateLimit("my-list-email", emailParam, EMAIL_DIRECT_MAX, EMAIL_DIRECT_WINDOW_MS);
+    if (!rlEmail.allowed) {
+      // 이메일 존재 여부 노출 방지: 동일 응답 반환
+      return NextResponse.json({ ok: true, email: emailParam, current: [], past: [], cancelled: [] });
+    }
     email = emailParam;
   } else {
     return NextResponse.json(
@@ -155,8 +165,7 @@ export async function GET(req: Request) {
   const cancelled = groups.filter((g) => ["취소", "반려"].includes(g.status));
 
   return NextResponse.json({ ok: true, email, current, past, cancelled });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

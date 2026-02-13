@@ -387,7 +387,8 @@ export async function POST(req: Request) {
         const buf = Buffer.from(ab);
 
         const first = sessions.find((s) => !s.isPrepDay) ?? sessions[0];
-        const fileName = `${first.date}_${first.startTime.replace(":", "")}-${first.endTime.replace(":", "")}_${input.roomId}_${f.name}`;
+        const safeName = f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, "_").slice(0, 100);
+        const fileName = `${first.date}_${first.startTime.replace(":", "")}-${first.endTime.replace(":", "")}_${input.roomId}_${safeName}`;
 
         const createRes = await drive.files.create({
           requestBody: { name: fileName, parents: [fullEnv.GOOGLE_DRIVE_FOLDER_ID] },

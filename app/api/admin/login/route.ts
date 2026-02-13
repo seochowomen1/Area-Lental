@@ -107,9 +107,8 @@ export async function POST(req: Request) {
 
   logger.info("관리자 로그인 성공", { ip });
   return res;
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
 

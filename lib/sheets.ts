@@ -400,15 +400,15 @@ export async function nextRequestId(): Promise<string> {
     return mock_nextRequestId();
   }
 
+  const { randomBytes } = await import("crypto");
   const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
   const all = await getAllRequests();
-  const nums = all
-    .map(r => r.requestId)
-    .filter(v => v.startsWith(prefix))
-    .map(v => parseInt(v.slice(prefix.length), 10))
-    .filter(n => Number.isFinite(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
+  const existingIds = new Set(all.map(r => r.requestId));
+  let candidate: string;
+  do {
+    candidate = `${prefix}${randomBytes(4).toString("hex").toUpperCase()}`;
+  } while (existingIds.has(candidate));
+  return candidate;
 }
 
 export async function appendRequest(
