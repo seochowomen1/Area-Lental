@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { loadUnifiedTemplates, saveTemplates, type TemplateStatus } from "@/lib/emailTemplates";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export async function PUT(req: Request) {
     }
 
     await saveTemplates("common", status, subject, templateBody);
+    auditLog({ action: "EMAIL_TEMPLATE_UPDATE", ip: getClientIp(req), details: { status, subject } });
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

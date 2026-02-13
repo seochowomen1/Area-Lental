@@ -3,6 +3,8 @@ import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, overlaps } from "@/lib/datetime";
 import { validateOperatingHours } from "@/lib/operating";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -104,6 +106,7 @@ export async function POST(req: Request) {
       const blockEndTime = isGallery ? "18:00" : "23:59";
       const item = { roomId, date, endDate: endDateRaw, startTime: blockStartTime, endTime: blockEndTime, reason };
       const result = await db.addBlock(item);
+      auditLog({ action: "BLOCK_CREATE", ip: getClientIp(req), target: result?.id ?? roomId, details: { roomId, date, endDate: endDateRaw, reason } });
       return NextResponse.json({ ok: true, created: result });
     }
 
@@ -162,6 +165,7 @@ export async function POST(req: Request) {
 
     const item = { roomId, date, startTime, endTime, reason };
     const result = await db.addBlock(item);
+    auditLog({ action: "BLOCK_CREATE", ip: getClientIp(req), target: result?.id ?? roomId, details: { roomId, date, startTime, endTime, reason } });
     return NextResponse.json({ ok: true, created: result });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
@@ -179,6 +183,7 @@ export async function DELETE(req: Request) {
 
     const db = getDatabase();
     await db.deleteBlock(id);
+    auditLog({ action: "BLOCK_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";

@@ -4,6 +4,8 @@ import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { isMockMode } from "@/lib/env";
 import { overlaps } from "@/lib/datetime";
 import { validateOperatingHoursByDayOfWeek } from "@/lib/operating";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -110,6 +112,7 @@ export async function POST(req: Request) {
     };
 
     const result = await db.addClassSchedule(item);
+    auditLog({ action: "SCHEDULE_CREATE", ip: getClientIp(req), target: result?.id ?? title, details: { title, roomId, dayOfWeek, startTime, endTime } });
     return NextResponse.json({ ok: true, created: result });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
@@ -172,6 +175,7 @@ export async function PATCH(req: Request) {
     const updated = await db.updateClassSchedule(id, {
       title, roomId, dayOfWeek, startTime, endTime, effectiveFrom, effectiveTo,
     });
+    auditLog({ action: "SCHEDULE_UPDATE", ip: getClientIp(req), target: id, details: { title, roomId, dayOfWeek } });
     return NextResponse.json({ ok: true, updated });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
@@ -189,6 +193,7 @@ export async function DELETE(req: Request) {
 
     const db = getDatabase();
     await db.deleteClassSchedule(id);
+    auditLog({ action: "SCHEDULE_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";

@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server";
-import crypto from "crypto";
 
-import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE } from "@/lib/adminConstants";
+import { ADMIN_COOKIE_NAME } from "@/lib/adminConstants";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
+import { verifyAdminPassword, generateSessionToken, isAdminPasswordConfigured } from "@/lib/adminPassword";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,20 +17,6 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 /** 글로벌 Rate Limit: 모든 IP 합산 1분 내 20회 (분산 브루트포스 방지) */
 const LOGIN_GLOBAL_MAX = 20;
 const LOGIN_GLOBAL_WINDOW_MS = 60 * 1000;
-
-function tokenFor(adminPassword: string) {
-  return crypto
-    .createHash("sha256")
-    .update(`${adminPassword}::${ADMIN_SIGN_MESSAGE}`)
-    .digest("hex");
-}
-
-/** 타이밍 공격 방어: 비밀번호 비교 시간 차이로 정보가 누출되지 않도록 방지 */
-function constantTimeCompare(a: string, b: string): boolean {
-  const bufA = Buffer.from(a.padEnd(256, "\0"));
-  const bufB = Buffer.from(b.padEnd(256, "\0"));
-  return bufA.length === bufB.length && crypto.timingSafeEqual(bufA, bufB);
-}
 
 export async function POST(req: Request) {
   try {
@@ -55,16 +42,14 @@ export async function POST(req: Request) {
     );
   }
 
-  const adminPw = process.env.ADMIN_PASSWORD;
-  if (!adminPw) {
-    // 환경변수 미설정 정보를 외부에 노출하지 않음
+  if (!isAdminPasswordConfigured()) {
     return NextResponse.json(
       { ok: false, message: "서버 설정 오류입니다." },
       { status: 500 }
     );
   }
 
-  // ✅ 클라이언트 구현에 따라 JSON 또는 FormData로 올 수 있어 둘 다 지원
+  // 클라이언트 구현에 따라 JSON 또는 FormData로 올 수 있어 둘 다 지원
   const contentType = req.headers.get("content-type") ?? "";
   let password = "";
   let nextPath = "/admin";
@@ -86,15 +71,18 @@ export async function POST(req: Request) {
     nextPath = "/admin";
   }
 
-  if (!constantTimeCompare(password, adminPw)) {
+  // bcrypt 또는 평문 비밀번호 검증
+  const isValid = await verifyAdminPassword(password);
+  if (!isValid) {
     logger.warn("관리자 로그인 실패", { ip });
+    auditLog({ action: "ADMIN_LOGIN", ip, details: { success: false } });
     return NextResponse.json(
       { ok: false, message: "비밀번호가 올바르지 않습니다." },
       { status: 401 }
     );
   }
 
-  const token = tokenFor(adminPw);
+  const token = generateSessionToken();
   const res = NextResponse.json({ ok: true, redirect: nextPath });
   const isProduction = process.env.NODE_ENV === "production";
   res.cookies.set(ADMIN_COOKIE_NAME, token, {
@@ -102,17 +90,20 @@ export async function POST(req: Request) {
     sameSite: "strict",
     secure: isProduction,
     path: "/",
-    maxAge: 8 * 60 * 60, // 8시간 후 자동 만료 (보안 강화: 24h→8h)
+    maxAge: 8 * 60 * 60,
   });
 
   logger.info("관리자 로그인 성공", { ip });
+  auditLog({ action: "ADMIN_LOGIN", ip, details: { success: true } });
   return res;
   } catch {
     return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
 
-export async function DELETE() {
+export async function DELETE(req: Request) {
+  const ip = getClientIp(req);
+  auditLog({ action: "ADMIN_LOGOUT", ip });
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
   return res;

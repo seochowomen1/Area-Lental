@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { getDatabase } from "@/lib/database";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -52,6 +54,7 @@ export async function DELETE(req: Request) {
 
     if (existingIds.length > 0) {
       await db.deleteRequests(existingIds);
+      auditLog({ action: "REQUEST_DELETE", ip: getClientIp(req), details: { deletedIds: existingIds, count: existingIds.length } });
     }
 
     return NextResponse.json({ ok: true, deletedCount: existingIds.length, skippedCount: requestIds.length - existingIds.length });

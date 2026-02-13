@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { sendCustomDecisionEmail } from "@/lib/mail";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,6 +24,7 @@ export async function POST(req: Request) {
     }
 
     await sendCustomDecisionEmail(to, subject, body);
+    auditLog({ action: "EMAIL_SEND", ip: getClientIp(req), target: to, details: { subject } });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : "메일 발송 중 오류가 발생했습니다.";

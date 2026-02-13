@@ -103,9 +103,9 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/admin/login")) return withSecurityHeaders(NextResponse.next());
   if (pathname === "/api/admin/login") return withSecurityHeaders(NextResponse.next());
 
-  const adminPw = process.env.ADMIN_PASSWORD;
-  // 환경변수 미설정이면 로그인 페이지로 유도(에러 표시용 쿼리)
-  if (!adminPw) {
+  // ADMIN_PASSWORD_HASH (bcrypt) 또는 ADMIN_PASSWORD (레거시) 지원
+  const tokenSource = process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD;
+  if (!tokenSource) {
     const url = req.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
@@ -114,7 +114,7 @@ export async function middleware(req: NextRequest) {
   }
 
   const cookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const expected = await tokenFor(adminPw);
+  const expected = await tokenFor(tokenSource);
 
   // 타이밍 공격 방어: 일정한 비교 시간 보장
   if (cookie) {

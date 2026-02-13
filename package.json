@@ -18,7 +18,9 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.6.0",
+    "bcryptjs": "^3.0.3",
     "googleapis": "^140.0.0",
+    "ioredis": "^5.9.3",
     "next": "14.2.35",
     "nodemailer": "^6.9.13",
     "react": "^18",
@@ -28,6 +30,7 @@
     "zod": "^3.23.8"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/nodemailer": "^6.4.14",
