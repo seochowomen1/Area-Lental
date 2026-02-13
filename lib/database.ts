@@ -58,6 +58,7 @@ export interface Database {
   // 정규 수업 일정 관련
   getClassSchedules(): Promise<ClassSchedule[]>;
   addClassSchedule(schedule: Omit<ClassSchedule, "id">): Promise<ClassSchedule>;
+  updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule>;
   deleteClassSchedule(id: string): Promise<void>;
 
   // 차단 시간대 관련
@@ -119,6 +120,11 @@ class MockDatabase implements Database {
   async addClassSchedule(schedule: Omit<ClassSchedule, "id">) {
     const { mock_addClassSchedule } = await this.mockdb;
     return mock_addClassSchedule(schedule);
+  }
+
+  async updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>) {
+    const { mock_updateClassSchedule } = await this.mockdb;
+    return mock_updateClassSchedule(id, updates);
   }
 
   async deleteClassSchedule(id: string) {
@@ -217,6 +223,12 @@ class SheetsDatabase implements Database {
     this.schedulesCache.invalidate();
     const { addClassSchedule } = await this.sheets;
     return addClassSchedule(schedule);
+  }
+
+  async updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>) {
+    this.schedulesCache.invalidate();
+    const { updateClassSchedule } = await this.sheets;
+    return updateClassSchedule(id, updates);
   }
 
   async deleteClassSchedule(id: string) {

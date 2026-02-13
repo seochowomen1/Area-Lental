@@ -765,6 +765,44 @@ export async function addClassSchedule(s: Omit<ClassSchedule, "id">): Promise<Cl
   return { id, ...s };
 }
 
+export async function updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule> {
+  if (isMockMode()) {
+    const { mock_updateClassSchedule } = await import("./mockdb");
+    return mock_updateClassSchedule(id, updates);
+  }
+
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  // 현재 스케줄 조회
+  const schedules = await getClassSchedules();
+  const existing = schedules.find(s => s.id === id);
+  if (!existing) throw new Error("수정할 수업시간을 찾을 수 없습니다.");
+
+  const updated: ClassSchedule = { ...existing, ...updates };
+
+  // 행 위치 찾기
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A:A`
+  });
+  const col = (res.data.values ?? []) as string[][];
+  const rowIndex = col.findIndex((r) => r[0] === id);
+  if (rowIndex < 0) throw new Error("시트에서 해당 행을 찾을 수 없습니다.");
+
+  const rowNumber = rowIndex + 1; // 1-based
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A${rowNumber}:H${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[updated.id, updated.roomId, String(updated.dayOfWeek), updated.startTime, updated.endTime, updated.title, updated.effectiveFrom, updated.effectiveTo]]
+    }
+  });
+
+  return updated;
+}
+
 async function getSheetIdByTitle(title: string): Promise<number> {
   if (isMockMode()) throw new Error("MOCK_MODE에서는 시트ID 조회가 필요 없습니다.");
 

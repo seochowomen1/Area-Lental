@@ -308,6 +308,15 @@ export async function mock_addClassSchedule(s: Omit<ClassSchedule, "id">): Promi
   return created;
 }
 
+export async function mock_updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule> {
+  const db = ensureDb();
+  const idx = db.schedules.findIndex(s => s.id === id);
+  if (idx < 0) throw new Error("수정할 수업시간을 찾을 수 없습니다.");
+  db.schedules[idx] = { ...db.schedules[idx], ...updates };
+  saveDb(db);
+  return db.schedules[idx];
+}
+
 export async function mock_deleteClassSchedule(id: string): Promise<void> {
   const db = ensureDb();
   db.schedules = db.schedules.filter(s => s.id !== id);

@@ -143,6 +143,39 @@ export default function SettingsClient(props: {
     }
   }
 
+  async function onUpdateSchedule(id: string, payload: Omit<ClassSchedule, "id">) {
+    setSubmitting("schedule");
+    try {
+      const data = await apiJson<{ ok: true; updated: ClassSchedule }>("/api/admin/class-schedules", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...payload })
+      });
+
+      setSchedules((prev) => prev.map((s) => (s.id === id ? data.updated : s)));
+      highlight(data.updated.id);
+      setToast({ type: "success", message: "수업시간이 수정되었습니다." });
+      router.refresh();
+    } catch (err: any) {
+      setToast({ type: "error", message: err?.message ?? "수정에 실패했습니다." });
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function onDeleteScheduleNoConfirm(id: string) {
+    setSubmitting("delete");
+    try {
+      await apiJson<{ ok: true }>(`/api/admin/class-schedules?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      setSchedules((prev) => prev.filter((s) => s.id !== id));
+      setToast({ type: "success", message: "삭제되었습니다." });
+      router.refresh();
+    } catch (err: any) {
+      setToast({ type: "error", message: err?.message ?? "삭제에 실패했습니다." });
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
   async function onDeleteSchedule(id: string) {
     if (!confirm("해당 수업시간을 삭제할까요?")) return;
     setSubmitting("delete");
@@ -245,7 +278,8 @@ export default function SettingsClient(props: {
                 rooms={props.rooms}
                 schedules={schedules}
                 onAdd={onCreateSchedule}
-                onDelete={onDeleteSchedule}
+                onUpdate={onUpdateSchedule}
+                onDelete={onDeleteScheduleNoConfirm}
                 isSubmitting={submitting !== null}
                 spaceLabel={spaceLabel}
               />
