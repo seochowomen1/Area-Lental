@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useTransition, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -64,8 +64,19 @@ export default function RequestTable({
   const router = useRouter();
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [deleting, setDeleting] = useState(false);
+  // 삭제 진행 중인 행 키 (페이드 아웃 표시)
+  const [deletingKeys, setDeletingKeys] = useState<Set<string>>(new Set());
+  // optimistic: 삭제 완료되어 화면에서 숨길 행 키
+  const [removedKeys, setRemovedKeys] = useState<Set<string>>(new Set());
+  const [, startTransition] = useTransition();
 
-  const deletableRows = rows.filter((r) => r.isDeletable);
+  // removedKeys에 해당하는 행은 즉시 화면에서 제거
+  const visibleRows = useMemo(
+    () => rows.filter((r) => !removedKeys.has(r.key)),
+    [rows, removedKeys],
+  );
+
+  const deletableRows = visibleRows.filter((r) => r.isDeletable);
   const hasDeletable = deletableRows.length > 0;
 
   const allDeletableSelected = hasDeletable && deletableRows.every((r) => selected.has(r.key));
@@ -87,30 +98,46 @@ export default function RequestTable({
     });
   }, []);
 
-  const selectedRequestIds = rows
-    .filter((r) => selected.has(r.key))
-    .flatMap((r) => r.requestIds);
-
   const handleDelete = async () => {
-    if (!selectedRequestIds.length) return;
-    if (!confirm(`선택한 ${selectedRequestIds.length}건을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`)) return;
+    const targetRows = visibleRows.filter((r) => selected.has(r.key));
+    const requestIds = targetRows.flatMap((r) => r.requestIds);
+    const targetKeys = new Set(targetRows.map((r) => r.key));
+    if (!requestIds.length) return;
+    if (!confirm(`선택한 ${requestIds.length}건을 삭제하시겠습니까?\n삭제된 데이터는 복구할 수 없습니다.`)) return;
 
+    // 1단계: 삭제 중 시각 표시 (페이드 아웃)
     setDeleting(true);
+    setDeletingKeys(targetKeys);
+
     try {
       const res = await fetch("/api/admin/requests", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ requestIds: selectedRequestIds }),
+        body: JSON.stringify({ requestIds }),
       });
       const data = await res.json();
       if (!data.ok) {
         alert(data.message || "삭제에 실패했습니다.");
+        setDeletingKeys(new Set());
         return;
       }
+
+      // 2단계: 즉시 화면에서 제거 (Optimistic UI)
+      setRemovedKeys((prev) => {
+        const next = new Set(prev);
+        targetKeys.forEach((k) => next.add(k));
+        return next;
+      });
       setSelected(new Set());
-      router.refresh();
+      setDeletingKeys(new Set());
+
+      // 3단계: 백그라운드에서 서버 데이터 동기화
+      startTransition(() => {
+        router.refresh();
+      });
     } catch {
       alert("삭제 중 오류가 발생했습니다.");
+      setDeletingKeys(new Set());
     } finally {
       setDeleting(false);
     }
@@ -122,7 +149,7 @@ export default function RequestTable({
       {selected.size > 0 && (
         <div className="flex items-center gap-3 border-b bg-rose-50 px-4 py-2.5 rounded-t-xl">
           <span className="text-sm font-medium text-rose-700">
-            {selected.size}건 선택됨
+            {selected.size}건 선택됨 ({visibleRows.filter((r) => selected.has(r.key)).flatMap((r) => r.requestIds).length}개 항목)
           </span>
           <button
             onClick={handleDelete}
@@ -169,8 +196,14 @@ export default function RequestTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
-            {rows.map((r) => (
-              <tr key={r.key} className="transition hover:bg-gray-50/50">
+            {visibleRows.map((r) => (
+              <tr
+                key={r.key}
+                className={
+                  "transition hover:bg-gray-50/50" +
+                  (deletingKeys.has(r.key) ? " opacity-40 pointer-events-none" : "")
+                }
+              >
                 {hasDeletable && (
                   <td className="w-10 px-2 py-3 text-center">
                     {r.isDeletable ? (
@@ -245,7 +278,7 @@ export default function RequestTable({
                 </td>
               </tr>
             ))}
-            {rows.length === 0 && (
+            {visibleRows.length === 0 && (
               <tr>
                 <td
                   colSpan={isGalleryCategory ? (hasDeletable ? 9 : 8) : (hasDeletable ? 10 : 9)}

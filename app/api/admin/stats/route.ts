@@ -24,7 +24,6 @@ type MonthStats = {
   studio: CategoryStats;
   lectureStudio: CategoryStats; // 강의실 + E-스튜디오 합산
   gallery: CategoryStats;
-  total: CategoryStats;
 };
 
 function groupKey(r: RentalRequest) {
@@ -231,22 +230,12 @@ export async function GET(req: Request) {
         totalRevenue: lecture.totalRevenue + studio.totalRevenue,
       };
 
-      const allEmails = new Set<string>();
-      lectureApplicants.forEach((e) => allEmails.add(e));
-      studioApplicants.forEach((e) => allEmails.add(e));
-      galleryApplicants.forEach((e) => allEmails.add(e));
-
       months.push({
         month,
         lecture,
         studio,
         lectureStudio,
         gallery,
-        total: {
-          uniqueApplicants: allEmails.size,
-          totalDays: lecture.totalDays + studio.totalDays + gallery.totalDays,
-          totalRevenue: lecture.totalRevenue + studio.totalRevenue + gallery.totalRevenue,
-        },
       });
     }
 
