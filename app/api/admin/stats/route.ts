@@ -39,6 +39,22 @@ function emptyStats(): CategoryStats {
   return { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
 }
 
+/** 날짜 범위를 일별로 순회하여 월별 전시일수(일요일 제외)를 계산 */
+function countDaysByMonth(startDate: string, endDate: string): Map<string, number> {
+  const result = new Map<string, number>();
+  const cur = new Date(startDate + "T00:00:00Z");
+  const end = new Date(endDate + "T00:00:00Z");
+  while (cur <= end) {
+    const ymd = cur.toISOString().slice(0, 10);
+    if (dayOfWeek(ymd) !== 0) {
+      const month = getMonth(ymd);
+      result.set(month, (result.get(month) ?? 0) + 1);
+    }
+    cur.setUTCDate(cur.getUTCDate() + 1);
+  }
+  return result;
+}
+
 export async function GET(req: Request) {
   const auth = assertAdminApiAuth();
   if (!auth.ok) {
@@ -83,24 +99,29 @@ export async function GET(req: Request) {
       const roomMeta = (ROOMS_BY_ID as Record<string, { category?: string }>)[rep.roomId];
       const cat = (roomMeta?.category ?? "lecture") as CategoryId;
 
-      // 갤러리 1행 형식
+      // 갤러리 1행 형식 — 월 걸침 시 각 월에 일수/수입 비례 배분
       if (cat === "gallery" && !rep.batchId && rep.startDate && rep.endDate) {
-        const month = getMonth(rep.startDate);
-        if (!month.startsWith(year)) continue;
-        const data = ensureMonth(month);
         const email = (rep.email ?? "").toLowerCase().trim();
-
-        // 실인원
-        if (!data.gallery.has(month)) data.gallery.set(month, new Set());
-        if (email) data.gallery.get(month)!.add(email);
-
-        // 연인원 (전시일수)
-        const days = rep.galleryExhibitionDayCount ?? 1;
-        data.galleryDays += days;
-
-        // 수입
         const fee = computeFeesForRequest(rep);
-        data.galleryRevenue += fee.finalFeeKRW;
+        const totalRevenue = fee.finalFeeKRW;
+
+        const daysByMonth = countDaysByMonth(rep.startDate, rep.endDate);
+        const totalDays = [...daysByMonth.values()].reduce((a, b) => a + b, 0);
+
+        for (const [month, days] of daysByMonth) {
+          if (!month.startsWith(year)) continue;
+          const data = ensureMonth(month);
+
+          // 실인원: 해당 월에 전시일이 있으면 카운트
+          if (!data.gallery.has(month)) data.gallery.set(month, new Set());
+          if (email) data.gallery.get(month)!.add(email);
+
+          // 연인원: 해당 월의 전시일수
+          data.galleryDays += days;
+
+          // 수입: 일수 비례 배분
+          data.galleryRevenue += totalDays > 0 ? Math.round(totalRevenue * days / totalDays) : 0;
+        }
         continue;
       }
 
@@ -146,29 +167,25 @@ export async function GET(req: Request) {
     const blocks = await db.getBlocks();
     const galleryBlocks = blocks.filter((b) => b.roomId === "gallery");
 
+    // 갤러리 내부 대관(블록) — 월 걸침 시 각 월에 일수 배분
     for (const block of galleryBlocks) {
       const blockStart = block.date;
       const blockEnd = block.endDate || block.date;
-      const month = getMonth(blockStart);
-      if (!month.startsWith(year)) continue;
 
-      const data = ensureMonth(month);
+      const daysByMonth = countDaysByMonth(blockStart, blockEnd);
 
-      // 실인원: 내부 대관 1건 = 1회
-      if (!data.gallery.has(month)) data.gallery.set(month, new Set());
-      data.gallery.get(month)!.add(`__block_${block.id}`);
+      for (const [month, days] of daysByMonth) {
+        if (!month.startsWith(year)) continue;
+        const data = ensureMonth(month);
 
-      // 연인원: 날짜 범위 내 일수 (일요일 제외)
-      let blockedDays = 0;
-      const cur = new Date(blockStart + "T00:00:00Z");
-      const end = new Date(blockEnd + "T00:00:00Z");
-      while (cur <= end) {
-        const ymd = cur.toISOString().slice(0, 10);
-        if (dayOfWeek(ymd) !== 0) blockedDays++;
-        cur.setUTCDate(cur.getUTCDate() + 1);
+        // 실인원: 해당 월에 일수가 있으면 카운트
+        if (!data.gallery.has(month)) data.gallery.set(month, new Set());
+        data.gallery.get(month)!.add(`__block_${block.id}`);
+
+        // 연인원: 해당 월의 차단 일수
+        data.galleryDays += days;
+        // 수입 = 0 (내부 대관)
       }
-      data.galleryDays += blockedDays;
-      // 수입 = 0 (내부 대관)
     }
 
     // 결과 정리
