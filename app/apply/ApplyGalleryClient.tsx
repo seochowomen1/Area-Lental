@@ -1133,8 +1133,8 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
                   </tr>
                 </thead>
                 <tbody className="divide-y">
-                  <tr><td className="px-3 py-2">평일 (월~금)</td><td className="px-3 py-2">09:00 ~ 18:00</td></tr>
-                  <tr><td className="px-3 py-2">야간 (화요일)</td><td className="px-3 py-2">18:00 ~ 20:00</td></tr>
+                  <tr><td className="px-3 py-2">평일 (월/수~금)</td><td className="px-3 py-2">09:00 ~ 18:00</td></tr>
+                  <tr><td className="px-3 py-2">화요일</td><td className="px-3 py-2">09:00 ~ 20:00</td></tr>
                   <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2">09:00 ~ 13:00</td></tr>
                   <tr><td className="px-3 py-2 text-slate-500">일요일·공휴일</td><td className="px-3 py-2 text-slate-500">휴관</td></tr>
                 </tbody>

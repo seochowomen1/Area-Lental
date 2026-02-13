@@ -23,19 +23,14 @@ function pad2(n: number) {
  * 운영 가능 시간대(시간 범위)를 날짜에 따라 반환합니다.
  * - 일요일(0): 운영 없음
  * - 토요일(6): 10:00~12:00
- * - 화요일(2): 10:00~17:00 + 18:00~20:00
+ * - 화요일(2): 10:00~20:00
  * - 그 외 평일: 10:00~17:00
  */
 export function operatingRangesForDate(dateYmd: string): TimeRange[] {
   const dow = dayOfWeek(dateYmd); // 0=Sun
   if (dow === 0) return [];
   if (dow === 6) return [{ ...OPERATING_RULES.saturday, label: "토요일" }];
-  if (dow === 2) {
-    return [
-      { ...OPERATING_RULES.weekday, label: "화요일(주간)" },
-      { ...OPERATING_RULES.tuesdayNight, label: "화요일(야간)" }
-    ];
-  }
+  if (dow === 2) return [{ ...OPERATING_RULES.tuesday, label: "화요일" }];
   return [{ ...OPERATING_RULES.weekday, label: "평일" }];
 }
 
@@ -43,18 +38,13 @@ export function operatingRangesForDate(dateYmd: string): TimeRange[] {
  * 운영 가능 시간대(시간 범위)를 요일(0~6) 기준으로 반환합니다.
  * - 0(일): 운영 없음
  * - 6(토): 10:00~12:00
- * - 2(화): 10:00~17:00 + 18:00~20:00
+ * - 2(화): 10:00~20:00
  * - 그 외: 10:00~17:00
  */
 export function operatingRangesForDayOfWeek(dow: number): TimeRange[] {
   if (dow === 0) return [];
   if (dow === 6) return [{ ...OPERATING_RULES.saturday, label: "토요일" }];
-  if (dow === 2) {
-    return [
-      { ...OPERATING_RULES.weekday, label: "화요일(주간)" },
-      { ...OPERATING_RULES.tuesdayNight, label: "화요일(야간)" }
-    ];
-  }
+  if (dow === 2) return [{ ...OPERATING_RULES.tuesday, label: "화요일" }];
   return [{ ...OPERATING_RULES.weekday, label: "평일" }];
 }
 
@@ -81,7 +71,7 @@ export function buildHourSlotsForDate(dateYmd: string): HourSlot[] {
     }
   }
 
-  // 중복 제거 + 정렬(화요일 2개 구간 대비)
+  // 중복 제거 + 정렬
   const uniq = new Map<string, HourSlot>();
   for (const s of out) uniq.set(`${s.start}-${s.end}`, s);
   return Array.from(uniq.values()).sort((a, b) => toMinutes(a.start) - toMinutes(b.start));
@@ -105,7 +95,7 @@ export function validateOperatingHours(dateYmd: string, startTime: string, endTi
   if (inAny) return { ok: true };
 
   if (dow === 6) return { ok: false, message: "토요일 운영시간(10:00~12:00) 내에서만 신청 가능합니다." };
-  if (dow === 2) return { ok: false, message: "화요일 운영시간(10:00~17:00 또는 18:00~20:00) 내에서만 신청 가능합니다." };
+  if (dow === 2) return { ok: false, message: "화요일 운영시간(10:00~20:00) 내에서만 신청 가능합니다." };
   return { ok: false, message: "평일 운영시간(10:00~17:00) 내에서만 신청 가능합니다." };
 }
 
@@ -130,7 +120,7 @@ export function validateOperatingHoursByDayOfWeek(
   if (inAny) return { ok: true };
 
   if (dayOfWeek === 6) return { ok: false, message: "토요일 운영시간(10:00~12:00) 내에서만 설정 가능합니다." };
-  if (dayOfWeek === 2) return { ok: false, message: "화요일 운영시간(10:00~17:00 또는 18:00~20:00) 내에서만 설정 가능합니다." };
+  if (dayOfWeek === 2) return { ok: false, message: "화요일 운영시간(10:00~20:00) 내에서만 설정 가능합니다." };
   return { ok: false, message: "평일 운영시간(10:00~17:00) 내에서만 설정 가능합니다." };
 }
 
@@ -174,21 +164,16 @@ function fmtRangeShort(start: string, end: string) {
 
 /**
  * 운영시간 안내 문구를 운영 규칙(OPERATING_RULES) 기반으로 자동 생성합니다.
- * 예) "평일 10~17 / 화 18~20 야간 / 토 10~12 (일 휴관)"
+ * 예) "평일 10~17 / 화 10~20 / 토 10~12 (일 휴관)"
  */
 export function operatingNoticeText(roomId?: string): string {
-  // 갤러리(우리동네 갤러리): 일 단위 전시 대관 운영시간
-  // - 평일 09:00~18:00
-  // - 화요일 야간 18:00~20:00
-  // - 토요일 09:00~13:00
-  // - 일요일 및 공휴일 휴관 (공휴일은 실제 차단을 Blocks로 처리)
   if (roomId === "gallery") {
-    return "평일 9~18 / 화 야간 18~20 / 토 9~13 (일·공휴일 휴관)";
+    return "평일 9~18 / 화 9~20 / 토 9~13 (일·공휴일 휴관)";
   }
   const weekday = fmtRangeShort(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
+  const tue = fmtRangeShort(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
   const sat = fmtRangeShort(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
-  const tueNight = fmtRangeShort(OPERATING_RULES.tuesdayNight.start, OPERATING_RULES.tuesdayNight.end);
-  return `평일 ${weekday} / 화 ${tueNight} 야간 / 토 ${sat} (일 휴관)`;
+  return `평일 ${weekday} / 화 ${tue} / 토 ${sat} (일 휴관)`;
 }
 
 function fmtHourKoreanToken(t: string) {
@@ -211,43 +196,30 @@ export function operatingNoticeLines(roomId?: string): Array<{ label: string; te
   if (roomId === "gallery") {
     return [
       { label: "평일", text: "9시~18시" },
-      { label: "야간", text: "화 18시~20시" },
+      { label: "화요일", text: "9시~20시" },
       { label: "주말", text: "토 9시~13시 (일요일 휴관)" }
     ];
   }
 
   const weekday = fmtRangeKorean(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
-  const tueNight = fmtRangeKorean(OPERATING_RULES.tuesdayNight.start, OPERATING_RULES.tuesdayNight.end);
+  const tue = fmtRangeKorean(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
   const sat = fmtRangeKorean(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
 
   return [
     { label: "평일", text: weekday },
-    { label: "야간", text: `화 ${tueNight}` },
+    { label: "화요일", text: tue },
     { label: "주말", text: `토 ${sat} (일요일 휴관)` }
   ];
 }
 
 /**
- * 화요일 야간(18~20) 운영 구간과 선택한 시간(시작~종료)이 "겹치는지"를 판정합니다.
- * - dateYmd가 화요일이 아니면 false
- * - endTime이 없으면 startTime을 기준으로 판정(점/기본값)
+ * 화요일 야간 운영 구간 판정 (호환성 유지)
+ * - 화요일 10:00~20:00 통합 운영으로 별도 야간 구분 없음
  */
 export function isTuesdayNightOverlap(
-  dateYmd: string | null | undefined,
-  startTime: string | null | undefined,
-  endTime: string | null | undefined
+  _dateYmd: string | null | undefined,
+  _startTime: string | null | undefined,
+  _endTime: string | null | undefined
 ): boolean {
-  if (!dateYmd || !startTime) return false;
-  if (dayOfWeek(dateYmd) !== 2) return false; // Tuesday
-
-  const s = toMinutes(startTime);
-  const e = endTime ? toMinutes(endTime) : s;
-  if (!Number.isFinite(s) || !Number.isFinite(e)) return false;
-
-  const ns = toMinutes(OPERATING_RULES.tuesdayNight.start);
-  const ne = toMinutes(OPERATING_RULES.tuesdayNight.end);
-
-  // overlap: [s,e] with [ns,ne) (end exclusive). If e==s (no end), treat point-in-range.
-  if (e === s) return ns <= s && s < ne;
-  return s < ne && e > ns;
+  return false;
 }

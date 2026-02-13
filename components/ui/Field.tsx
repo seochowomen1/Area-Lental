@@ -11,7 +11,11 @@ export function FieldLabel({ children, className, htmlFor }: { children: React.R
 }
 
 export function FieldHelp({ children, className }: { children: React.ReactNode; className?: string }) {
-  return <p className={cn(FIELD_HELP, className)}>{children}</p>;
+  const isError = typeof className === "string" && className.includes("text-red");
+  const base = isError
+    ? "mt-1 text-xs leading-4 font-semibold"
+    : FIELD_HELP;
+  return <p className={cn(base, className)}>{children}</p>;
 }
 
 type ControlProps<T> = T & { className?: string };

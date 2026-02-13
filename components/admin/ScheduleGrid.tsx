@@ -34,7 +34,7 @@ function toMin(hhmm: string) {
 function opRanges(dow: number): { s: number; e: number }[] {
   if (dow === 0) return [];
   if (dow === 6) return [{ s: 600, e: 720 }];          // 토 10~12
-  if (dow === 2) return [{ s: 600, e: 1020 }, { s: 1080, e: 1200 }]; // 화 10~17 + 18~20
+  if (dow === 2) return [{ s: 600, e: 1200 }]; // 화 10~20 (통합)
   return [{ s: 600, e: 1020 }];                         // 평일 10~17
 }
 function isOp(dow: number, m: number) {
