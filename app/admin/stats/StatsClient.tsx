@@ -49,7 +49,7 @@ export default function StatsClient() {
     fetch(`/api/admin/stats?year=${year}`)
       .then((r) => r.json())
       .then((j: ApiResp) => setData(j))
-      .catch(() => setData({ ok: false, year: String(year), months: [], message: "조회 실패" }))
+      .catch((e) => { console.error("통계 조회 실패:", e); setData({ ok: false, year: String(year), months: [], message: "조회 실패" }); })
       .finally(() => setLoading(false));
   }, [year]);
 

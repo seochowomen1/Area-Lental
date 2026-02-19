@@ -135,7 +135,8 @@ export default function RequestTable({
       startTransition(() => {
         router.refresh();
       });
-    } catch {
+    } catch (e: unknown) {
+      console.error("삭제 요청 실패:", e);
       alert("삭제 중 오류가 발생했습니다.");
       setDeletingKeys(new Set());
     } finally {
@@ -227,7 +228,7 @@ export default function RequestTable({
                     <div className="mt-0.5 text-xs text-gray-500">외 {r.extraCount}건</div>
                   )}
                 </td>
-                <td className="px-4 py-3">{r.roomName}</td>
+                <td className="whitespace-nowrap px-4 py-3">{r.roomName}</td>
                 <td className="px-4 py-3">
                   {view === "group" ? (
                     <>
@@ -245,7 +246,7 @@ export default function RequestTable({
                 </td>
                 <td className="px-4 py-3 font-medium">{r.applicantName}</td>
                 <td className="px-4 py-3">{r.orgHeadcount}</td>
-                <td className="px-4 py-3">
+                <td className="whitespace-nowrap px-4 py-3">
                   <StatusBadge status={r.status} />
                   {r.displayStatus === "부분처리" && (
                     <div className="mt-1">

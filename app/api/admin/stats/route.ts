@@ -62,7 +62,12 @@ export async function GET(req: Request) {
 
   try {
     const { searchParams } = new URL(req.url);
-    const year = searchParams.get("year") ?? new Date().getFullYear().toString();
+    const rawYear = searchParams.get("year") ?? new Date().getFullYear().toString();
+    const yearNum = Number(rawYear);
+    if (!Number.isInteger(yearNum) || yearNum < 2000 || yearNum > 2100) {
+      return NextResponse.json({ ok: false, message: "유효하지 않은 연도입니다." }, { status: 400 });
+    }
+    const year = String(yearNum);
 
     const db = getDatabase();
     const allRequests = await db.getAllRequests();

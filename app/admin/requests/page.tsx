@@ -9,7 +9,6 @@ import RequestTable, { type TableRowData } from "./RequestTable";
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
-export const revalidate = 0;
 
 type ViewMode = "group" | "items";
 
@@ -161,7 +160,7 @@ export default async function AdminRequestsPage({
       if (roomId === "all") return true;
       return g.representative.roomId === roomId;
     })
-    .filter((g) => (status === "all" ? true : g.groupStatus === (status as any)))
+    .filter((g) => (status === "all" ? true : g.groupStatus === status))
     .filter((g) => {
       if (!date) return true;
       // 갤러리 1행 형식: 날짜 범위 내 포함 여부 확인
@@ -197,7 +196,7 @@ export default async function AdminRequestsPage({
           if (r.roomId === "all") return true;
           return allowedRoomIds.has(r.roomId);
         })
-        .filter((r) => (status === "all" ? true : r.status === (status as any)))
+        .filter((r) => (status === "all" ? true : r.status === status))
         .filter((r) => (date ? r.date === date : true))
         .filter((r) => {
           if (!qLower) return true;
