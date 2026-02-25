@@ -405,7 +405,6 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
             <li>센터 방문하여 환불신청서 작성 및 제출 (양식 별도 안내)</li>
             <li>우편, 메일 등 비대면 접수 불가</li>
-            <li>환불 방법: 지로 결제 시 방문 카드리퍼스 / 현금 결제 시 계좌이체</li>
           </ul>
         </div>
 

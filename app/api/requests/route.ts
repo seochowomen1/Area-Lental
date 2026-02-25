@@ -3,7 +3,7 @@ import { Readable } from "stream";
 import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { UPLOAD, ROOMS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
-import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps } from "@/lib/datetime";
+import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
 import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
 import { buildGallerySessionsFromPeriod, validateGalleryOperatingHours } from "@/lib/gallery";
 import { getGoogleClient } from "@/lib/google";
@@ -172,6 +172,15 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
+      // 갤러리 당일 대관 차단: 준비일이 과거가 되므로 최소 익일부터 신청 가능
+      const todayStr = todayYmdSeoul();
+      if (startDate <= todayStr) {
+        return NextResponse.json(
+          { ok: false, code: "VALIDATION_ERROR", message: "갤러리 대관은 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" },
+          { status: 400 }
+        );
+      }
+
       if (endDate < startDate) {
         return NextResponse.json(
           { ok: false, code: "VALIDATION_ERROR", message: "종료일은 시작일보다 빠를 수 없습니다." },
