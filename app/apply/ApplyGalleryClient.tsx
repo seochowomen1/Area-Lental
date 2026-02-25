@@ -212,6 +212,7 @@ export default function ApplyGalleryClient() {
   const birthDayRef = useRef<HTMLInputElement>(null);
 
   const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
+  const minStartDate = useMemo(() => addDays(todayYmdSeoul(), 1), []);
 
   const qpStart = searchParams.get("startDate") ?? "";
   const qpEnd = searchParams.get("endDate") ?? "";
@@ -699,7 +700,7 @@ export default function ApplyGalleryClient() {
             <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div>
                 <FieldLabel htmlFor="startDate">시작일 *</FieldLabel>
-                <Input id="startDate" type="date" {...register("startDate")} />
+                <Input id="startDate" type="date" min={minStartDate} {...register("startDate")} />
                 {errors.startDate?.message ? <FieldHelp className="text-red-600">{errors.startDate.message}</FieldHelp> : null}
               </div>
 

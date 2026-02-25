@@ -90,9 +90,9 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
           <InfoRow label="공간명" value="우리동네 갤러리" />
           <InfoRow label="위치" value="서초센터 4층 (북카페 일대)" />
           <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-            <span className="text-xs font-semibold text-slate-600">전시 작품 수</span>
-            <span className="text-sm font-semibold text-slate-900">
-              액자형태 최대 15점 <span className="text-[11px] font-normal text-slate-400">(가로 60cm)</span>
+            <span className="shrink-0 text-xs font-semibold text-slate-600">전시 작품 수</span>
+            <span className="text-right text-sm font-semibold text-slate-900">
+              액자형태 최대 15점<span className="block text-[11px] font-normal text-slate-400">(가로 60cm 기준)</span>
             </span>
           </div>
           <InfoRow label="문의" value={room ? `${room.contactName} (${room.contactPhone})` : "-"} />
@@ -378,44 +378,34 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
       <div className="mt-4 grid gap-4">
         <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">취소 안내</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>대관 취소는 <span className="font-semibold">신청현황</span>에서 취소 요청을 진행할 수 있습니다.</li>
-            <li>승인 완료 건의 취소는 운영 일정 및 타 이용자에게 영향을 줄 수 있으므로, 가급적 조기에 요청해 주시기 바랍니다.</li>
-            <li>긴급 취소 또는 시스템 오류가 있는 경우, 센터 문의처로 연락해 주시기 바랍니다.</li>
-          </ul>
-        </div>
-
-        <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">환불 안내</h4>
+          <h4 className="mb-2 text-sm font-semibold">환불 기준</h4>
           <div className="overflow-hidden rounded-md border">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">내용</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">취소 시점</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">환불 비율</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
-                <tr>
-                  <td className="px-3 py-2">대관료 환불</td>
-                  <td className="px-3 py-2">
-                    {room && room.feeKRW > 0
-                      ? "센터 내부 규정 및 회계 처리 기준에 따라 진행"
-                      : "별도 협의 대상 (센터 안내 및 규정에 따라 진행)"}
-                  </td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2">환불 처리 기간</td>
-                  <td className="px-3 py-2">결제 수단(카드/계좌이체 등)에 따라 상이</td>
-                </tr>
-                <tr>
-                  <td className="px-3 py-2">필요 서류</td>
-                  <td className="px-3 py-2">담당자 안내에 따라 증빙 서류 제출 요청 가능</td>
-                </tr>
+                <tr><td className="px-3 py-2">사용일 3일 전까지</td><td className="px-3 py-2 font-semibold text-green-700">전액 환불</td></tr>
+                <tr><td className="px-3 py-2">사용일 2일 전까지</td><td className="px-3 py-2 font-semibold">90% 환불</td></tr>
+                <tr><td className="px-3 py-2">사용일 1일 전까지</td><td className="px-3 py-2 font-semibold">80% 환불</td></tr>
+                <tr><td className="px-3 py-2 text-red-600">사용일 당일 이후</td><td className="px-3 py-2 font-semibold text-red-600">환불 불가</td></tr>
               </tbody>
             </table>
           </div>
+          <p className="mt-2 text-xs text-slate-600">
+            ※ 운영일 기준 (일요일·공휴일 제외)
+          </p>
+        </div>
+
+        <div className="rounded-lg border p-4">
+          <h4 className="mb-2 text-sm font-semibold">환불 절차</h4>
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+            <li>센터 방문하여 환불신청서 작성 및 제출 (양식 별도 안내)</li>
+            <li>우편, 메일 등 비대면 접수 불가</li>
+          </ul>
         </div>
 
         <div className="rounded-lg border p-4">
@@ -423,7 +413,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
             <li>천재지변, 시설 점검, 안전상 필요 등 불가피한 사유로 일정이 조정될 수 있습니다.</li>
             <li>시설물 훼손, 안전수칙 위반, 허위 신청 등 운영상 문제가 확인될 경우 이용이 제한될 수 있습니다.</li>
-            <li>필요 시 센터는 대관 취소 또는 일정 변경을 요청드릴 수 있으며, 관련 내용은 별도 안내합니다.</li>
+            <li>대관 진행 중 발견 시 바로 취소되며 대관료는 환불 불가합니다.</li>
           </ul>
         </div>
 
