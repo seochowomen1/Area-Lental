@@ -90,9 +90,9 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
           <InfoRow label="공간명" value="우리동네 갤러리" />
           <InfoRow label="위치" value="서초센터 4층 (북카페 일대)" />
           <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
-            <span className="text-xs font-semibold text-slate-600">전시 작품 수</span>
-            <span className="text-sm font-semibold text-slate-900">
-              액자형태 최대 15점 <span className="text-[11px] font-normal text-slate-400">(가로 60cm)</span>
+            <span className="shrink-0 text-xs font-semibold text-slate-600">전시 작품 수</span>
+            <span className="text-right text-sm font-semibold text-slate-900">
+              액자형태 최대 15점<span className="block text-[11px] font-normal text-slate-400">(가로 60cm 기준)</span>
             </span>
           </div>
           <InfoRow label="문의" value={room ? `${room.contactName} (${room.contactPhone})` : "-"} />
