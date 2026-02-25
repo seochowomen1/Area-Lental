@@ -245,8 +245,8 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     if (dayOfWeekLocal(ymd) === 0) return true;
     // 예약 마감 날짜는 선택 불가
     if (bookedDates.has(ymd)) return true;
-    // 과거 날짜 선택 불가
-    if (ymd < dateToYmdLocal(new Date())) return true;
+    // 과거 및 당일 선택 불가 (준비일이 과거가 되므로 익일부터 선택 가능)
+    if (ymd <= dateToYmdLocal(new Date())) return true;
 
     // 시작일만 선택된 상태: 시작일 이전은 비활성, 최대 30일(포함) 초과는 비활성
     if (isYmd(startDate) && !isYmd(endDate)) {
