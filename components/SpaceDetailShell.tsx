@@ -221,10 +221,10 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
 
           <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2">
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">{room.id === "gallery" ? "전시 작품 수" : "수용인원"}</span>
-              <span className="font-medium">
+              <span className="shrink-0 text-gray-500">{room.id === "gallery" ? "전시 작품 수" : "수용인원"}</span>
+              <span className="font-medium text-right">
                 {room.id === "gallery"
-                  ? <>액자형태 최대 15점 <span className="text-[11px] font-normal text-gray-400">(가로 60cm)</span></>
+                  ? <>액자형태 최대 15점<span className="block text-[11px] font-normal text-gray-400">(가로 60cm 기준)</span></>
                   : `최대 ${room.capacity}명`}
               </span>
             </div>
