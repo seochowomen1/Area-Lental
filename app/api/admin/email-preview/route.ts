@@ -36,7 +36,13 @@ export async function GET(req: Request) {
   }
 
   if (!content) {
-    return NextResponse.json({ ok: false, message: "이메일 내용을 생성할 수 없습니다." }, { status: 400 });
+    const noEmail = current.batchId
+      ? !(await db.getRequestsByBatchId(current.batchId)).some((r) => r.email)
+      : !current.email;
+    const message = noEmail
+      ? "신청자 이메일 주소가 없어 메일을 발송할 수 없습니다."
+      : "이메일 내용을 생성할 수 없습니다.";
+    return NextResponse.json({ ok: false, message }, { status: 400 });
   }
 
   return NextResponse.json({ ok: true, ...content });

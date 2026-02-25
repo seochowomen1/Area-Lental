@@ -54,7 +54,7 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
   });
 
   // 승인/반려/취소 시 이메일 발송 팝업을 표시하기 위해 상태 전달 (자동 발송 안 함)
-  const isDecision = (status === "승인" || status === "반려" || status === "취소") && status !== current.status;
+  const isDecision = status === "승인" || status === "반려" || status === "취소";
   const emailParam = isDecision ? `&emailPending=${encodeURIComponent(status)}` : "";
   const cat = categoryOf(current);
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(cat)}&saved=1${emailParam}`);

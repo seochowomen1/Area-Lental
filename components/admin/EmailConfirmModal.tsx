@@ -34,12 +34,19 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
           if (data.ok) {
             setContent({ to: data.to, subject: data.subject, body: data.body });
             setOpen(true);
+          } else {
+            // 이메일 미리보기 생성 실패 (이메일 주소 없음 등)
+            setToast(data.message || "메일 내용을 생성할 수 없습니다.");
+            router.replace(pathname, { scroll: false });
           }
         })
-        .catch(() => {})
+        .catch(() => {
+          setToast("메일 미리보기를 불러오는 중 오류가 발생했습니다.");
+          router.replace(pathname, { scroll: false });
+        })
         .finally(() => setLoading(false));
     }
-  }, [saved, emailPending, requestId]);
+  }, [saved, emailPending, requestId, router, pathname]);
 
   // 메일 발송 완료 토스트
   useEffect(() => {
