@@ -168,7 +168,7 @@ function fmtRangeShort(start: string, end: string) {
  */
 export function operatingNoticeText(roomId?: string): string {
   if (roomId === "gallery") {
-    return "평일 9~18 / 화 9~20 / 토 9~13 (일·공휴일 휴관)";
+    return "평일 9:00~18:00 / 화 9:00~20:00 / 토 9:00~13:00 (일·공휴일 휴관)";
   }
   const weekday = fmtRangeShort(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
   const tue = fmtRangeShort(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
@@ -176,16 +176,14 @@ export function operatingNoticeText(roomId?: string): string {
   return `평일 ${weekday} / 화 ${tue} / 토 ${sat} (일 휴관)`;
 }
 
-function fmtHourKoreanToken(t: string) {
-  // "10:00" -> "10시", "10:30" -> "10시30분"
+function fmtHourColonToken(t: string) {
+  // "10:00" -> "10:00", "09:30" -> "9:30"
   const [hh, mm] = t.split(":");
-  const h = String(parseInt(hh, 10));
-  if (mm === "00") return `${h}시`;
-  return `${h}시${mm}분`;
+  return `${parseInt(hh, 10)}:${mm}`;
 }
 
-function fmtRangeKorean(start: string, end: string) {
-  return `${fmtHourKoreanToken(start)}~${fmtHourKoreanToken(end)}`;
+function fmtRangeColon(start: string, end: string) {
+  return `${fmtHourColonToken(start)} ~ ${fmtHourColonToken(end)}`;
 }
 
 /**
@@ -195,15 +193,15 @@ function fmtRangeKorean(start: string, end: string) {
 export function operatingNoticeLines(roomId?: string): Array<{ label: string; text: string }> {
   if (roomId === "gallery") {
     return [
-      { label: "평일", text: "9시~18시" },
-      { label: "화요일", text: "9시~20시" },
-      { label: "주말", text: "토 9시~13시 (일요일 휴관)" }
+      { label: "평일", text: "9:00 ~ 18:00" },
+      { label: "화요일", text: "9:00 ~ 20:00" },
+      { label: "주말", text: "토 9:00 ~ 13:00 (일요일 휴관)" }
     ];
   }
 
-  const weekday = fmtRangeKorean(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
-  const tue = fmtRangeKorean(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
-  const sat = fmtRangeKorean(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
+  const weekday = fmtRangeColon(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
+  const tue = fmtRangeColon(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
+  const sat = fmtRangeColon(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
 
   return [
     { label: "평일", text: weekday },
