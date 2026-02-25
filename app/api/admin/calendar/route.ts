@@ -6,6 +6,18 @@ import { galleryOperatingWindow } from "@/lib/gallery";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
 
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -27,11 +39,16 @@ export type CalendarItem = {
   status?: RequestStatus;
   applicantName?: string;
   phone?: string;
+  headcount?: number;
   batchId?: string;
   batchSeq?: number;
   batchSize?: number;
   /** 우리동네 갤러리: 준비(세팅)일 여부 */
   isPrepDay?: boolean;
+  /** 갤러리 철거 시간 */
+  galleryRemovalTime?: string;
+  /** 갤러리 전시 마지막 날짜 */
+  galleryEndDate?: string;
 
   // block/schedule 전용
   reason?: string;
@@ -192,7 +209,10 @@ export async function GET(req: Request) {
             status: r.status,
             applicantName: r.applicantName,
             phone: r.phone,
+            headcount: r.headcount,
             isPrepDay: true,
+            galleryRemovalTime: resolveGalleryRemovalTime(r),
+            galleryEndDate: r.endDate,
           });
         }
       }
@@ -218,7 +238,10 @@ export async function GET(req: Request) {
           status: r.status,
           applicantName: r.applicantName,
           phone: r.phone,
+          headcount: r.headcount,
           isPrepDay: false,
+          galleryRemovalTime: resolveGalleryRemovalTime(r),
+          galleryEndDate: r.endDate,
         });
       }
       continue;
@@ -243,10 +266,13 @@ export async function GET(req: Request) {
       status: r.status,
       applicantName: r.applicantName,
       phone: r.phone,
+      headcount: r.headcount,
       batchId: r.batchId,
       batchSeq: r.batchSeq,
       batchSize: r.batchSize,
-      isPrepDay: r.isPrepDay
+      isPrepDay: r.isPrepDay,
+      galleryRemovalTime: resolveGalleryRemovalTime(r),
+      galleryEndDate: r.endDate,
     });
   }
 

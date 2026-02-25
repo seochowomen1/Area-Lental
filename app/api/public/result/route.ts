@@ -6,10 +6,15 @@ import { normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/** 조회: IP당 1분 내 10회 제한 */
+const RESULT_MAX_PER_MIN = 10;
+const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
 
@@ -58,6 +63,16 @@ function roomMeta(roomId: string) {
 
 export async function POST(req: Request) {
   try {
+  // Rate Limiting
+  const ip = getClientIp(req);
+  const rl = rateLimit("result", ip, RESULT_MAX_PER_MIN, RESULT_WINDOW_MS);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, message: `요청이 너무 많습니다. ${rl.retryAfterSeconds}초 후 다시 시도해주세요.` },
+      { status: 429 }
+    );
+  }
+
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
@@ -78,13 +93,13 @@ export async function POST(req: Request) {
 
   const db = getDatabase();
   const r = await db.getRequestById(requestId);
-  if (!r) {
-    return NextResponse.json({ ok: false, message: "신청건을 찾을 수 없습니다." }, { status: 404 });
-  }
 
-  // 이메일 일치 확인
-  if (normalizeEmail(r.email) !== email) {
-    return NextResponse.json({ ok: false, message: "신청번호와 이메일이 일치하지 않습니다." }, { status: 403 });
+  // 신청번호 미존재 또는 이메일 불일치 시 동일 메시지 반환 (이메일 열거 방지)
+  if (!r || normalizeEmail(r.email) !== email) {
+    return NextResponse.json(
+      { ok: false, message: "신청번호 또는 이메일을 확인해주세요." },
+      { status: 400 },
+    );
   }
 
   // 묶음 신청이면 같은 batchId 전체를 조회하여 요약
@@ -205,8 +220,7 @@ export async function POST(req: Request) {
       galleryPrepDate: representative.galleryPrepDate ?? "",
     } : {}),
   });
-  } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+  } catch {
+    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

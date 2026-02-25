@@ -2,7 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import AdminDiscountFields from "@/components/admin/AdminDiscountFields";
+import BatchActionSection from "@/components/admin/BatchActionSection";
 import BatchSessionSelector from "@/components/admin/BatchSessionSelector";
+import SingleStatusFields from "@/components/admin/SingleStatusFields";
 import StatusBadge from "@/components/admin/StatusBadge";
 
 import { assertAdminAuth } from "@/lib/adminAuth";
@@ -31,6 +33,18 @@ function categoryAccent(cat: RoomCategory) {
   if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
   if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
   return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
+}
+
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
 }
 
 function sortSessions(list: RentalRequest[]) {
@@ -292,11 +306,23 @@ export default async function AdminRequestDetail({
               <>
                 <InfoRow label="전시 기간">
                   {req.startDate ?? req.date} ~ {req.endDate ?? req.date}
-                  {galleryPrepDate && <span className="ml-1 text-xs text-gray-500">(준비일 1일 포함)</span>}
+                </InfoRow>
+                <InfoRow label="준비일">
+                  {galleryPrepDate
+                    ? <span className="font-medium text-emerald-700">{galleryPrepDate} (무료)</span>
+                    : <span className="text-gray-400">없음</span>}
                 </InfoRow>
                 <InfoRow label="전시일수">
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)
-                  {galleryPrepDate ? <span className="ml-1 text-gray-500">/ 준비일 {galleryPrepDate}</span> : null}
+                </InfoRow>
+                <InfoRow label="철거일">
+                  {req.endDate ?? req.date}
+                  {(() => {
+                    const removalTime = resolveGalleryRemovalTime(req);
+                    return removalTime
+                      ? <span className="ml-1 font-medium text-orange-700">{removalTime}까지 철수</span>
+                      : <span className="ml-1 text-gray-400">철수 시간 미지정</span>;
+                  })()}
                 </InfoRow>
               </>
             ) : (
@@ -568,35 +594,10 @@ export default async function AdminRequestDetail({
                         <input key={s.requestId} type="hidden" name="selectedIds" value={s.requestId} />
                       ))}
 
-                      <div>
-                        <label className="block text-sm font-semibold text-gray-700">반려 사유 (반려 시 필수)</label>
-                        <textarea
-                          name="rejectReason"
-                          defaultValue=""
-                          className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                          rows={2}
-                          placeholder="예: 전시 일정 충돌, 신청 내용 확인 불가 등"
-                        />
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="submit"
-                          name="actionStatus"
-                          value="승인"
-                          className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-                        >
-                          전체 승인
-                        </button>
-                        <button
-                          type="submit"
-                          name="actionStatus"
-                          value="반려"
-                          className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
-                        >
-                          전체 반려
-                        </button>
-                      </div>
+                      <BatchActionSection
+                        approveLabel="전체 승인"
+                        rejectLabel="전체 반려"
+                      />
                     </form>
                   </div>
 
@@ -613,17 +614,11 @@ export default async function AdminRequestDetail({
                     <form action={decideSelectedSessions} className="mt-4 space-y-4">
                       <BatchSessionSelector sessions={sessionSelectorRows} />
 
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <div>
-                          <label className="block text-sm font-semibold text-gray-700">반려 사유 (선택 반려 시 적용)</label>
-                          <textarea
-                            name="rejectReason"
-                            defaultValue=""
-                            className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                            rows={2}
-                            placeholder="예: 신청 목적 확인 불가, 운영시간 외 신청 등"
-                          />
-                        </div>
+                      <BatchActionSection
+                        approveLabel="선택 승인"
+                        rejectLabel="선택 반려"
+                        note="* 체크된 회차에만 적용됩니다. 전체 처리하려면 '전체 선택' 후 버튼을 누르세요."
+                      >
                         <div>
                           <label className="block text-sm font-semibold text-gray-700">관리 메모 (선택 회차에 적용, 미입력 시 기존 유지)</label>
                           <textarea
@@ -634,29 +629,7 @@ export default async function AdminRequestDetail({
                             placeholder="예: 전화로 내용 확인 완료"
                           />
                         </div>
-                      </div>
-
-                      <div className="flex flex-wrap items-center gap-3">
-                        <button
-                          type="submit"
-                          name="actionStatus"
-                          value="승인"
-                          className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90"
-                        >
-                          선택 승인
-                        </button>
-                        <button
-                          type="submit"
-                          name="actionStatus"
-                          value="반려"
-                          className="rounded-lg bg-red-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-red-700"
-                        >
-                          선택 반려
-                        </button>
-                        <span className="text-xs text-gray-500">
-                          * 체크된 회차에만 적용됩니다. 전체 처리하려면 &lsquo;전체 선택&rsquo; 후 버튼을 누르세요.
-                        </span>
-                      </div>
+                      </BatchActionSection>
                     </form>
                   </div>
 
@@ -670,30 +643,10 @@ export default async function AdminRequestDetail({
             /* ── 단일 건 처리 ── */
             <form action={decideSingle} className="space-y-5">
               <div className="grid gap-5 sm:grid-cols-2">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700">처리 상태</label>
-                  <select
-                    name="status"
-                    defaultValue={req.status}
-                    className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                  >
-                    <option value="접수">접수</option>
-                    <option value="승인">승인</option>
-                    <option value="반려">반려</option>
-                    <option value="취소">취소</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700">반려 사유 (반려 시 필수)</label>
-                  <textarea
-                    name="rejectReason"
-                    defaultValue={req.rejectReason || ""}
-                    className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
-                    rows={2}
-                    placeholder="예: 신청 목적 확인 불가, 운영시간 외 신청 등"
-                  />
-                </div>
+                <SingleStatusFields
+                  defaultStatus={req.status}
+                  defaultRejectReason={req.rejectReason || ""}
+                />
               </div>
 
               <div>

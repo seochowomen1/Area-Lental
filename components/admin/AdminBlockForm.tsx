@@ -32,6 +32,8 @@ function minToHm(min: number) {
   return `${pad2(h)}:${pad2(m)}`;
 }
 
+type BlockType = "time" | "day";
+
 export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess, onCreate, onToast, spaceLabel = "강의실", category }: Props) {
   const formRef = useRef<HTMLFormElement | null>(null);
   const isGalleryCategory = category === "gallery";
@@ -41,6 +43,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
   const [endDate, setEndDate] = useState<string>("");
   const [startTime, setStartTime] = useState<string>("");
   const [endTime, setEndTime] = useState<string>("");
+  const [blockType, setBlockType] = useState<BlockType>("time");
 
   const isGallery = isGalleryCategory || roomId === "gallery";
 
@@ -110,9 +113,11 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
 
   const canSubmit = isGalleryCategory
     ? Boolean(date) && Boolean(endDate) && endDate >= date
-    : isGallery
-      ? Boolean(date) && Boolean(galleryHours)
-      : Boolean(date) && Boolean(startTime) && Boolean(endTime);
+    : blockType === "day"
+      ? Boolean(date) && Boolean(endDate) && endDate >= date
+      : isGallery
+        ? Boolean(date) && Boolean(galleryHours)
+        : Boolean(date) && Boolean(startTime) && Boolean(endTime);
 
   const showAllWarning = roomId === "all";
 
@@ -145,7 +150,27 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
         return createdId;
       }
 
-      // 일반 모드
+      // 일 단위 차단 모드 (비갤러리)
+      if (blockType === "day") {
+        const createdId = await onCreate({
+          roomId,
+          date,
+          endDate,
+          startTime: "00:00",
+          endTime: "23:59",
+          reason: reason || "일 단위 차단"
+        });
+
+        if (resetAfterSuccess) {
+          form.reset();
+          setRoomId(rooms[0]?.id ?? "all");
+          setDate("");
+          setEndDate("");
+        }
+        return createdId;
+      }
+
+      // 시간 단위 차단 모드
       const createdId = await onCreate({
         roomId,
         date,
@@ -216,94 +241,173 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
     );
   }
 
-  // 일반(강의실/스튜디오) 모드: 기존 시간 기반 폼
+  // 일반(강의실/스튜디오) 모드
   return (
-    <form ref={formRef} onSubmit={handleSubmit} className="grid grid-cols-1 gap-3 md:grid-cols-12">
-      <div className="md:col-span-3">
-        <FieldLabel>{spaceLabel}</FieldLabel>
-        <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
-          {rooms.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.name}
-            </option>
-          ))}
-        </Select>
-        {showAllWarning ? (
-          <FieldHelp className="text-xs text-red-600">
-            전체 선택 시 모든 {spaceLabel}에 동일한 차단시간이 적용됩니다.
-          </FieldHelp>
-        ) : null}
+    <form ref={formRef} onSubmit={handleSubmit} className="space-y-3">
+      {/* 차단 유형 선택 */}
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => { setBlockType("time"); setEndDate(""); }}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            blockType === "time"
+              ? "bg-slate-900 text-white"
+              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          시간 단위 차단
+        </button>
+        <button
+          type="button"
+          onClick={() => setBlockType("day")}
+          className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
+            blockType === "day"
+              ? "bg-slate-900 text-white"
+              : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+          }`}
+        >
+          일 단위 차단
+        </button>
       </div>
 
-      <div className="md:col-span-3">
-        <FieldLabel>날짜</FieldLabel>
-        <Input type="date" name="date" required value={date} onChange={(e) => setDate(e.target.value)} />
-      </div>
+      {blockType === "day" ? (
+        /* 일 단위 차단 폼 */
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+          <div className="md:col-span-3">
+            <FieldLabel>{spaceLabel}</FieldLabel>
+            <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>{r.name}</option>
+              ))}
+            </Select>
+            {showAllWarning && (
+              <FieldHelp className="text-xs text-red-600">
+                전체 선택 시 모든 {spaceLabel}에 적용됩니다.
+              </FieldHelp>
+            )}
+          </div>
 
-      <div className="md:col-span-2">
-        <FieldLabel>시작</FieldLabel>
-        {isGallery ? (
-          <>
-            <Input readOnly value={startTime || "-"} />
-            <FieldHelp>갤러리는 일 단위 차단으로, 운영시간이 자동 적용됩니다.</FieldHelp>
-          </>
-        ) : (
-          <>
-            <Select
-              name="startTime"
+          <div className="md:col-span-3">
+            <FieldLabel>시작일 *</FieldLabel>
+            <Input type="date" name="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
+
+          <div className="md:col-span-3">
+            <FieldLabel>종료일 *</FieldLabel>
+            <Input
+              type="date"
+              name="endDate"
               required
-              disabled={!date || !startOptions.length}
-              value={startTime}
-              onChange={(e) => setStartTime(e.target.value)}
-            >
-              {!date ? <option value="">날짜를 먼저 선택하세요</option> : null}
-              {date && !startOptions.length ? <option value="">운영시간 없음</option> : null}
-              {startOptions.map((t) => (
-                <option key={t} value={t}>
-                  {t}
+              value={endDate}
+              min={date || undefined}
+              onChange={(e) => setEndDate(e.target.value)}
+            />
+            {date && endDate && endDate < date && (
+              <FieldHelp className="text-xs text-red-600">종료일은 시작일 이후여야 합니다.</FieldHelp>
+            )}
+          </div>
+
+          <div className="md:col-span-3">
+            <FieldLabel>사유(선택)</FieldLabel>
+            <Input name="reason" placeholder="예: 행사/점검/내부 일정" />
+          </div>
+
+          <div className="md:col-span-12">
+            <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+              {isSubmitting ? "등록 중..." : "일 단위 차단 추가"}
+            </Button>
+          </div>
+        </div>
+      ) : (
+        /* 시간 단위 차단 폼 */
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+          <div className="md:col-span-3">
+            <FieldLabel>{spaceLabel}</FieldLabel>
+            <Select name="roomId" value={roomId} onChange={(e) => setRoomId(e.target.value)}>
+              {rooms.map((r) => (
+                <option key={r.id} value={r.id}>
+                  {r.name}
                 </option>
               ))}
             </Select>
-            <FieldHelp>운영시간 내 30분 단위</FieldHelp>
-          </>
-        )}
-      </div>
+            {showAllWarning ? (
+              <FieldHelp className="text-xs text-red-600">
+                전체 선택 시 모든 {spaceLabel}에 동일한 차단시간이 적용됩니다.
+              </FieldHelp>
+            ) : null}
+          </div>
 
-      <div className="md:col-span-2">
-        <FieldLabel>종료</FieldLabel>
-        {isGallery ? (
-          <Input readOnly value={endTime || "-"} />
-        ) : (
-          <>
-            <Select
-              name="endTime"
-              required
-              disabled={!date || !endOptions.length}
-              value={endTime}
-              onChange={(e) => setEndTime(e.target.value)}
-            >
-              {!endOptions.length ? <option value="">--:--</option> : null}
-              {endOptions.map((t) => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </Select>
-            <FieldHelp>시작시간 이후(동일 운영 구간 내)</FieldHelp>
-          </>
-        )}
-      </div>
+          <div className="md:col-span-3">
+            <FieldLabel>날짜</FieldLabel>
+            <Input type="date" name="date" required value={date} onChange={(e) => setDate(e.target.value)} />
+          </div>
 
-      <div className="md:col-span-2">
-        <FieldLabel>사유(선택)</FieldLabel>
-        <Input name="reason" placeholder="예: 행사/점검" />
-      </div>
+          <div className="md:col-span-2">
+            <FieldLabel>시작</FieldLabel>
+            {isGallery ? (
+              <>
+                <Input readOnly value={startTime || "-"} />
+                <FieldHelp>갤러리는 일 단위 차단으로, 운영시간이 자동 적용됩니다.</FieldHelp>
+              </>
+            ) : (
+              <>
+                <Select
+                  name="startTime"
+                  required
+                  disabled={!date || !startOptions.length}
+                  value={startTime}
+                  onChange={(e) => setStartTime(e.target.value)}
+                >
+                  {!date ? <option value="">날짜를 먼저 선택하세요</option> : null}
+                  {date && !startOptions.length ? <option value="">운영시간 없음</option> : null}
+                  {startOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+                <FieldHelp>운영시간 내 30분 단위</FieldHelp>
+              </>
+            )}
+          </div>
 
-      <div className="md:col-span-12">
-        <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
-          {isSubmitting ? "등록 중..." : "차단시간 추가"}
-        </Button>
-      </div>
+          <div className="md:col-span-2">
+            <FieldLabel>종료</FieldLabel>
+            {isGallery ? (
+              <Input readOnly value={endTime || "-"} />
+            ) : (
+              <>
+                <Select
+                  name="endTime"
+                  required
+                  disabled={!date || !endOptions.length}
+                  value={endTime}
+                  onChange={(e) => setEndTime(e.target.value)}
+                >
+                  {!endOptions.length ? <option value="">--:--</option> : null}
+                  {endOptions.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </Select>
+                <FieldHelp>시작시간 이후(동일 운영 구간 내)</FieldHelp>
+              </>
+            )}
+          </div>
+
+          <div className="md:col-span-2">
+            <FieldLabel>사유(선택)</FieldLabel>
+            <Input name="reason" placeholder="예: 행사/점검" />
+          </div>
+
+          <div className="md:col-span-12">
+            <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
+              {isSubmitting ? "등록 중..." : "차단시간 추가"}
+            </Button>
+          </div>
+        </div>
+      )}
     </form>
   );
 }

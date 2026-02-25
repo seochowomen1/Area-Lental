@@ -13,11 +13,6 @@ const nextConfig = {
       bodySizeLimit: "40mb",
     },
   },
-  // build 단계에서 next가 내부적으로 lint를 다시 실행하지 않도록 끄고,
-  // 대신 npm scripts에서 eslint를 직접 실행하도록 구성합니다.
-  eslint: {
-    ignoreDuringBuilds: true,
-  },
 };
 
 module.exports = nextConfig;

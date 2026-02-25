@@ -26,7 +26,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, Props>(
         />
         <span className="min-w-0">
           <span className={CHECKBOX_TEXT}>{label}</span>
-          {error ? <div className={[CHECKBOX_HELP, "text-red-600"].join(" ")}>{error}</div> : null}
+          {error ? <div className="mt-1 text-xs leading-4 font-semibold text-red-600">{error}</div> : null}
           {!error && help ? <div className={CHECKBOX_HELP}>{help}</div> : null}
         </span>
       </label>

@@ -1,34 +1,52 @@
 /**
- * 이메일 템플릿 관리
+ * 이메일 템플릿 관리 (통합)
  *
- * 카테고리별(강의실/E-스튜디오/갤러리) + 상태별(승인/반려/취소) 이메일 본문 템플릿을
- * data/email-templates.json에 저장·로드합니다.
+ * 상태별(접수/승인/반려/취소) 이메일 본문 템플릿을
+ * Google Sheets(email_templates 시트)에 저장·로드합니다.
+ * 공간 카테고리 구분 없이 하나의 템플릿 세트를 사용합니다.
  *
  * 변수 치환:
  *   {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}},
- *   {{요금정보}}, {{반려사유}}, {{조회링크}}
+ *   {{요금정보}}, {{반려사유}}, {{조회링크}}, {{장비정보}}
  */
 
-import fs from "fs";
-import path from "path";
+import { getDatabase } from "./database";
 
-const TEMPLATE_FILE = path.join(process.cwd(), "data", "email-templates.json");
-
-export type TemplateCategory = "lecture" | "studio" | "gallery";
-export type TemplateStatus = "승인" | "반려" | "취소";
+export type TemplateStatus = "접수" | "승인" | "반려" | "취소";
 
 export type EmailTemplate = {
   subject: string;
   body: string;
 };
 
+export type UnifiedTemplates = Record<TemplateStatus, EmailTemplate>;
+
+// 하위 호환: 기존 TemplateCategory 타입 export (mail.ts 등에서 사용)
+export type TemplateCategory = "lecture" | "studio" | "gallery";
+// 하위 호환: 기존 AllTemplates 타입 export
 export type AllTemplates = Record<TemplateCategory, Partial<Record<TemplateStatus, EmailTemplate>>>;
 
+/** 통합 저장 시 사용하는 내부 카테고리 키 */
+const UNIFIED_CATEGORY = "common";
+
 const DEFAULT_SUBJECT: Record<TemplateStatus, string> = {
+  "접수": "[신청완료] {{카테고리}} 대관 신청 ({{신청번호}})",
   "승인": "[승인] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
   "반려": "[반려] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
   "취소": "[취소] {{카테고리}} 대관 신청 결과 ({{신청번호}})",
 };
+
+const DEFAULT_BODY_RECEIVED = `안녕하세요. 서초여성가족플라자 서초센터입니다.
+
+{{카테고리}} 대관 신청이 정상적으로 완료되었습니다.
+담당자 검토 후 승인/반려 결과를 이메일로 안내드리겠습니다.
+
+- 신청번호: {{신청번호}}
+- 공간({{카테고리}}): {{공간}}
+- 일시: {{일시}}
+{{장비정보}}
+
+감사합니다.`;
 
 const DEFAULT_BODY_APPROVED = `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
@@ -77,7 +95,9 @@ function defaultTemplateFor(status: TemplateStatus): EmailTemplate {
   return {
     subject: DEFAULT_SUBJECT[status],
     body:
-      status === "승인"
+      status === "접수"
+        ? DEFAULT_BODY_RECEIVED
+        : status === "승인"
         ? DEFAULT_BODY_APPROVED
         : status === "반려"
         ? DEFAULT_BODY_REJECTED
@@ -85,64 +105,93 @@ function defaultTemplateFor(status: TemplateStatus): EmailTemplate {
   };
 }
 
+const ALL_STATUSES: TemplateStatus[] = ["접수", "승인", "반려", "취소"];
+
+export function getDefaultUnifiedTemplates(): UnifiedTemplates {
+  return Object.fromEntries(ALL_STATUSES.map((s) => [s, defaultTemplateFor(s)])) as UnifiedTemplates;
+}
+
+/**
+ * 하위 호환용: 기존 API가 category별로 반환하는 형태 유지
+ * 내부적으로는 통합 템플릿 1세트를 모든 카테고리에 동일하게 제공
+ */
 export function getDefaultTemplates(): AllTemplates {
+  const unified = getDefaultUnifiedTemplates();
   return {
-    lecture: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
-    studio: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
-    gallery: {
-      "승인": defaultTemplateFor("승인"),
-      "반려": defaultTemplateFor("반려"),
-      "취소": defaultTemplateFor("취소"),
-    },
+    lecture: { ...unified },
+    studio: { ...unified },
+    gallery: { ...unified },
   };
 }
 
-export function loadTemplates(): AllTemplates {
-  try {
-    if (fs.existsSync(TEMPLATE_FILE)) {
-      const raw = fs.readFileSync(TEMPLATE_FILE, "utf-8");
-      const parsed = JSON.parse(raw) as Partial<AllTemplates>;
-      const defaults = getDefaultTemplates();
+/**
+ * Google Sheets에서 이메일 템플릿을 로드합니다.
+ * "common" 카테고리로 저장된 통합 템플릿을 우선 사용하고,
+ * 없으면 기존 카테고리별 데이터에서 폴백합니다.
+ */
+export async function loadUnifiedTemplates(): Promise<UnifiedTemplates> {
+  const defaults = getDefaultUnifiedTemplates();
 
-      // Merge with defaults to fill any missing fields
-      for (const cat of ["lecture", "studio", "gallery"] as TemplateCategory[]) {
-        if (!parsed[cat]) continue;
-        for (const st of ["승인", "반려", "취소"] as TemplateStatus[]) {
-          if (parsed[cat]![st]) {
-            defaults[cat][st] = {
-              subject: parsed[cat]![st]!.subject || defaults[cat][st]!.subject,
-              body: parsed[cat]![st]!.body || defaults[cat][st]!.body,
-            };
-          }
-        }
-      }
-      return defaults;
+  try {
+    const db = getDatabase();
+    const rows = await db.getEmailTemplates();
+
+    // "common" 카테고리 템플릿 우선
+    for (const row of rows) {
+      if (row.category !== UNIFIED_CATEGORY) continue;
+      const st = row.status as TemplateStatus;
+      if (!ALL_STATUSES.includes(st)) continue;
+      defaults[st] = {
+        subject: row.subject || defaults[st].subject,
+        body: row.body || defaults[st].body,
+      };
     }
   } catch {
-    // ignore
+    // DB 연결 실패 시 기본 템플릿 반환
   }
-  return getDefaultTemplates();
+
+  return defaults;
 }
 
-export function saveTemplates(templates: AllTemplates): void {
-  const dir = path.dirname(TEMPLATE_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
-  }
-  fs.writeFileSync(TEMPLATE_FILE, JSON.stringify(templates, null, 2), "utf-8");
+/**
+ * 하위 호환: 기존 API 응답 형태 (category→status→template)
+ * 내부적으로 통합 템플릿을 모든 카테고리에 동일하게 반환
+ */
+export async function loadTemplates(): Promise<AllTemplates> {
+  const unified = await loadUnifiedTemplates();
+  return {
+    lecture: { ...unified },
+    studio: { ...unified },
+    gallery: { ...unified },
+  };
 }
 
-export function getTemplate(category: TemplateCategory, status: TemplateStatus): EmailTemplate {
-  const all = loadTemplates();
-  return all[category]?.[status] ?? defaultTemplateFor(status);
+/**
+ * 통합 이메일 템플릿을 Google Sheets에 저장합니다.
+ * 항상 "common" 카테고리로 저장합니다.
+ */
+export async function saveTemplates(
+  _category: string,
+  status: TemplateStatus,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const db = getDatabase();
+  await db.saveEmailTemplate(UNIFIED_CATEGORY, status, subject, body);
+}
+
+/**
+ * 특정 상태의 이메일 템플릿을 반환합니다.
+ * category 인자는 하위 호환을 위해 남겨두었으나 무시됩니다.
+ */
+export async function getTemplate(_category: TemplateCategory | string, status: TemplateStatus): Promise<EmailTemplate> {
+  const all = await loadUnifiedTemplates();
+  return all[status] ?? defaultTemplateFor(status);
+}
+
+/** 변수 값 내의 {{...}} 패턴을 무력화하여 재귀 치환 방지 */
+function sanitizeValue(value: string): string {
+  return value.replace(/\{\{/g, "{ {").replace(/\}\}/g, "} }");
 }
 
 /** 변수를 실제 값으로 치환합니다 */
@@ -153,8 +202,10 @@ export function renderTemplate(
   function replace(text: string) {
     let result = text;
     for (const [key, value] of Object.entries(vars)) {
-      result = result.replaceAll(`{{${key}}}`, value);
+      result = result.replaceAll(`{{${key}}}`, sanitizeValue(value));
     }
+    // 미치환 변수 제거 (사용되지 않는 플레이스홀더 정리)
+    result = result.replace(/\{\{[^}]+\}\}/g, "");
     return result;
   }
   return {

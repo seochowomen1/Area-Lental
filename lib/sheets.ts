@@ -166,12 +166,35 @@ function buildRecordValueMap(record: RentalRequest): Record<string, string> {
 }
 
 /**
+ * Google Sheets 수식 인젝션 방어
+ * =, +, -, @, \t, \r 로 시작하는 값은 Sheets에서 수식으로 해석될 수 있음
+ */
+function sanitizeForSheets(value: string): string {
+  if (!value) return value;
+  const first = value.charAt(0);
+  if (first === "=" || first === "+" || first === "-" || first === "@" || first === "\t" || first === "\r") {
+    return "'" + value;
+  }
+  return value;
+}
+
+/** 수식 인젝션 방어 대상 (사용자 입력 필드) */
+const USER_INPUT_COLUMNS = new Set([
+  "applicantName", "address", "orgName", "purpose",
+  "exhibitionTitle", "exhibitionPurpose", "genreContent",
+  "awarenessPath", "specialNotes", "adminMemo", "rejectReason", "discountReason",
+]);
+
+/**
  * 헤더 배열 순서에 맞춰 레코드 값 배열을 생성합니다.
  * 헤더 순서가 코드와 다르더라도 정확한 컬럼에 값이 배치됩니다.
  */
 function buildRowFromHeader(header: string[], record: RentalRequest): string[] {
   const map = buildRecordValueMap(record);
-  return header.map((col) => map[col] ?? "");
+  return header.map((col) => {
+    const val = map[col] ?? "";
+    return USER_INPUT_COLUMNS.has(col) ? sanitizeForSheets(val) : val;
+  });
 }
 
 function roomName(roomId: string): string {
@@ -377,15 +400,15 @@ export async function nextRequestId(): Promise<string> {
     return mock_nextRequestId();
   }
 
+  const { randomBytes } = await import("crypto");
   const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
   const all = await getAllRequests();
-  const nums = all
-    .map(r => r.requestId)
-    .filter(v => v.startsWith(prefix))
-    .map(v => parseInt(v.slice(prefix.length), 10))
-    .filter(n => Number.isFinite(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
+  const existingIds = new Set(all.map(r => r.requestId));
+  let candidate: string;
+  do {
+    candidate = `${prefix}${randomBytes(4).toString("hex").toUpperCase()}`;
+  } while (existingIds.has(candidate));
+  return candidate;
 }
 
 export async function appendRequest(
@@ -742,6 +765,44 @@ export async function addClassSchedule(s: Omit<ClassSchedule, "id">): Promise<Cl
   return { id, ...s };
 }
 
+export async function updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule> {
+  if (isMockMode()) {
+    const { mock_updateClassSchedule } = await import("./mockdb");
+    return mock_updateClassSchedule(id, updates);
+  }
+
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  // 현재 스케줄 조회
+  const schedules = await getClassSchedules();
+  const existing = schedules.find(s => s.id === id);
+  if (!existing) throw new Error("수정할 수업시간을 찾을 수 없습니다.");
+
+  const updated: ClassSchedule = { ...existing, ...updates };
+
+  // 행 위치 찾기
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A:A`
+  });
+  const col = (res.data.values ?? []) as string[][];
+  const rowIndex = col.findIndex((r) => r[0] === id);
+  if (rowIndex < 0) throw new Error("시트에서 해당 행을 찾을 수 없습니다.");
+
+  const rowNumber = rowIndex + 1; // 1-based
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A${rowNumber}:H${rowNumber}`,
+    valueInputOption: "RAW",
+    requestBody: {
+      values: [[updated.id, updated.roomId, String(updated.dayOfWeek), updated.startTime, updated.endTime, updated.title, updated.effectiveFrom, updated.effectiveTo]]
+    }
+  });
+
+  return updated;
+}
+
 async function getSheetIdByTitle(title: string): Promise<number> {
   if (isMockMode()) throw new Error("MOCK_MODE에서는 시트ID 조회가 필요 없습니다.");
 
@@ -851,4 +912,178 @@ export async function deleteBlock(id: string): Promise<void> {
       }]
     }
   });
+}
+
+/* ── 신청 삭제 ── */
+
+export async function deleteRequests(requestIds: string[]): Promise<void> {
+  if (isMockMode()) {
+    const { mock_deleteRequests } = await import("./mockdb");
+    return mock_deleteRequests(requestIds);
+  }
+
+  if (!requestIds.length) return;
+
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  // requestId 컬럼(A열) 조회
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:A`,
+  });
+  const col = (res.data.values ?? []) as string[][];
+
+  const idsSet = new Set(requestIds);
+  const rowIndicesToDelete: number[] = [];
+  for (let i = 1; i < col.length; i++) {
+    if (idsSet.has(col[i]?.[0])) {
+      rowIndicesToDelete.push(i);
+    }
+  }
+
+  if (!rowIndicesToDelete.length) return;
+
+  const sheetId = await getSheetIdByTitle(SHEET_REQUESTS);
+
+  // 아래에서 위로 삭제해야 인덱스가 밀리지 않음
+  rowIndicesToDelete.sort((a, b) => b - a);
+
+  const requests = rowIndicesToDelete.map((rowIndex) => ({
+    deleteDimension: {
+      range: {
+        sheetId,
+        dimension: "ROWS" as const,
+        startIndex: rowIndex,
+        endIndex: rowIndex + 1,
+      },
+    },
+  }));
+
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: { requests },
+  });
+}
+
+/* ── 이메일 템플릿 (Google Sheets 저장) ── */
+
+const SHEET_EMAIL_TEMPLATES = "email_templates";
+
+type EmailTemplateRow = {
+  category: string;
+  status: string;
+  subject: string;
+  body: string;
+};
+
+/**
+ * email_templates 시트가 없으면 자동으로 생성(헤더 포함)합니다.
+ */
+async function ensureEmailTemplatesSheet(): Promise<void> {
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID });
+  const exists = meta.data.sheets?.some(
+    (s) => s.properties?.title === SHEET_EMAIL_TEMPLATES
+  );
+  if (exists) return;
+
+  // 시트 생성
+  await sheets.spreadsheets.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: {
+      requests: [
+        { addSheet: { properties: { title: SHEET_EMAIL_TEMPLATES } } },
+      ],
+    },
+  });
+
+  // 헤더 작성
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A1:D1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [["category", "status", "subject", "body"]] },
+  });
+}
+
+/**
+ * 이메일 템플릿 전체를 Google Sheets에서 읽어옵니다.
+ */
+export async function getEmailTemplates(): Promise<EmailTemplateRow[]> {
+  if (isMockMode()) {
+    const { mock_getEmailTemplates } = await import("./mockdb");
+    return mock_getEmailTemplates();
+  }
+
+  const env = requireGoogleEnv();
+  await ensureEmailTemplatesSheet();
+
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+  });
+
+  const rows = (res.data.values ?? []) as string[][];
+  if (rows.length <= 1) return [];
+
+  return rows.slice(1).filter((r) => r[0] && r[1]).map((r) => ({
+    category: r[0],
+    status: r[1],
+    subject: r[2] ?? "",
+    body: r[3] ?? "",
+  }));
+}
+
+/**
+ * 특정 카테고리+상태의 이메일 템플릿을 저장(있으면 업데이트, 없으면 추가)합니다.
+ */
+export async function saveEmailTemplate(
+  category: string,
+  status: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  if (isMockMode()) {
+    const { mock_saveEmailTemplate } = await import("./mockdb");
+    return mock_saveEmailTemplate(category, status, subject, body);
+  }
+
+  const env = requireGoogleEnv();
+  await ensureEmailTemplatesSheet();
+
+  const { sheets } = getGoogleClient();
+
+  // 기존 행 검색
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+  });
+  const rows = (res.data.values ?? []) as string[][];
+
+  const rowIndex = rows.findIndex(
+    (r, i) => i > 0 && r[0] === category && r[1] === status,
+  );
+
+  if (rowIndex >= 0) {
+    // 기존 행 업데이트
+    const rowNumber = rowIndex + 1;
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_EMAIL_TEMPLATES}!A${rowNumber}:D${rowNumber}`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[category, status, subject, body]] },
+    });
+  } else {
+    // 새 행 추가
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_EMAIL_TEMPLATES}!A:D`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[category, status, subject, body]] },
+    });
+  }
 }

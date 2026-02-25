@@ -4,6 +4,8 @@ import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { isMockMode } from "@/lib/env";
 import { overlaps } from "@/lib/datetime";
 import { validateOperatingHoursByDayOfWeek } from "@/lib/operating";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -83,8 +85,10 @@ export async function POST(req: Request) {
     // 중복/겹침 방지
     const hasConflict = existing.some((s) => {
       if (s.dayOfWeek !== dayOfWeek) return false;
-      // 적용 기간이 겹치는 경우만 체크
-      const effectiveOverlap = s.effectiveFrom <= effectiveTo && s.effectiveTo >= effectiveFrom;
+      // 적용 기간이 겹치는 경우만 체크 (미설정 시 무제한으로 간주)
+      const sFrom = s.effectiveFrom || "0000-00-00";
+      const sTo = s.effectiveTo || "9999-12-31";
+      const effectiveOverlap = sFrom <= effectiveTo && sTo >= effectiveFrom;
       if (!effectiveOverlap) return false;
       // 'all'은 모든 공간에 적용
       const roomOverlap = s.roomId === "all" || roomId === "all" || s.roomId === roomId;
@@ -108,7 +112,71 @@ export async function POST(req: Request) {
     };
 
     const result = await db.addClassSchedule(item);
+    auditLog({ action: "SCHEDULE_CREATE", ip: getClientIp(req), target: result?.id ?? title, details: { title, roomId, dayOfWeek, startTime, endTime } });
     return NextResponse.json({ ok: true, created: result });
+  } catch (e: unknown) {
+    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
+    return jsonError(msg, 500, "SERVER_ERROR");
+  }
+}
+
+export async function PATCH(req: Request) {
+  const auth = assertAdminApiAuth();
+  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  try {
+    const body = (await req.json()) as Partial<ClassSchedule> & { id?: string };
+    const id = String(body.id ?? "").trim();
+    if (!id) return jsonError("수정할 항목(id)이 필요합니다.", 400, "VALIDATION");
+
+    let title = String(body.title ?? "").trim();
+    const roomId = String(body.roomId ?? "").trim();
+    const dayOfWeek = Number(body.dayOfWeek);
+    const startTime = body.startTime;
+    const endTime = body.endTime;
+    const effectiveFrom = body.effectiveFrom;
+    const effectiveTo = body.effectiveTo;
+
+    if (!title) title = "정규수업";
+    if (!roomId) return jsonError("대상을 선택해 주세요.", 400, "VALIDATION");
+    if (!Number.isInteger(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6)
+      return jsonError("요일 값이 올바르지 않습니다.", 400, "VALIDATION");
+    if (!isHHMM(startTime) || !isHHMM(endTime))
+      return jsonError("시간 형식이 올바르지 않습니다. (HH:MM)", 400, "VALIDATION");
+    if (!is30Min(startTime) || !is30Min(endTime))
+      return jsonError("시간은 30분 단위(00/30)로만 등록할 수 있습니다.", 400, "VALIDATION");
+    if (startTime >= endTime) return jsonError("종료 시간은 시작 시간보다 늦어야 합니다.", 400, "VALIDATION");
+    if (!isYmd(effectiveFrom) || !isYmd(effectiveTo))
+      return jsonError("적용 기간 형식이 올바르지 않습니다. (YYYY-MM-DD)", 400, "VALIDATION");
+    if (effectiveFrom > effectiveTo) return jsonError("적용 기간(시작/종료)이 올바르지 않습니다.", 400, "VALIDATION");
+
+    const op = validateOperatingHoursByDayOfWeek(dayOfWeek, startTime, endTime);
+    if (!op.ok) return jsonError(op.message, 400, "OUT_OF_HOURS");
+
+    const db = getDatabase();
+    const existing = await db.getClassSchedules();
+
+    // 중복/겹침 방지 (자기 자신은 제외)
+    const hasConflict = existing.some((s) => {
+      if (s.id === id) return false; // 자기 자신 제외
+      if (s.dayOfWeek !== dayOfWeek) return false;
+      const sFrom = s.effectiveFrom || "0000-00-00";
+      const sTo = s.effectiveTo || "9999-12-31";
+      const effectiveOverlap = sFrom <= effectiveTo && sTo >= effectiveFrom;
+      if (!effectiveOverlap) return false;
+      const roomOverlap = s.roomId === "all" || roomId === "all" || s.roomId === roomId;
+      if (!roomOverlap) return false;
+      return overlaps(s.startTime, s.endTime, startTime, endTime);
+    });
+
+    if (hasConflict) {
+      return jsonError("이미 등록된 정규수업 시간과 겹칩니다.", 409, "CONFLICT");
+    }
+
+    const updated = await db.updateClassSchedule(id, {
+      title, roomId, dayOfWeek, startTime, endTime, effectiveFrom, effectiveTo,
+    });
+    auditLog({ action: "SCHEDULE_UPDATE", ip: getClientIp(req), target: id, details: { title, roomId, dayOfWeek } });
+    return NextResponse.json({ ok: true, updated });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
     return jsonError(msg, 500, "SERVER_ERROR");
@@ -125,6 +193,7 @@ export async function DELETE(req: Request) {
 
     const db = getDatabase();
     await db.deleteClassSchedule(id);
+    auditLog({ action: "SCHEDULE_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";

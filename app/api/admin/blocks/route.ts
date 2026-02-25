@@ -3,6 +3,8 @@ import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, overlaps } from "@/lib/datetime";
 import { validateOperatingHours } from "@/lib/operating";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -76,27 +78,35 @@ export async function POST(req: Request) {
     if (!roomId) return jsonError("대상을 선택해 주세요.", 400, "VALIDATION");
     if (!isYmd(date)) return jsonError("날짜 형식이 올바르지 않습니다. (YYYY-MM-DD)", 400, "VALIDATION");
 
-    // 갤러리 날짜 범위 차단 모드
-    if (isGallery && isYmd(endDateRaw)) {
+    // 날짜 범위 차단 모드 (갤러리 + 비갤러리 일 단위 차단)
+    if (isYmd(endDateRaw)) {
       if (endDateRaw < date) return jsonError("종료일은 시작일 이후여야 합니다.", 400, "VALIDATION");
 
       const db = getDatabase();
       const existingBlocks = await db.getBlocks();
 
-      // 범위 내 기존 갤러리 블록 겹침 체크
+      // 범위 내 기존 블록 겹침 체크 (같은 room 또는 all)
       const rangeConflict = existingBlocks.some((b) => {
-        if (b.roomId !== roomId && b.roomId !== "all") return false;
+        const roomOverlap = b.roomId === "all" || roomId === "all" || b.roomId === roomId;
+        if (!roomOverlap) return false;
         const bStart = b.date;
         const bEnd = b.endDate || b.date;
-        // 두 범위 [date, endDate] 과 [bStart, bEnd] 가 겹치는지 체크
-        return bStart <= endDateRaw && bEnd >= date;
+        if (b.endDate) {
+          // 날짜 범위 블록끼리 겹침 체크
+          return bStart <= endDateRaw && bEnd >= date;
+        }
+        // 단일 날짜 시간 블록: 해당 날짜가 새 범위 내에 있는지
+        return b.date >= date && b.date <= endDateRaw;
       });
       if (rangeConflict) {
         return jsonError("이미 등록된 일정과 기간이 겹칩니다.", 409, "CONFLICT");
       }
 
-      const item = { roomId, date, endDate: endDateRaw, startTime: "09:00", endTime: "18:00", reason };
+      const blockStartTime = isGallery ? "09:00" : "00:00";
+      const blockEndTime = isGallery ? "18:00" : "23:59";
+      const item = { roomId, date, endDate: endDateRaw, startTime: blockStartTime, endTime: blockEndTime, reason };
       const result = await db.addBlock(item);
+      auditLog({ action: "BLOCK_CREATE", ip: getClientIp(req), target: result?.id ?? roomId, details: { roomId, date, endDate: endDateRaw, reason } });
       return NextResponse.json({ ok: true, created: result });
     }
 
@@ -137,11 +147,13 @@ export async function POST(req: Request) {
       return jsonError("이미 등록된 차단 시간과 겹칩니다.", 409, "CONFLICT");
     }
 
-    // 2) 정규수업과 겹침 방지(적용 기간 포함)
+    // 2) 정규수업과 겹침 방지(적용 기간 포함, 미설정 시 무제한)
     const dow = dayOfWeek(date);
     const scheduleConflict = (existingSchedules as ClassSchedule[]).some((s) => {
       if (s.dayOfWeek !== dow) return false;
-      const effectiveOverlap = s.effectiveFrom <= date && s.effectiveTo >= date;
+      const sFrom = s.effectiveFrom || "0000-00-00";
+      const sTo = s.effectiveTo || "9999-12-31";
+      const effectiveOverlap = sFrom <= date && sTo >= date;
       if (!effectiveOverlap) return false;
       const roomOverlap = s.roomId === "all" || roomId === "all" || s.roomId === roomId;
       if (!roomOverlap) return false;
@@ -153,6 +165,7 @@ export async function POST(req: Request) {
 
     const item = { roomId, date, startTime, endTime, reason };
     const result = await db.addBlock(item);
+    auditLog({ action: "BLOCK_CREATE", ip: getClientIp(req), target: result?.id ?? roomId, details: { roomId, date, startTime, endTime, reason } });
     return NextResponse.json({ ok: true, created: result });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
@@ -170,6 +183,7 @@ export async function DELETE(req: Request) {
 
     const db = getDatabase();
     await db.deleteBlock(id);
+    auditLog({ action: "BLOCK_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";

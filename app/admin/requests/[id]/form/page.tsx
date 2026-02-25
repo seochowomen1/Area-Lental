@@ -42,6 +42,18 @@ function sortSessions(list: RentalRequest[]) {
     );
 }
 
+/** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
+function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
+  if (req.galleryRemovalTime) return req.galleryRemovalTime;
+  if (req.galleryAuditJson) {
+    try {
+      const audit = JSON.parse(req.galleryAuditJson);
+      if (typeof audit.removalTime === "string" && audit.removalTime) return audit.removalTime;
+    } catch { /* ignore */ }
+  }
+  return undefined;
+}
+
 /* ── Shared table cell styles (compact for A4) ── */
 const TH =
   "border border-gray-400 bg-gray-50 px-2 py-1 text-left text-[11px] font-bold text-gray-900 whitespace-nowrap print:px-1.5 print:py-0.5 print:text-[9px]";
@@ -515,7 +527,6 @@ export default async function AdminRequestFormPage({
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
@@ -794,7 +805,6 @@ export default async function AdminRequestFormPage({
               <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
                 <span>신청 일시: {consentDate}</span>
                 <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
@@ -903,9 +913,12 @@ export default async function AdminRequestFormPage({
                 <tr>
                   <th className={TH}>철수시간</th>
                   <td className={TD} colSpan={3}>
-                    {req.galleryRemovalTime
-                      ? `종료일 ${req.galleryRemovalTime}까지`
-                      : "-"}
+                    {(() => {
+                      const rt = resolveGalleryRemovalTime(req);
+                      return rt
+                        ? `종료일(${req.endDate ?? req.date}) ${rt}까지`
+                        : "-";
+                    })()}
                   </td>
                 </tr>
                 <tr>
@@ -1109,7 +1122,6 @@ export default async function AdminRequestFormPage({
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
-                <span>서약 동의: {req.pledgeAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
                 본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
@@ -1245,15 +1257,6 @@ export default async function AdminRequestFormPage({
                   <th className={TH}>대관 시설</th>
                   <td className={TD}>
                     {room?.name ?? req.roomId} ({categoryLabel})
-                  </td>
-                </tr>
-                <tr>
-                  <th className={TH}>서약 동의</th>
-                  <td className={TD} colSpan={3}>
-                    <span className="font-semibold">
-                      {req.pledgeAgree ? "■ 동의" : "□ 동의"} &nbsp;&nbsp;{" "}
-                      {req.pledgeAgree ? "□ 미동의" : "■ 미동의"}
-                    </span>
                   </td>
                 </tr>
               </tbody>

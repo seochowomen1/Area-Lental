@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import AdminScheduleForm from "@/components/admin/AdminScheduleForm";
 import AdminBlockForm from "@/components/admin/AdminBlockForm";
+import ScheduleGrid from "@/components/admin/ScheduleGrid";
 import ToastBanner from "@/components/ToastBanner";
 
 import type { BlockTime, ClassSchedule, Room } from "@/lib/types";
@@ -47,6 +48,10 @@ export default function SettingsClient(props: {
   // 펼치기/접기 상태
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
   const [blockFormOpen, setBlockFormOpen] = useState(false);
+
+  // 시간표 보기 / 목록 보기 전환
+  type ScheduleViewMode = "list" | "grid";
+  const [scheduleView, setScheduleView] = useState<ScheduleViewMode>("grid");
 
   const sortedSchedules = useMemo(() => {
     return [...schedules].sort((a, b) => {
@@ -138,6 +143,39 @@ export default function SettingsClient(props: {
     }
   }
 
+  async function onUpdateSchedule(id: string, payload: Omit<ClassSchedule, "id">) {
+    setSubmitting("schedule");
+    try {
+      const data = await apiJson<{ ok: true; updated: ClassSchedule }>("/api/admin/class-schedules", {
+        method: "PATCH",
+        body: JSON.stringify({ id, ...payload })
+      });
+
+      setSchedules((prev) => prev.map((s) => (s.id === id ? data.updated : s)));
+      highlight(data.updated.id);
+      setToast({ type: "success", message: "수업시간이 수정되었습니다." });
+      router.refresh();
+    } catch (err: any) {
+      setToast({ type: "error", message: err?.message ?? "수정에 실패했습니다." });
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
+  async function onDeleteScheduleNoConfirm(id: string) {
+    setSubmitting("delete");
+    try {
+      await apiJson<{ ok: true }>(`/api/admin/class-schedules?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      setSchedules((prev) => prev.filter((s) => s.id !== id));
+      setToast({ type: "success", message: "삭제되었습니다." });
+      router.refresh();
+    } catch (err: any) {
+      setToast({ type: "error", message: err?.message ?? "삭제에 실패했습니다." });
+    } finally {
+      setSubmitting(null);
+    }
+  }
+
   async function onDeleteSchedule(id: string) {
     if (!confirm("해당 수업시간을 삭제할까요?")) return;
     setSubmitting("delete");
@@ -195,80 +233,125 @@ export default function SettingsClient(props: {
                 <h2 className="text-base font-bold text-slate-900">정규 수업시간</h2>
                 <p className="mt-0.5 text-xs text-slate-500">등록된 시간에는 대관 신청이 차단됩니다</p>
               </div>
-              <button
-                type="button"
-                onClick={() => setScheduleFormOpen((v) => !v)}
-                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
-              >
-                {scheduleFormOpen ? "닫기" : "+ 새 수업시간"}
-              </button>
+              <div className="flex items-center gap-2">
+                {/* 시간표 / 목록 토글 */}
+                <div className="flex rounded-full border border-slate-200 bg-white p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setScheduleView("grid")}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      scheduleView === "grid"
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    시간표
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setScheduleView("list")}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
+                      scheduleView === "list"
+                        ? "bg-slate-900 text-white"
+                        : "text-slate-500 hover:text-slate-700"
+                    }`}
+                  >
+                    목록
+                  </button>
+                </div>
+                {scheduleView === "list" && (
+                  <button
+                    type="button"
+                    onClick={() => setScheduleFormOpen((v) => !v)}
+                    className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                  >
+                    {scheduleFormOpen ? "닫기" : "+ 새 수업시간"}
+                  </button>
+                )}
+              </div>
             </div>
           </div>
 
-          {scheduleFormOpen && (
-            <div className="border-b border-slate-100 bg-blue-50/30 px-5 py-5">
-              <AdminScheduleForm
+          {scheduleView === "grid" ? (
+            <div className="px-5 py-5">
+              <ScheduleGrid
                 rooms={props.rooms}
-                dayOptions={props.dayOptions}
+                schedules={schedules}
+                onAdd={onCreateSchedule}
+                onUpdate={onUpdateSchedule}
+                onDelete={onDeleteScheduleNoConfirm}
                 isSubmitting={submitting !== null}
-                resetAfterSuccess={false}
-                onCreate={onCreateSchedule}
-                onToast={(t) => setToast(t)}
                 spaceLabel={spaceLabel}
               />
             </div>
-          )}
+          ) : (
+            <>
+              {scheduleFormOpen && (
+                <div className="border-b border-slate-100 bg-blue-50/30 px-5 py-5">
+                  <AdminScheduleForm
+                    rooms={props.rooms}
+                    dayOptions={props.dayOptions}
+                    isSubmitting={submitting !== null}
+                    resetAfterSuccess={false}
+                    onCreate={onCreateSchedule}
+                    onToast={(t) => setToast(t)}
+                    spaceLabel={spaceLabel}
+                  />
+                </div>
+              )}
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="border-b bg-slate-50/80 text-left text-xs font-semibold text-slate-600">
-                <tr>
-                  <th className="px-5 py-3">{spaceLabel}</th>
-                  <th className="px-5 py-3">요일</th>
-                  <th className="px-5 py-3">시간</th>
-                  <th className="px-5 py-3">제목</th>
-                  <th className="px-5 py-3">적용기간</th>
-                  <th className="px-5 py-3 text-right">관리</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {sortedSchedules.length ? (
-                  sortedSchedules.map((s) => (
-                    <tr key={s.id} className={`transition hover:bg-slate-50/50 ${highlightRowClass(s.id)}`}>
-                      <td className="px-5 py-3 font-medium">{props.rooms.find((r) => r.id === s.roomId)?.name ?? s.roomId}</td>
-                      <td className="px-5 py-3">
-                        <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold">
-                          {DOW_LABELS[s.dayOfWeek] ?? s.dayOfWeek}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3 tabular-nums">{s.startTime}~{s.endTime}</td>
-                      <td className="px-5 py-3 text-slate-600">{s.title || <span className="text-slate-400">-</span>}</td>
-                      <td className="px-5 py-3 text-xs tabular-nums text-slate-600">{(s.effectiveFrom || "-") + " ~ " + (s.effectiveTo || "-")}</td>
-                      <td className="px-5 py-3 text-right">
-                        <button
-                          type="button"
-                          disabled={submitting !== null}
-                          onClick={() => onDeleteSchedule(s.id)}
-                          className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50"
-                        >
-                          삭제
-                        </button>
-                      </td>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className="border-b bg-slate-50/80 text-left text-xs font-semibold text-slate-600">
+                    <tr>
+                      <th className="px-5 py-3">{spaceLabel}</th>
+                      <th className="px-5 py-3">요일</th>
+                      <th className="px-5 py-3">시간</th>
+                      <th className="px-5 py-3">제목</th>
+                      <th className="px-5 py-3">적용기간</th>
+                      <th className="px-5 py-3 text-right">관리</th>
                     </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td className="px-5 py-8 text-center text-slate-400" colSpan={6}>등록된 수업시간이 없습니다.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sortedSchedules.length ? (
+                      sortedSchedules.map((s) => (
+                        <tr key={s.id} className={`transition hover:bg-slate-50/50 ${highlightRowClass(s.id)}`}>
+                          <td className="px-5 py-3 font-medium">{props.rooms.find((r) => r.id === s.roomId)?.name ?? s.roomId}</td>
+                          <td className="px-5 py-3">
+                            <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-semibold">
+                              {DOW_LABELS[s.dayOfWeek] ?? s.dayOfWeek}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3 tabular-nums">{s.startTime}~{s.endTime}</td>
+                          <td className="px-5 py-3 text-slate-600">{s.title || <span className="text-slate-400">-</span>}</td>
+                          <td className="px-5 py-3 text-xs tabular-nums text-slate-600">{(s.effectiveFrom || "-") + " ~ " + (s.effectiveTo || "-")}</td>
+                          <td className="px-5 py-3 text-right">
+                            <button
+                              type="button"
+                              disabled={submitting !== null}
+                              onClick={() => onDeleteSchedule(s.id)}
+                              className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50"
+                            >
+                              삭제
+                            </button>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td className="px-5 py-8 text-center text-slate-400" colSpan={6}>등록된 수업시간이 없습니다.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
 
-          {sortedSchedules.length > 0 && (
-            <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-2.5 text-xs text-slate-500">
-              총 {sortedSchedules.length}건 등록
-            </div>
+              {sortedSchedules.length > 0 && (
+                <div className="border-t border-slate-100 bg-slate-50/50 px-5 py-2.5 text-xs text-slate-500">
+                  총 {sortedSchedules.length}건 등록
+                </div>
+              )}
+            </>
           )}
         </section>
       )}
@@ -279,12 +362,12 @@ export default function SettingsClient(props: {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                {isGallery ? "내부 대관 일정" : "내부 대관 일정 (수동 차단)"}
+                {isGallery ? "내부 대관 일정" : "내부 대관 일정 / 수동 차단"}
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {isGallery
                   ? "내부(강사·수강생) 대관 일정을 등록하면 외부 대관 신청이 차단됩니다"
-                  : "특정 날짜/시간을 수동으로 차단합니다"}
+                  : "시간 단위 또는 일 단위로 특정 날짜/기간의 대관 신청을 차단합니다"}
               </p>
             </div>
             <button
@@ -316,7 +399,7 @@ export default function SettingsClient(props: {
             <thead className="border-b bg-slate-50/80 text-left text-xs font-semibold text-slate-600">
               <tr>
                 <th className="px-5 py-3">{spaceLabel}</th>
-                <th className="px-5 py-3">{isGallery ? "기간" : "날짜"}</th>
+                <th className="px-5 py-3">{isGallery ? "기간" : "날짜/기간"}</th>
                 {!isGallery && <th className="px-5 py-3">시간</th>}
                 <th className="px-5 py-3">사유</th>
                 <th className="px-5 py-3 text-right">관리</th>
@@ -324,7 +407,9 @@ export default function SettingsClient(props: {
             </thead>
             <tbody className="divide-y divide-slate-100">
               {sortedBlocks.length ? (
-                sortedBlocks.map((b) => (
+                sortedBlocks.map((b) => {
+                  const isDayBlock = !isGallery && b.endDate;
+                  return (
                   <tr key={b.id} className={`transition hover:bg-slate-50/50 ${highlightRowClass(b.id)}`}>
                     <td className="px-5 py-3 font-medium">{props.rooms.find((r) => r.id === b.roomId)?.name ?? b.roomId}</td>
                     <td className="px-5 py-3 tabular-nums">
@@ -333,6 +418,11 @@ export default function SettingsClient(props: {
                           {b.date}
                           {b.endDate && b.endDate !== b.date ? ` ~ ${b.endDate}` : ""}
                         </span>
+                      ) : isDayBlock ? (
+                        <span>
+                          {b.date} ~ {b.endDate}
+                          <span className="ml-1.5 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">일 단위</span>
+                        </span>
                       ) : (
                         <>
                           {b.date}
@@ -340,7 +430,13 @@ export default function SettingsClient(props: {
                         </>
                       )}
                     </td>
-                    {!isGallery && <td className="px-5 py-3">{renderBlockTime(b)}</td>}
+                    {!isGallery && (
+                      <td className="px-5 py-3">
+                        {isDayBlock
+                          ? <span className="font-semibold text-slate-900">하루 전체</span>
+                          : renderBlockTime(b)}
+                      </td>
+                    )}
                     <td className="px-5 py-3 text-slate-600">{b.reason || <span className="text-slate-400">-</span>}</td>
                     <td className="px-5 py-3 text-right">
                       <button
@@ -353,7 +449,8 @@ export default function SettingsClient(props: {
                       </button>
                     </td>
                   </tr>
-                ))
+                  );
+                })
               ) : (
                 <tr>
                   <td className="px-5 py-8 text-center text-slate-400" colSpan={isGallery ? 4 : 5}>
@@ -372,45 +469,41 @@ export default function SettingsClient(props: {
         )}
       </section>
 
-      {/* 이메일 템플릿 섹션 */}
-      <EmailTemplateSection category={props.category ?? "lecture"} onToast={(t) => setToast(t)} />
+      {/* 이메일 템플릿 섹션 (통합 — 모든 공간 공통) */}
+      <EmailTemplateSection onToast={(t) => setToast(t)} />
     </div>
   );
 }
 
-/* ── 이메일 템플릿 편집 섹션 ── */
+/* ── 이메일 템플릿 편집 섹션 (통합) ── */
 
 type EmailTemplate = { subject: string; body: string };
-type TemplateStatus = "승인" | "반려" | "취소";
+type TemplateStatus = "접수" | "승인" | "반려" | "취소";
 
-const STATUS_OPTIONS: TemplateStatus[] = ["승인", "반려", "취소"];
+const STATUS_OPTIONS: TemplateStatus[] = ["접수", "승인", "반려", "취소"];
 
-const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}";
+const TEMPLATE_VARS_HELP = "사용 가능 변수: {{신청번호}}, {{공간}}, {{카테고리}}, {{일시}}, {{신청자}}, {{상태}}, {{요금정보}}, {{반려사유}}, {{조회링크}}, {{장비정보}}";
 
 function EmailTemplateSection({
-  category,
   onToast,
 }: {
-  category: string;
   onToast: (t: { type: "success" | "error"; message: string }) => void;
 }) {
   const [open, setOpen] = useState(false);
-  const [selectedStatus, setSelectedStatus] = useState<TemplateStatus>("승인");
+  const [selectedStatus, setSelectedStatus] = useState<TemplateStatus>("접수");
   const [templates, setTemplates] = useState<Record<string, EmailTemplate> | null>(null);
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
-  const catId = category === "studio" ? "studio" : category === "gallery" ? "gallery" : "lecture";
-
-  const loadTemplates = useCallback(async () => {
+  const loadTemplatesFn = useCallback(async () => {
     try {
       const res = await fetch("/api/admin/email-templates");
       const data = await res.json();
-      if (data.ok && data.templates?.[catId]) {
-        setTemplates(data.templates[catId]);
-        const tpl = data.templates[catId][selectedStatus];
+      if (data.ok && data.templates) {
+        setTemplates(data.templates);
+        const tpl = data.templates[selectedStatus];
         if (tpl) {
           setSubject(tpl.subject);
           setBody(tpl.body);
@@ -420,13 +513,13 @@ function EmailTemplateSection({
     } catch {
       // ignore
     }
-  }, [catId, selectedStatus]);
+  }, [selectedStatus]);
 
   useEffect(() => {
     if (open && !loaded) {
-      loadTemplates();
+      loadTemplatesFn();
     }
-  }, [open, loaded, loadTemplates]);
+  }, [open, loaded, loadTemplatesFn]);
 
   useEffect(() => {
     if (templates && templates[selectedStatus]) {
@@ -441,11 +534,10 @@ function EmailTemplateSection({
       const res = await fetch("/api/admin/email-templates", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ category: catId, status: selectedStatus, subject, body }),
+        body: JSON.stringify({ status: selectedStatus, subject, body }),
       });
       const data = await res.json();
       if (data.ok) {
-        // Update local cache
         setTemplates((prev) => ({ ...prev, [selectedStatus]: { subject, body } }));
         onToast({ type: "success", message: `${selectedStatus} 메일 템플릿이 저장되었습니다.` });
       } else {
@@ -463,9 +555,9 @@ function EmailTemplateSection({
       <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-bold text-slate-900">메일 템플릿</h2>
+            <h2 className="text-base font-bold text-slate-900">메일 템플릿 (통합)</h2>
             <p className="mt-0.5 text-xs text-slate-500">
-              승인/반려/취소 시 표시되는 메일 기본 내용을 수정합니다
+              모든 공간에 공통으로 적용되는 접수/승인/반려/취소 메일 내용을 수정합니다
             </p>
           </div>
           <button
@@ -532,7 +624,7 @@ function EmailTemplateSection({
               {saving ? "저장 중..." : "템플릿 저장"}
             </button>
             <span className="text-xs text-slate-500">
-              * 저장 후 승인/반려/취소 시 해당 템플릿이 메일 팝업에 표시됩니다.
+              * 저장 후 해당 상태의 메일 발송 시 적용됩니다 (모든 공간 공통)
             </span>
           </div>
         </div>

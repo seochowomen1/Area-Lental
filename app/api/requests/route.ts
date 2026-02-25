@@ -16,6 +16,7 @@ import {
 } from "@/lib/mail";
 import { logger } from "@/lib/logger";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
+import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import type { RequestStatus } from "@/lib/types";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
@@ -62,8 +63,31 @@ function BufferToStream(buffer: Buffer) {
   return stream;
 }
 
+/** 대관 신청: IP당 1분 내 5건, 1시간 내 20건 제한 */
+const REQUEST_MAX_PER_MIN = 5;
+const REQUEST_WINDOW_MIN_MS = 60 * 1000;
+const REQUEST_MAX_PER_HOUR = 20;
+const REQUEST_WINDOW_HOUR_MS = 60 * 60 * 1000;
+
 export async function POST(req: Request) {
   try {
+    // ✅ Rate Limiting: 악의적 대량 예약 방지
+    const ip = getClientIp(req);
+    const rlMin = rateLimit("request-min", ip, REQUEST_MAX_PER_MIN, REQUEST_WINDOW_MIN_MS);
+    if (!rlMin.allowed) {
+      return NextResponse.json(
+        { ok: false, code: "RATE_LIMIT", message: `요청이 너무 많습니다. ${rlMin.retryAfterSeconds}초 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
+    const rlHour = rateLimit("request-hour", ip, REQUEST_MAX_PER_HOUR, REQUEST_WINDOW_HOUR_MS);
+    if (!rlHour.allowed) {
+      return NextResponse.json(
+        { ok: false, code: "RATE_LIMIT", message: `시간당 신청 횟수를 초과했습니다. ${rlHour.retryAfterSeconds}초 후 다시 시도해주세요.` },
+        { status: 429 }
+      );
+    }
+
     const isMock = isMockMode();
     const db = getDatabase();
 
@@ -104,6 +128,7 @@ export async function POST(req: Request) {
       awarenessPath: String(form.get("awarenessPath") ?? ""),
       specialNotes: String(form.get("specialNotes") ?? ""),
       galleryRemovalTime: String(form.get("galleryRemovalTime") ?? ""),
+      galleryPrepDate: String(form.get("galleryPrepDate") ?? ""),
 
       purpose: String(form.get("purpose") ?? ""),
 
@@ -163,7 +188,10 @@ export async function POST(req: Request) {
         );
       }
 
-      sessions = buildGallerySessionsFromPeriod(startDate, endDate);
+      // 사용자가 선택한 준비일 사용 (빈 문자열이면 준비일 없음, 미전송 시 자동 계산)
+      const customPrepDate = galleryInput?.galleryPrepDate;
+      const prepDateParam = customPrepDate !== undefined ? (customPrepDate || null) : undefined;
+      sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam);
     } else {
       const rawSessions = String(form.get("sessions") ?? "").trim();
       if (rawSessions) {
@@ -359,7 +387,8 @@ export async function POST(req: Request) {
         const buf = Buffer.from(ab);
 
         const first = sessions.find((s) => !s.isPrepDay) ?? sessions[0];
-        const fileName = `${first.date}_${first.startTime.replace(":", "")}-${first.endTime.replace(":", "")}_${input.roomId}_${f.name}`;
+        const safeName = f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, "_").slice(0, 100);
+        const fileName = `${first.date}_${first.startTime.replace(":", "")}-${first.endTime.replace(":", "")}_${input.roomId}_${safeName}`;
 
         const createRes = await drive.files.create({
           requestBody: { name: fileName, parents: [fullEnv.GOOGLE_DRIVE_FOLDER_ID] },
@@ -484,12 +513,20 @@ export async function POST(req: Request) {
       savedList = await db.appendRequestsBatch(appendInputs);
     }
 
-    if (savedList.length > 1) {
-      await sendAdminNewRequestEmailBatch(savedList);
-      await sendApplicantReceivedEmailBatch(savedList);
-    } else {
-      await sendAdminNewRequestEmail(savedList[0]);
-      await sendApplicantReceivedEmail(savedList[0]);
+    try {
+      if (savedList.length > 1) {
+        await sendAdminNewRequestEmailBatch(savedList);
+        await sendApplicantReceivedEmailBatch(savedList);
+      } else {
+        await sendAdminNewRequestEmail(savedList[0]);
+        await sendApplicantReceivedEmail(savedList[0]);
+      }
+    } catch (emailErr) {
+      // 메일 발송 실패해도 신청 자체는 성공 처리
+      logger.error("메일 발송 실패 (신청은 정상 저장됨)", {
+        requestId: savedList[0]?.requestId,
+        error: emailErr instanceof Error ? emailErr.message : String(emailErr),
+      });
     }
 
     logger.info('대관 신청 생성 완료', {
@@ -546,14 +583,11 @@ export async function POST(req: Request) {
       );
     }
 
-    // 개발 환경에서는 상세 에러 메시지 포함
-    const isDev = process.env.NODE_ENV === 'development';
     return NextResponse.json(
       {
         ok: false,
         code: "SERVER_ERROR",
-        message: isDev ? `서버 오류: ${err.message}` : "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-        ...((isDev ? { stack: err.stack } : {}))
+        message: "서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
       },
       { status: 500 }
     );

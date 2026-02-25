@@ -19,6 +19,13 @@ const CheckboxBoolean = z.preprocess((v) => {
   return Boolean(v);
 }, z.boolean());
 
+/** YYYY-MM-DD 형식 + 실제 존재하는 날짜인지 검증 */
+const ValidDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜 형식을 확인해 주세요.").refine((v) => {
+  const [y, m, d] = v.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  return date.getFullYear() === y && date.getMonth() === m - 1 && date.getDate() === d;
+}, "유효하지 않은 날짜입니다.");
+
 export const RequestInputSchema = z.object({
   roomId: z.string().min(1),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -26,7 +33,10 @@ export const RequestInputSchema = z.object({
   endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
   applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
-  birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+  birth: ValidDate.refine((v) => {
+    const y = parseInt(v.split("-")[0], 10);
+    return y >= 1900 && y <= new Date().getFullYear();
+  }, "생년월일을 확인해 주세요."),
   address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
   phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
   email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
@@ -103,7 +113,10 @@ export const GalleryRequestInputSchema = z
     endTime: z.string().regex(/^\d{2}:\d{2}$/),
 
     applicantName: z.string().min(2, "성명은 2자 이상 입력해 주세요.").max(30, "성명은 30자 이내로 입력해 주세요."),
-    birth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "생년월일을 입력해 주세요."),
+    birth: ValidDate.refine((v) => {
+      const y = parseInt(v.split("-")[0], 10);
+      return y >= 1900 && y <= new Date().getFullYear();
+    }, "생년월일을 확인해 주세요."),
     address: z.string().min(2, "주소를 입력해 주세요.").max(200, "주소는 200자 이내로 입력해 주세요."),
     phone: z.string().min(9, "연락처는 9자 이상 입력해 주세요.").max(20, "연락처는 20자 이내로 입력해 주세요."),
     email: z.string().email("올바른 이메일 주소를 입력해 주세요."),
@@ -133,6 +146,9 @@ export const GalleryRequestInputSchema = z
 
     // 철수시간 (종료일 당일, 17:00 이전 필수)
     galleryRemovalTime: z.string().regex(/^\d{2}:\d{2}$/, "철수 시간을 선택해 주세요."),
+
+    // 전시 준비일 (사용자 선택, 빈 문자열이면 준비일 없음)
+    galleryPrepDate: z.string().optional().default(""),
 
     // 호환: 관리자 확인용 텍스트(갤러리 전용 필드를 합쳐서 구성)
     purpose: z.string().min(1, "사용 목적을 입력해 주세요.").max(2000),
@@ -170,6 +186,15 @@ export const GalleryRequestInputSchema = z
       const rmMin = toMinutes(v.galleryRemovalTime);
       if (Number.isFinite(rmMin) && rmMin > toMinutes("17:00")) {
         ctx.addIssue({ code: "custom", path: ["galleryRemovalTime"], message: "철수 시간은 17:00 이전으로 설정해 주세요." });
+      }
+    }
+
+    // 준비일 검증: 비어있지 않으면 YYYY-MM-DD 형식이고, 시작일 이전이어야 함
+    if (v.galleryPrepDate) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v.galleryPrepDate)) {
+        ctx.addIssue({ code: "custom", path: ["galleryPrepDate"], message: "준비일 형식을 확인해 주세요." });
+      } else if (v.galleryPrepDate >= v.startDate) {
+        ctx.addIssue({ code: "custom", path: ["galleryPrepDate"], message: "준비일은 전시 시작일 이전이어야 합니다." });
       }
     }
   });

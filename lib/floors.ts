@@ -21,7 +21,7 @@ export type FloorRoom = {
  * 층 정의
  */
 export type FloorDef = {
-  id: FloorId;
+  id: FloorId | "all";
   name: string;
   rooms: FloorRoom[];
 };
@@ -37,6 +37,19 @@ export const FLOORS: FloorDef[] = FLOOR_LIST.map(floor => ({
     .filter(room => room.floor === floor.id)
     .map(room => ({ id: room.id, name: room.name }))
 }));
+
+/**
+ * "전체" 옵션이 포함된 층 목록 (강의실 신청 폼용)
+ * 전체 선택 시 4~7층의 모든 강의실을 표시합니다.
+ */
+export const FLOORS_WITH_ALL: FloorDef[] = [
+  {
+    id: "all",
+    name: "전체",
+    rooms: FLOORS.flatMap(f => f.rooms),
+  },
+  ...FLOORS,
+];
 
 /**
  * 레거시 호환성을 위한 export

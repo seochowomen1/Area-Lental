@@ -1,22 +1,24 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { loadTemplates, saveTemplates, type AllTemplates, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
+import { loadUnifiedTemplates, saveTemplates, type TemplateStatus } from "@/lib/emailTemplates";
+import { getClientIp } from "@/lib/rateLimit";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-/** 전체 템플릿 조회 */
+/** 통합 템플릿 조회 */
 export async function GET() {
   const auth = assertAdminApiAuth();
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
 
-  const templates = loadTemplates();
+  const templates = await loadUnifiedTemplates();
   return NextResponse.json({ ok: true, templates });
 }
 
-/** 특정 카테고리+상태 템플릿 저장 */
+/** 상태별 템플릿 저장 (카테고리 구분 없이 통합) */
 export async function PUT(req: Request) {
   const auth = assertAdminApiAuth();
   if (!auth.ok) {
@@ -25,33 +27,24 @@ export async function PUT(req: Request) {
 
   try {
     const body = (await req.json()) as {
-      category?: string;
       status?: string;
       subject?: string;
       body?: string;
     };
 
-    const category = body.category as TemplateCategory;
     const status = body.status as TemplateStatus;
     const subject = String(body.subject ?? "").trim();
     const templateBody = String(body.body ?? "").trim();
 
-    if (!["lecture", "studio", "gallery"].includes(category)) {
-      return NextResponse.json({ ok: false, message: "잘못된 카테고리입니다." }, { status: 400 });
-    }
-    if (!["승인", "반려", "취소"].includes(status)) {
+    if (!["접수", "승인", "반려", "취소"].includes(status)) {
       return NextResponse.json({ ok: false, message: "잘못된 상태입니다." }, { status: 400 });
     }
     if (!subject || !templateBody) {
       return NextResponse.json({ ok: false, message: "제목과 본문을 입력해주세요." }, { status: 400 });
     }
 
-    const all = loadTemplates();
-    if (!all[category]) {
-      (all as AllTemplates)[category] = {};
-    }
-    all[category][status] = { subject, body: templateBody };
-    saveTemplates(all);
+    await saveTemplates("common", status, subject, templateBody);
+    auditLog({ action: "EMAIL_TEMPLATE_UPDATE", ip: getClientIp(req), details: { status, subject } });
 
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {

@@ -24,12 +24,14 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
             </Link>
 
             <div className="flex items-center justify-between gap-3">
-              <Link
+              <a
                 href="/"
+                target="_blank"
+                rel="noopener noreferrer"
                 className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
               >
                 사용자 화면
-              </Link>
+              </a>
               <AdminLogoutButton />
             </div>
           </div>

@@ -4,10 +4,18 @@ import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus } from "@/l
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
 
+type EmailTemplateRow = {
+  category: string;
+  status: string;
+  subject: string;
+  body: string;
+};
+
 type MockDB = {
   requests: RentalRequest[];
   schedules: ClassSchedule[];
   blocks: BlockTime[];
+  emailTemplates?: EmailTemplateRow[];
 };
 
 // Vercel 서버리스에서는 process.cwd()가 읽기 전용이므로 /tmp 사용
@@ -68,15 +76,15 @@ export async function mock_getRequestById(id: string): Promise<RentalRequest | n
 }
 
 export async function mock_nextRequestId(): Promise<string> {
+  const { randomBytes } = await import("crypto");
   const db = ensureDb();
   const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
-  const nums = db.requests
-    .map(r => r.requestId)
-    .filter(v => v.startsWith(prefix))
-    .map(v => parseInt(v.slice(prefix.length), 10))
-    .filter(n => Number.isFinite(n));
-  const next = (nums.length ? Math.max(...nums) : 0) + 1;
-  return `${prefix}${String(next).padStart(4, "0")}`;
+  const existingIds = new Set(db.requests.map(r => r.requestId));
+  let candidate: string;
+  do {
+    candidate = `${prefix}${randomBytes(4).toString("hex").toUpperCase()}`;
+  } while (existingIds.has(candidate));
+  return candidate;
 }
 
 export async function mock_appendRequest(input: Omit<RentalRequest, "requestId" | "createdAt" | "status" | "adminMemo" | "rejectReason" | "decidedAt" | "decidedBy" | "roomName">): Promise<RentalRequest> {
@@ -193,6 +201,7 @@ export async function mock_appendRequestsBatch(
       galleryExhibitionDayCount: input.galleryExhibitionDayCount,
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
+      galleryRemovalTime: input.galleryRemovalTime,
 
       applicantName: input.applicantName,
       birth: input.birth,
@@ -299,6 +308,15 @@ export async function mock_addClassSchedule(s: Omit<ClassSchedule, "id">): Promi
   return created;
 }
 
+export async function mock_updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule> {
+  const db = ensureDb();
+  const idx = db.schedules.findIndex(s => s.id === id);
+  if (idx < 0) throw new Error("수정할 수업시간을 찾을 수 없습니다.");
+  db.schedules[idx] = { ...db.schedules[idx], ...updates };
+  saveDb(db);
+  return db.schedules[idx];
+}
+
 export async function mock_deleteClassSchedule(id: string): Promise<void> {
   const db = ensureDb();
   db.schedules = db.schedules.filter(s => s.id !== id);
@@ -321,5 +339,40 @@ export async function mock_addBlock(b: Omit<BlockTime, "id">): Promise<BlockTime
 export async function mock_deleteBlock(id: string): Promise<void> {
   const db = ensureDb();
   db.blocks = db.blocks.filter(b => b.id !== id);
+  saveDb(db);
+}
+
+/* ── 삭제 (Mock) ── */
+
+export async function mock_deleteRequests(requestIds: string[]): Promise<void> {
+  const db = ensureDb();
+  const idsSet = new Set(requestIds);
+  db.requests = db.requests.filter(r => !idsSet.has(r.requestId));
+  saveDb(db);
+}
+
+/* ── 이메일 템플릿 (Mock) ── */
+
+export async function mock_getEmailTemplates(): Promise<EmailTemplateRow[]> {
+  const db = ensureDb();
+  return db.emailTemplates ?? [];
+}
+
+export async function mock_saveEmailTemplate(
+  category: string,
+  status: string,
+  subject: string,
+  body: string,
+): Promise<void> {
+  const db = ensureDb();
+  if (!db.emailTemplates) db.emailTemplates = [];
+  const idx = db.emailTemplates.findIndex(
+    (t) => t.category === category && t.status === status,
+  );
+  if (idx >= 0) {
+    db.emailTemplates[idx] = { category, status, subject, body };
+  } else {
+    db.emailTemplates.push({ category, status, subject, body });
+  }
   saveDb(db);
 }

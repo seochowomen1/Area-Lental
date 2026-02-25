@@ -9,6 +9,29 @@ import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus } from ".
 import { isMockMode } from "./env";
 
 /**
+ * 간단한 인메모리 TTL 캐시
+ * Serverless 환경에서 동일 인스턴스 내 반복 호출을 줄여줍니다.
+ */
+class TtlCache<T> {
+  private data: T | null = null;
+  private expiresAt = 0;
+  constructor(private ttlMs: number) {}
+
+  get(): T | null {
+    if (this.data !== null && Date.now() < this.expiresAt) return this.data;
+    return null;
+  }
+  set(value: T) {
+    this.data = value;
+    this.expiresAt = Date.now() + this.ttlMs;
+  }
+  invalidate() {
+    this.data = null;
+    this.expiresAt = 0;
+  }
+}
+
+/**
  * 데이터베이스 인터페이스
  */
 export interface Database {
@@ -29,16 +52,23 @@ export interface Database {
     discountAmountKRW?: number;
     discountReason?: string;
   }): Promise<RentalRequest>;
+  /** 반려/취소된 신청건 삭제 */
+  deleteRequests(requestIds: string[]): Promise<void>;
 
   // 정규 수업 일정 관련
   getClassSchedules(): Promise<ClassSchedule[]>;
   addClassSchedule(schedule: Omit<ClassSchedule, "id">): Promise<ClassSchedule>;
+  updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule>;
   deleteClassSchedule(id: string): Promise<void>;
 
   // 차단 시간대 관련
   getBlocks(): Promise<BlockedSlot[]>;
   addBlock(block: Omit<BlockedSlot, "id">): Promise<BlockedSlot>;
   deleteBlock(id: string): Promise<void>;
+
+  // 이메일 템플릿 관련
+  getEmailTemplates(): Promise<{ category: string; status: string; subject: string; body: string }[]>;
+  saveEmailTemplate(category: string, status: string, subject: string, body: string): Promise<void>;
 }
 
 /**
@@ -77,6 +107,11 @@ class MockDatabase implements Database {
     return mock_updateRequestStatus(args);
   }
 
+  async deleteRequests(requestIds: string[]) {
+    const { mock_deleteRequests } = await this.mockdb;
+    return mock_deleteRequests(requestIds);
+  }
+
   async getClassSchedules() {
     const { mock_getClassSchedules } = await this.mockdb;
     return mock_getClassSchedules();
@@ -85,6 +120,11 @@ class MockDatabase implements Database {
   async addClassSchedule(schedule: Omit<ClassSchedule, "id">) {
     const { mock_addClassSchedule } = await this.mockdb;
     return mock_addClassSchedule(schedule);
+  }
+
+  async updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>) {
+    const { mock_updateClassSchedule } = await this.mockdb;
+    return mock_updateClassSchedule(id, updates);
   }
 
   async deleteClassSchedule(id: string) {
@@ -106,6 +146,16 @@ class MockDatabase implements Database {
     const { mock_deleteBlock } = await this.mockdb;
     return mock_deleteBlock(id);
   }
+
+  async getEmailTemplates() {
+    const { mock_getEmailTemplates } = await this.mockdb;
+    return mock_getEmailTemplates();
+  }
+
+  async saveEmailTemplate(category: string, status: string, subject: string, body: string) {
+    const { mock_saveEmailTemplate } = await this.mockdb;
+    return mock_saveEmailTemplate(category, status, subject, body);
+  }
 }
 
 /**
@@ -113,10 +163,17 @@ class MockDatabase implements Database {
  */
 class SheetsDatabase implements Database {
   private sheets = import("./sheets");
+  private requestsCache = new TtlCache<RentalRequest[]>(10_000); // 10초 TTL
+  private schedulesCache = new TtlCache<ClassSchedule[]>(30_000); // 30초 TTL
+  private blocksCache = new TtlCache<BlockedSlot[]>(30_000); // 30초 TTL
 
   async getAllRequests() {
+    const cached = this.requestsCache.get();
+    if (cached) return cached;
     const { getAllRequests } = await this.sheets;
-    return getAllRequests();
+    const result = await getAllRequests();
+    this.requestsCache.set(result);
+    return result;
   }
 
   async getRequestById(id: string) {
@@ -130,48 +187,85 @@ class SheetsDatabase implements Database {
   }
 
   async appendRequest(input: Parameters<Database["appendRequest"]>[0]) {
+    this.requestsCache.invalidate();
     const { appendRequest } = await this.sheets;
     return appendRequest(input);
   }
 
   async appendRequestsBatch(inputs: Array<Parameters<Database["appendRequest"]>[0]>) {
+    this.requestsCache.invalidate();
     const { appendRequestsBatch } = await this.sheets;
     return appendRequestsBatch(inputs);
   }
 
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
+    this.requestsCache.invalidate();
     const { updateRequestStatus } = await this.sheets;
     return updateRequestStatus(args);
   }
 
+  async deleteRequests(requestIds: string[]) {
+    this.requestsCache.invalidate();
+    const { deleteRequests } = await this.sheets;
+    return deleteRequests(requestIds);
+  }
+
   async getClassSchedules() {
+    const cached = this.schedulesCache.get();
+    if (cached) return cached;
     const { getClassSchedules } = await this.sheets;
-    return getClassSchedules();
+    const result = await getClassSchedules();
+    this.schedulesCache.set(result);
+    return result;
   }
 
   async addClassSchedule(schedule: Omit<ClassSchedule, "id">) {
+    this.schedulesCache.invalidate();
     const { addClassSchedule } = await this.sheets;
     return addClassSchedule(schedule);
   }
 
+  async updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>) {
+    this.schedulesCache.invalidate();
+    const { updateClassSchedule } = await this.sheets;
+    return updateClassSchedule(id, updates);
+  }
+
   async deleteClassSchedule(id: string) {
+    this.schedulesCache.invalidate();
     const { deleteClassSchedule } = await this.sheets;
     return deleteClassSchedule(id);
   }
 
   async getBlocks() {
+    const cached = this.blocksCache.get();
+    if (cached) return cached;
     const { getBlocks } = await this.sheets;
-    return getBlocks();
+    const result = await getBlocks();
+    this.blocksCache.set(result);
+    return result;
   }
 
   async addBlock(block: Omit<BlockedSlot, "id">) {
+    this.blocksCache.invalidate();
     const { addBlock } = await this.sheets;
     return addBlock(block);
   }
 
   async deleteBlock(id: string) {
+    this.blocksCache.invalidate();
     const { deleteBlock } = await this.sheets;
     return deleteBlock(id);
+  }
+
+  async getEmailTemplates() {
+    const { getEmailTemplates } = await this.sheets;
+    return getEmailTemplates();
+  }
+
+  async saveEmailTemplate(category: string, status: string, subject: string, body: string) {
+    const { saveEmailTemplate } = await this.sheets;
+    return saveEmailTemplate(category, status, subject, body);
   }
 }
 

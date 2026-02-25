@@ -95,6 +95,10 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, bookedDates });
   } catch (e: unknown) {
-    return NextResponse.json({ ok: true, bookedDates: [] });
+    console.error("[booked-dates] 조회 오류:", e instanceof Error ? e.message : e);
+    return NextResponse.json(
+      { ok: false, message: "예약 현황 조회 중 오류가 발생했습니다.", bookedDates: [] },
+      { status: 500 },
+    );
   }
 }
