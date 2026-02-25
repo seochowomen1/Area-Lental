@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { RequestInputSchema, type RequestInput } from "@/lib/schema";
-import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
+import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW } from "@/lib/config";
 import { operatingRangesForDate, isTuesdayNightOverlap } from "@/lib/operating";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import { FLOORS } from "@/lib/floors";
@@ -15,10 +15,14 @@ import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
+import ConfirmationView from "@/components/apply/ConfirmationView";
+import ExtraSessionModal from "@/components/apply/ExtraSessionModal";
+import ConsentSection from "@/components/apply/ConsentSection";
+import EquipmentSection from "@/components/apply/EquipmentSection";
+import FeeSummaryCard from "@/components/apply/FeeSummaryCard";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
-import Checkbox from "@/components/ui/Checkbox";
 import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
 import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
 
@@ -216,20 +220,10 @@ export default function ApplyClient() {
     if (endTime && !addEndTime) setAddEndTime(endTime);
   }, [endTime, addEndTime]);
 
-  // 추가 회차 모달(ESC로 닫기)
-  useEffect(() => {
-    if (!extraOpen) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        setExtraOpen(false);
-        setSessionError(null);
-      }
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [extraOpen]);
+  const handleExtraClose = useCallback(() => {
+    setExtraOpen(false);
+    setSessionError(null);
+  }, []);
 
   // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
   // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
@@ -550,165 +544,18 @@ export default function ApplyClient() {
 
   // ─── 확인 화면 ───
   if (confirmData) {
-    const confirmRoom = getRoom(confirmData.roomId);
-    const confirmSessions = [
-      { date: confirmData.date, startTime: confirmData.startTime, endTime: confirmData.endTime },
-      ...extraSessions,
-    ]
-      .filter((s) => s.date && s.startTime && s.endTime)
-      .sort((a, b) => (a.date !== b.date ? a.date.localeCompare(b.date) : a.startTime.localeCompare(b.startTime)));
-
     return (
-      <div>
-        <SiteHeader title="신청 내용 확인" backHref="/space" backLabel="목록" />
-        <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-slate-900">신청 내용 확인</h2>
-            <p className="mt-2 text-sm text-slate-600">아래 내용을 확인하신 후 제출해 주세요.</p>
-          </div>
-
-          {error && (
-            <div className="mt-4">
-              <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">{error}</Notice>
-            </div>
-          )}
-          {batchError && (
-            <div className="mt-4">
-              <Notice variant="warn" title="일부 회차는 신청할 수 없습니다" pad="md">
-                <div className="whitespace-pre-line text-sm">{batchError}</div>
-              </Notice>
-            </div>
-          )}
-
-          <div className="mt-6 space-y-4">
-            {/* 대관 일시 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>대관 일시</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">공간</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmRoom?.name ?? confirmData.roomId}</span>
-                </div>
-                {confirmSessions.map((s, i) => (
-                  <div key={`${s.date}|${s.startTime}`} className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500">{confirmSessions.length > 1 ? `${i + 1}회차` : "일시"}</span>
-                    <span className="text-sm font-semibold text-slate-900">{s.date} {s.startTime}~{s.endTime}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">총 이용시간</span>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {fmtDuration(bundle.totalDurationMin)}
-                    {bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}
-                  </span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 신청자 정보 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>신청자 정보</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                {([
-                  ["성명", confirmData.applicantName],
-                  ["생년월일", confirmData.birth],
-                  ["주소", confirmData.address],
-                  ["연락처", confirmData.phone],
-                  ["이메일", confirmData.email],
-                ] as const).map(([label, value]) => (
-                  <div key={label} className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500 shrink-0">{label}</span>
-                    <span className="text-sm font-semibold text-slate-900 text-right">{value}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-
-            {/* 단체/행사 정보 (E-스튜디오 제외) */}
-            {confirmRoom?.category !== "studio" && (
-              <Card pad="lg">
-                <h3 className={SECTION_TITLE}>단체/행사 정보</h3>
-                <div className="mt-3 divide-y divide-slate-100">
-                  <div className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500">단체명</span>
-                    <span className="text-sm font-semibold text-slate-900">{confirmData.orgName}</span>
-                  </div>
-                  <div className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500">인원</span>
-                    <span className="text-sm font-semibold text-slate-900">{confirmData.headcount}명</span>
-                  </div>
-                  <div className="py-2.5">
-                    <span className="text-sm text-slate-500">사용 목적/행사 내용</span>
-                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.purpose}</p>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {/* 장비 사용 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용" : "장비 사용"}</h3>
-              <div className="mt-3">
-                {isStudioRoom ? (
-                  confirmData.mirrorless || confirmData.camcorder || confirmData.wirelessMic || confirmData.pinMic || confirmData.rodeMic || confirmData.electronicBoard ? (
-                    <div className="flex flex-wrap gap-2">
-                      {confirmData.mirrorless && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">미러리스</span>}
-                      {confirmData.camcorder && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">캠코더</span>}
-                      {confirmData.wirelessMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">무선 마이크</span>}
-                      {confirmData.pinMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">핀 마이크</span>}
-                      {confirmData.rodeMic && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">로데 마이크</span>}
-                      {confirmData.electronicBoard && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">전자칠판</span>}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">선택 없음</p>
-                  )
-                ) : (
-                  confirmData.laptop || confirmData.projector || confirmData.audio ? (
-                    <div className="flex flex-wrap gap-2">
-                      {confirmData.laptop && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">노트북</span>}
-                      {confirmData.projector && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">프로젝터</span>}
-                      {confirmData.audio && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">음향</span>}
-                    </div>
-                  ) : (
-                    <p className="text-sm text-slate-400">선택 없음</p>
-                  )
-                )}
-              </div>
-            </Card>
-
-            {/* 예상 이용요금 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>예상 이용요금</h3>
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-                <div className="px-4 py-3 space-y-2">
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>대관료{bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}</span>
-                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>장비 사용료</span>
-                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
-                  </div>
-                </div>
-                <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-                  <span className="text-sm font-bold text-slate-900">총 금액</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{bundle.total.toLocaleString()}원</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 버튼 */}
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" className="flex-1 py-3" onClick={() => setConfirmData(null)}>
-                수정하기
-              </Button>
-              <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting} onClick={submitConfirmed}>
-                {submitting ? "제출 중..." : "최종 제출"}
-              </Button>
-            </div>
-          </div>
-        </main>
-      </div>
+      <ConfirmationView
+        confirmData={confirmData}
+        extraSessions={extraSessions}
+        error={error}
+        batchError={batchError}
+        submitting={submitting}
+        isStudioRoom={isStudioRoom}
+        bundle={bundle}
+        onSubmit={submitConfirmed}
+        onBack={() => setConfirmData(null)}
+      />
     );
   }
 
@@ -1116,324 +963,60 @@ export default function ApplyClient() {
             </Card>
           )}
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>{isStudioRoom ? "촬영장비 사용(선택)" : "장비 사용(선택)"}</h3>
-            {isStudioRoom ? (
-              <>
-                <div className="mt-4 space-y-3">
-                  {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
-                    <Checkbox
-                      key={key}
-                      {...register(key)}
-                      label={`${STUDIO_EQUIPMENT_LABELS[key]} — ${STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원`}
-                    />
-                  ))}
-                </div>
-                <FieldHelp className="mt-3">
-                  * 촬영장비 사용료 (1일 1회 과금): <b>{equipmentFee.toLocaleString()}</b>원
-                  {bundle.sessionCount > 1 ? (
-                    <>
-                      <br />* 장비 사용료 합계 (총 {bundle.sessionCount}회차): <b>{bundle.equipmentSum.toLocaleString()}</b>원
-                    </>
-                  ) : null}
-                </FieldHelp>
-              </>
-            ) : (
-              <>
-                <div className="mt-4 grid gap-3 md:grid-cols-3">
-                  <Checkbox {...register("laptop")} label="노트북" />
-                  <Checkbox {...register("projector")} label="프로젝터" />
-                  <Checkbox {...register("audio")} label="음향" />
-                </div>
-                <FieldHelp className="mt-3">
-                  * 장비 사용료 (회차당): <b>{equipmentFee.toLocaleString()}</b>원 (기준: 노트북 {EQUIPMENT_FEE_KRW.laptop.toLocaleString()}원 /
-                  프로젝터 {EQUIPMENT_FEE_KRW.projector.toLocaleString()}원 / 음향 {EQUIPMENT_FEE_KRW.audio.toLocaleString()}원)
-                  {bundle.sessionCount > 1 ? (
-                    <>
-                      <br />* 장비 사용료 합계 (총 {bundle.sessionCount}회차): <b>{bundle.equipmentSum.toLocaleString()}</b>원
-                    </>
-                  ) : null}
-                </FieldHelp>
-              </>
-            )}
-          </Card>
+          <EquipmentSection
+            register={register}
+            isStudioRoom={isStudioRoom}
+            equipmentFee={equipmentFee}
+            sessionCount={bundle.sessionCount}
+            equipmentSum={bundle.equipmentSum}
+          />
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>이용요금 안내</h3>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                <span className="text-base">💰</span>
-                <span className="text-sm font-bold text-slate-800">대관료 및 장비 사용료</span>
-              </div>
-              <div className="px-4 py-3">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>
-                      {bundle.sessionCount > 1 ? (
-                        <>대관료 ({bundle.sessionCount}회차 · {bundle.totalDurationMin ? fmtDuration(bundle.totalDurationMin) : "-"})</>
-                      ) : (
-                        <>대관료 {durationMinutes ? `(${fmtDuration(durationMinutes)})` : ""}</>
-                      )}
-                    </span>
-                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
-                  </div>
-                  <div className="flex items-center justify-between text-sm text-slate-600">
-                    <span>
-                      {bundle.sessionCount > 1 ? <>장비 사용료 ({bundle.sessionCount}회차)</> : <>장비 사용료</>}
-                    </span>
-                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
-                  </div>
-                </div>
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-                  <span className="text-sm font-bold text-slate-900">총 금액</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{bundle.total.toLocaleString()}원</span>
-                </div>
-                <p className="mt-2 text-[11px] text-slate-400">
-                  ※ 장비 사용료는 선택 항목에 따라 변동되며, 선택한 회차 수 기준으로 합산됩니다.
-                </p>
-              </div>
-            </div>
-          </Card>
+          <FeeSummaryCard
+            sessionCount={bundle.sessionCount}
+            totalDurationMin={bundle.totalDurationMin}
+            durationMinutes={durationMinutes}
+            rentalSum={bundle.rentalSum}
+            equipmentSum={bundle.equipmentSum}
+            total={bundle.total}
+          />
 
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>동의/서약</h3>
-            <div className="mt-4">
-              {/* privacyAgree는 모달 동의/비동의로만 결정 */}
-              <input type="hidden" {...register("privacyAgree")} />
-              <Checkbox
-                checked={!!privacyAgree}
-                readOnly
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPrivacyOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPrivacyOpen(true);
-                  }
-                }}
-                label="개인정보 수집·이용에 동의합니다. (필수)"
-                error={errors.privacyAgree?.message}
-              />
-              <FieldHelp className="mt-1">* 체크 시 안내 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
-            </div>
-            <div className="mt-4">
-              {/* pledgeAgree는 모달 동의/비동의로만 결정 */}
-              <input type="hidden" {...register("pledgeAgree")} />
-              <Checkbox
-                checked={!!pledgeAgree}
-                readOnly
-                onClick={(e) => {
-                  // 체크박스 클릭 시에도 "서약서 모달"이 먼저 열리도록 강제
-                  e.preventDefault();
-                  setPledgeOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPledgeOpen(true);
-                  }
-                }}
-                label="서약 내용에 동의합니다. (필수)"
-                error={errors.pledgeAgree?.message}
-              />
-              <FieldHelp className="mt-1">
-                * 체크 시 서약서 내용을 확인한 후 동의 여부가 반영됩니다.
-              </FieldHelp>
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="pledgeDate">서약 일자 *</FieldLabel>
-                {/* 신청 당일로 고정 */}
-                <input type="hidden" {...register("pledgeDate")} />
-                <Input id="pledgeDate" type="text" value={fixedPledgeDate} readOnly className="bg-slate-50 text-slate-700" />
-                {errors.pledgeDate ? <FieldHelp className="text-red-600">{errors.pledgeDate.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
-                <Input
-                  id="pledgeName"
-                  {...register("pledgeName", {
-                    onChange: (e) => {
-                      // 사용자가 직접 수정하면 자동 동기화 중단(원하면 다시 비워서 자동 채움 가능)
-                      pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
-                    },
-                  })}
-                />
-                {errors.pledgeName ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
-              </div>
-            </div>
-          </Card>
+          <ConsentSection
+            register={register}
+            errors={errors}
+            privacyAgree={!!privacyAgree}
+            pledgeAgree={!!pledgeAgree}
+            fixedPledgeDate={fixedPledgeDate}
+            onPrivacyClick={() => setPrivacyOpen(true)}
+            onPledgeClick={() => setPledgeOpen(true)}
+            onPledgeNameChange={(e) => {
+              pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
+            }}
+          />
 
           <Button type="submit" variant="primary" disabled={submitting} className="w-full py-3 shadow-sm hover:opacity-90">
             {submitting ? "신청 중..." : "신청하기"}
           </Button>
         </form>
 
-        {/* ── 추가 회차 모달 (리뉴얼) ── */}
-        {extraOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="extra-session-modal-title"
-          >
-            <button
-              type="button"
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              aria-label="모달 닫기"
-              onClick={() => { setExtraOpen(false); setSessionError(null); }}
-              tabIndex={-1}
-            />
-
-            <div className="relative w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
-              {/* 헤더 */}
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div>
-                  <h3 id="extra-session-modal-title" className="text-base font-bold text-slate-900">대관 일정 추가</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">여러 회차를 한 번에 신청할 수 있습니다</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  aria-label="닫기"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                </button>
-              </div>
-
-              <div className="max-h-[70vh] overflow-auto">
-                {/* 에러 */}
-                {sessionError ? (
-                  <div className="px-5 pt-4">
-                    <div className="rounded-lg bg-red-50 border border-red-200 px-3 py-2 text-xs text-red-700">
-                      {sessionError}
-                    </div>
-                  </div>
-                ) : null}
-
-                {/* 입력 영역 */}
-                <div className="px-5 py-4 space-y-3">
-                  <div>
-                    <FieldLabel htmlFor="addDate" className="text-xs">날짜</FieldLabel>
-                    <Input
-                      id="addDate"
-                      type="date"
-                      value={addDate}
-                      min={todayYmdSeoul()}
-                      disabled={!selectedDate}
-                      onChange={(e) => setAddDate(e.target.value)}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <FieldLabel htmlFor="addStartTime" className="text-xs">시작 시간</FieldLabel>
-                      <Select
-                        id="addStartTime"
-                        value={addStartTime}
-                        disabled={!selectedDate || !addDate}
-                        onChange={(e) => setAddStartTime(e.target.value)}
-                      >
-                        {addStartOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </Select>
-                    </div>
-                    <div>
-                      <FieldLabel htmlFor="addEndTime" className="text-xs">종료 시간</FieldLabel>
-                      <Select
-                        id="addEndTime"
-                        value={addEndTime}
-                        disabled={!selectedDate || !addDate}
-                        onChange={(e) => setAddEndTime(e.target.value)}
-                      >
-                        {addEndOptions.map((t) => <option key={t} value={t}>{t}</option>)}
-                      </Select>
-                    </div>
-                  </div>
-
-                  <Button
-                    variant="outline"
-                    className="h-10 w-full"
-                    disabled={!selectedDate || !addDate || !addStartTime || !addEndTime}
-                    onClick={addSession}
-                    type="button"
-                  >
-                    + 일정 추가
-                  </Button>
-                </div>
-
-                {/* 구분선 + 일정 목록 */}
-                <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-4">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-bold text-slate-700">선택된 일정</span>
-                    <span className="rounded-full bg-[rgb(var(--brand-primary)/0.1)] px-2.5 py-0.5 text-xs font-bold text-[rgb(var(--brand-primary))]">
-                      {allSessions.length}회차
-                    </span>
-                  </div>
-
-                  {allSessions.length > 0 ? (
-                    <div className="space-y-2">
-                      {allSessions.map((s, idx) => {
-                        const isBase = s.date === selectedDate && s.startTime === startTime && s.endTime === endTime;
-                        return (
-                          <div
-                            key={`${s.date}|${s.startTime}|${s.endTime}`}
-                            className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
-                          >
-                            <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
-                                {idx + 1}
-                              </span>
-                              <div className="text-xs">
-                                <span className="font-semibold text-slate-900">{s.date}</span>
-                                <span className="ml-1.5 text-slate-600">{s.startTime} ~ {s.endTime}</span>
-                              </div>
-                              {isBase && (
-                                <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">기본</span>
-                              )}
-                            </div>
-
-                            {!isBase ? (
-                              <button
-                                type="button"
-                                className="shrink-0 rounded-md border border-slate-200 bg-white p-1 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
-                                onClick={() => removeExtraSession(s)}
-                                aria-label={`삭제: ${s.date}`}
-                              >
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5l-7 7M3.5 3.5l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
-                              </button>
-                            ) : (
-                              <span className="text-[10px] text-slate-400">기본</span>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="rounded-lg border border-dashed border-slate-200 bg-white/60 p-4 text-center text-xs text-slate-500">
-                      날짜와 시간을 선택 후<br />&ldquo;일정 추가&rdquo; 버튼을 눌러 주세요
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* 하단 완료 버튼 */}
-              <div className="border-t border-slate-100 px-5 py-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  className="w-full py-2.5"
-                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
-                >
-                  완료 ({allSessions.length}회차)
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        <ExtraSessionModal
+          open={extraOpen}
+          selectedDate={selectedDate}
+          startTime={startTime}
+          endTime={endTime}
+          allSessions={allSessions}
+          addDate={addDate}
+          addStartTime={addStartTime}
+          addEndTime={addEndTime}
+          addStartOptions={addStartOptions}
+          addEndOptions={addEndOptions}
+          sessionError={sessionError}
+          onClose={handleExtraClose}
+          onAddDateChange={setAddDate}
+          onAddStartTimeChange={setAddStartTime}
+          onAddEndTimeChange={setAddEndTime}
+          onAddSession={addSession}
+          onRemoveSession={removeExtraSession}
+        />
 
         <PrivacyModal
           open={privacyOpen}

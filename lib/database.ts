@@ -7,6 +7,8 @@
 
 import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus } from "./types";
 import { isMockMode } from "./env";
+import { validateEnv } from "./env-validation";
+import { logger } from "./logger";
 
 /**
  * 데이터베이스 인터페이스
@@ -179,12 +181,14 @@ class SheetsDatabase implements Database {
  * 데이터베이스 인스턴스 (싱글톤)
  */
 let dbInstance: Database | null = null;
+let envValidated = false;
 
 /**
  * 데이터베이스 인스턴스 가져오기
- * 
+ *
  * 환경 변수에 따라 자동으로 Mock 또는 Sheets 구현체를 반환합니다.
- * 
+ * 최초 호출 시 환경 변수 검증을 수행합니다.
+ *
  * @example
  * const db = getDatabase();
  * const requests = await db.getAllRequests();
@@ -194,8 +198,19 @@ export function getDatabase(): Database {
     return dbInstance;
   }
 
-  // ✅ 로컬 개발(MOCK_MODE=true)에서는 Google/SMTP 환경변수 없이도 동작해야 하므로
-  //    "env 전체 검증"을 여기서 강제하지 않습니다.
+  // 최초 초기화 시 환경 변수 검증 (1회만 실행)
+  if (!envValidated) {
+    try {
+      validateEnv();
+      logger.info("환경 변수 검증 완료", { mode: isMockMode() ? "mock" : "sheets" });
+    } catch (e: any) {
+      logger.error("환경 변수 검증 실패", { error: e.message });
+      // Mock 모드에서는 경고만, 프로덕션에서는 에러 전파
+      if (!isMockMode()) throw e;
+    }
+    envValidated = true;
+  }
+
   dbInstance = isMockMode() ? new MockDatabase() : new SheetsDatabase();
   return dbInstance;
 }
