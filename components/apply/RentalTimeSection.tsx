@@ -98,7 +98,6 @@ export default function RentalTimeSection({
 
       <FieldHelp className="mt-2">
         ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다. (최소 1시간, 최대 6시간)
-        <br />※ 신청 시 &quot;수업시간/차단/이미 신청된 일정&quot;과 충돌하면 신청이 제한됩니다.
       </FieldHelp>
     </Card>
   );
