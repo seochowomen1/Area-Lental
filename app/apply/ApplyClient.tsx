@@ -731,7 +731,6 @@ export default function ApplyClient() {
                 시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.
               </li>
               <li>“대관 일정 추가하기”를 이용하면 <b>여러 날짜/시간</b>을 한 번에 신청할 수 있습니다.</li>
-              <li>신청 시 &lsquo;정규 수업시간/담당자 차단/기 승인 일정&rsquo;과 충돌하면 자동으로 신청이 제한됩니다.</li>
               <li>상세 화면의 “공간정보 및 시설안내 / 취소·환불규정”을 확인한 후 신청해 주세요.</li>
             </ul>
           </Notice>
@@ -976,7 +975,6 @@ export default function ApplyClient() {
 
             <FieldHelp className="mt-2">
               ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다. (최소 1시간, 최대 6시간)
-              <br />※ 신청 시 “수업시간/차단/이미 신청된 일정”과 충돌하면 신청이 제한됩니다.
             </FieldHelp>
           </Card>
 
