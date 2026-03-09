@@ -115,7 +115,8 @@ export default function ResultClient() {
     });
     const json = (await res.json()) as ResultPayload;
     if (!res.ok || !json.ok) {
-      throw new Error((json as any).message ?? "조회에 실패했습니다.");
+      const msg = !json.ok ? json.message : "조회에 실패했습니다.";
+      throw new Error(msg);
     }
     return json;
   }

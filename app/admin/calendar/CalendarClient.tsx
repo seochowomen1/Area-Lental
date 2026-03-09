@@ -342,7 +342,7 @@ export default function CalendarClient({
     // 층 필터가 걸려있을 때, 다른 층 roomId가 남아있지 않도록 정리
     if (floorId === "all") return;
     if (roomId === "all") return;
-    const meta = (ROOMS_BY_ID as any)[roomId] as { floor?: string } | undefined;
+    const meta = ROOMS_BY_ID[roomId];
     if (!meta?.floor || meta.floor !== floorId) {
       setRoomId("all");
     }
@@ -443,7 +443,7 @@ export default function CalendarClient({
     const base = [{ id: "all", name: "전체" }];
     // 카테고리별 강의실만 노출
     const list = roomsInCategory
-      .filter((r) => (floorId === "all" ? true : r.floor === (floorId as any)))
+      .filter((r) => (floorId === "all" ? true : r.floor === floorId))
       .map((r) => ({ id: r.id, name: r.name }))
       .sort((a, b) => a.name.localeCompare(b.name));
 

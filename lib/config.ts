@@ -107,5 +107,5 @@ export type MockEnv = z.infer<typeof MockEnvSchema>;
 export type AppEnv = FullEnv | MockEnv;
 
 export function isMockEnv(env: AppEnv): env is MockEnv {
-  return (env as any).MOCK_MODE === "true";
+  return "MOCK_MODE" in env && env.MOCK_MODE === "true";
 }
