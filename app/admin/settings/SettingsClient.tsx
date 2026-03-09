@@ -115,8 +115,8 @@ export default function SettingsClient(props: {
       setScheduleFormOpen(false);
       router.refresh();
       return data.created.id;
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "등록에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "등록에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }
@@ -136,8 +136,8 @@ export default function SettingsClient(props: {
       setBlockFormOpen(false);
       router.refresh();
       return data.created.id;
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "등록에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "등록에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }
@@ -155,8 +155,8 @@ export default function SettingsClient(props: {
       highlight(data.updated.id);
       setToast({ type: "success", message: "수업시간이 수정되었습니다." });
       router.refresh();
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "수정에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "수정에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }
@@ -169,8 +169,8 @@ export default function SettingsClient(props: {
       setSchedules((prev) => prev.filter((s) => s.id !== id));
       setToast({ type: "success", message: "삭제되었습니다." });
       router.refresh();
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "삭제에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "삭제에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }
@@ -184,8 +184,8 @@ export default function SettingsClient(props: {
       setSchedules((prev) => prev.filter((s) => s.id !== id));
       setToast({ type: "success", message: "삭제되었습니다." });
       router.refresh();
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "삭제에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "삭제에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }
@@ -199,8 +199,8 @@ export default function SettingsClient(props: {
       setBlocks((prev) => prev.filter((b) => b.id !== id));
       setToast({ type: "success", message: "삭제되었습니다." });
       router.refresh();
-    } catch (err: any) {
-      setToast({ type: "error", message: err?.message ?? "삭제에 실패했습니다." });
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "삭제에 실패했습니다." });
     } finally {
       setSubmitting(null);
     }

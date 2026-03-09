@@ -446,8 +446,8 @@ export default function ApplyGalleryClient() {
       if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
       if (token) qp.set("token", token);
       router.push(qp.toString() ? `/success?${qp.toString()}` : "/success");
-    } catch (e: any) {
-      setError(e?.message ?? "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
       setSubmitting(false);
     }

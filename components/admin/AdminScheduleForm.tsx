@@ -128,8 +128,8 @@ export default function AdminScheduleForm({ rooms, dayOptions, isSubmitting, res
         // start/end는 effect가 옵션 기준으로 자동 보정
       }
       return createdId;
-    } catch (err: any) {
-      onToast?.({ type: "error", message: err?.message ?? "등록에 실패했습니다." });
+    } catch (err: unknown) {
+      onToast?.({ type: "error", message: err instanceof Error ? err.message : "등록에 실패했습니다." });
     }
   }
 

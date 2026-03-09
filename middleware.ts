@@ -94,6 +94,33 @@ export async function middleware(req: NextRequest) {
     );
   }
 
+  // ── CSRF 보호: 변경 요청(POST/PUT/PATCH/DELETE)의 Origin 검증 ──
+  const method = req.method.toUpperCase();
+  if (
+    pathname.startsWith("/api/") &&
+    method !== "GET" &&
+    method !== "HEAD" &&
+    method !== "OPTIONS"
+  ) {
+    const origin = req.headers.get("origin") ?? "";
+    const host = req.headers.get("host") ?? "";
+    if (origin) {
+      let originHost: string;
+      try {
+        originHost = new URL(origin).host;
+      } catch {
+        return withSecurityHeaders(
+          NextResponse.json({ ok: false, message: "Invalid Origin" }, { status: 403 })
+        );
+      }
+      if (originHost !== host) {
+        return withSecurityHeaders(
+          NextResponse.json({ ok: false, message: "Cross-origin request blocked" }, { status: 403 })
+        );
+      }
+    }
+  }
+
   // 보안 헤더는 모든 라우트에 적용
   if (!pathname.startsWith("/admin") && !pathname.startsWith("/api/admin")) {
     return withSecurityHeaders(NextResponse.next());

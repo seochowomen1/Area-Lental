@@ -149,8 +149,8 @@ export default function ResultClient() {
       try {
         const json = await fetchResult();
         setData(json);
-      } catch (err: any) {
-        setError(err?.message || "조회에 실패했습니다.");
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "조회에 실패했습니다.");
       } finally {
         setLoading(false);
       }
@@ -185,8 +185,8 @@ export default function ResultClient() {
       // 취소 후 최신 상태 재조회
       const refreshed = await fetchResult();
       setData(refreshed);
-    } catch (err: any) {
-      setError(err?.message || "취소 중 오류가 발생했습니다.");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "취소 중 오류가 발생했습니다.");
     } finally {
       setCancelLoading(false);
     }
