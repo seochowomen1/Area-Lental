@@ -49,8 +49,8 @@ const SHEETS_CONFIG = [
   },
 ];
 
-export async function POST() {
-  const auth = assertAdminApiAuth();
+export async function POST(req: Request) {
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const env = requireGoogleEnv();
