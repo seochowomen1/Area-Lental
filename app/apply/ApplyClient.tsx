@@ -143,7 +143,7 @@ export default function ApplyClient() {
     if (qpRoomId) {
       // roomId로 floor를 역추적해 동기화
       const matchedFloor = FLOORS.find((f) => f.rooms.some((r) => r.id === qpRoomId));
-      if (matchedFloor) setFloorId(matchedFloor.id as any);
+      if (matchedFloor) setFloorId(matchedFloor.id);
       setRoomId(qpRoomId);
       setValue("roomId", qpRoomId, { shouldValidate: true, shouldDirty: true });
     }
@@ -784,7 +784,7 @@ export default function ApplyClient() {
                 <Select
                   id="floor"
                   value={floorId}
-                  onChange={(e) => setFloorId(e.target.value as any)}
+                  onChange={(e) => setFloorId(e.target.value as typeof floorId)}
                   disabled={prefillLocked}
                 >
                   {FLOORS_WITH_ALL.map((f) => (

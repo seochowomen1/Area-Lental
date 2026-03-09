@@ -9,12 +9,17 @@ type EmailContent = {
   body: string;
 };
 
-export default function EmailConfirmModal({ requestId }: { requestId: string }) {
+interface EmailConfirmModalProps {
+  requestId: string;
+  /** 현재 신청 상태 — 접수가 아닌 경우에만 메일 발송 버튼 표시 */
+  currentStatus: string;
+}
+
+export default function EmailConfirmModal({ requestId, currentStatus }: EmailConfirmModalProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
   const pathname = usePathname();
 
-  const emailPending = searchParams.get("emailPending");
   const saved = searchParams.get("saved");
   const mailed = searchParams.get("mailed");
 
@@ -23,23 +28,6 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
   const [loading, setLoading] = useState(false);
   const [sending, setSending] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
-
-  // 저장 후 이메일 발송 대기 상태 감지
-  useEffect(() => {
-    if (saved === "1" && emailPending) {
-      setLoading(true);
-      fetch(`/api/admin/email-preview?requestId=${encodeURIComponent(requestId)}`)
-        .then((r) => r.json())
-        .then((data) => {
-          if (data.ok) {
-            setContent({ to: data.to, subject: data.subject, body: data.body });
-            setOpen(true);
-          }
-        })
-        .catch(() => {})
-        .finally(() => setLoading(false));
-    }
-  }, [saved, emailPending, requestId]);
 
   // 메일 발송 완료 토스트
   useEffect(() => {
@@ -50,12 +38,29 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
     }
   }, [mailed]);
 
+  /** 메일 발송 모달 열기 — 이메일 프리뷰를 가져와 모달 표시 */
+  const openEmailModal = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch(`/api/admin/email-preview?requestId=${encodeURIComponent(requestId)}`);
+      const data = await res.json();
+      if (data.ok) {
+        setContent({ to: data.to, subject: data.subject, body: data.body });
+        setOpen(true);
+      } else {
+        setToast("이메일 미리보기를 불러오지 못했습니다.");
+      }
+    } catch {
+      setToast("이메일 미리보기를 불러오는 중 오류가 발생했습니다.");
+    } finally {
+      setLoading(false);
+    }
+  }, [requestId]);
+
   const close = useCallback(() => {
     setOpen(false);
     setContent(null);
-    // URL에서 emailPending 파라미터 제거
-    router.replace(pathname, { scroll: false });
-  }, [router, pathname]);
+  }, []);
 
   const send = useCallback(async () => {
     if (!content) return;
@@ -87,6 +92,8 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
     }
   }, [content, router, pathname]);
 
+  const showSendButton = currentStatus !== "접수";
+
   return (
     <>
       {/* 토스트 메시지 */}
@@ -96,9 +103,38 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
         </div>
       )}
 
-      {/* 저장 완료 토스트 (이메일 없는 경우) */}
-      {saved === "1" && !emailPending && !mailed && (
+      {/* 저장 완료 토스트 */}
+      {saved === "1" && !mailed && (
         <SavedToast />
+      )}
+
+      {/* 메일 발송 버튼 — 처리 상태(승인/반려/취소)일 때만 표시 */}
+      {showSendButton && (
+        <section className="rounded-xl border-2 border-gray-200 bg-white shadow-sm">
+          <div className="border-b border-gray-100 px-5 py-3">
+            <h2 className="text-sm font-bold text-gray-900">메일 발송</h2>
+          </div>
+          <div className="px-5 py-4">
+            <p className="text-sm text-gray-600 mb-3">
+              현재 처리 상태를 기반으로 신청자에게 안내 메일을 발송합니다.
+            </p>
+            <button
+              type="button"
+              onClick={openEmailModal}
+              disabled={loading}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
+                <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
+              </svg>
+              {loading ? "불러오는 중..." : "메일 작성 및 발송"}
+            </button>
+            <p className="text-xs text-gray-500 mt-2">
+              * 메일 내용을 미리 확인하고 수정한 뒤 발송할 수 있습니다.
+            </p>
+          </div>
+        </section>
       )}
 
       {/* 이메일 확인 모달 */}
@@ -151,7 +187,7 @@ export default function EmailConfirmModal({ requestId }: { requestId: string }) 
                 disabled={sending}
                 className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
               >
-                발송 안 함
+                취소
               </button>
               <button
                 type="button"

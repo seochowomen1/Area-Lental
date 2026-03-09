@@ -339,7 +339,7 @@ export default async function AdminRequestsPage({
             <select name="status" defaultValue={status} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
               {["all", "접수", "승인", "반려", "취소"].map((s) => (
                 <option key={s} value={s}>
-                  {s === "all" ? "전체" : statusLabel(s as any)}
+                  {s === "all" ? "전체" : statusLabel(s as RequestStatus)}
                 </option>
               ))}
             </select>

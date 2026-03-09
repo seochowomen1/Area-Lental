@@ -90,12 +90,12 @@ function eachYmd(from: string, to: string): string[] {
 }
 
 function roomFloor(roomId: string): FloorId | null {
-  const meta = (ROOMS_BY_ID as any)[roomId] as { floor?: FloorId } | undefined;
+  const meta = ROOMS_BY_ID[roomId];
   return meta?.floor ?? null;
 }
 
 function roomName(roomId: string, fallback?: string): string {
-  const meta = (ROOMS_BY_ID as any)[roomId] as { name?: string } | undefined;
+  const meta = ROOMS_BY_ID[roomId];
   if (meta?.name) return meta.name;
   if (roomId === "all") return "전체";
   return fallback ?? roomId;

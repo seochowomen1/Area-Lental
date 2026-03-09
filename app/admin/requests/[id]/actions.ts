@@ -53,11 +53,8 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
     discountReason: isGallery ? "" : discountReason,
   });
 
-  // 승인/반려/취소 시 이메일 발송 팝업을 표시하기 위해 상태 전달 (자동 발송 안 함)
-  const isDecision = (status === "승인" || status === "반려" || status === "취소") && status !== current.status;
-  const emailParam = isDecision ? `&emailPending=${encodeURIComponent(status)}` : "";
   const cat = categoryOf(current);
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(cat)}&saved=1${emailParam}`);
+  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(cat)}&saved=1`);
 }
 
 /** 묶음 공통 메타(할인/메모) 저장 */
@@ -148,8 +145,7 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     })
   );
 
-  // 승인/반려 시 이메일 발송 팝업 표시를 위해 상태 전달
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1&emailPending=${encodeURIComponent(actionStatus)}`);
+  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
 }
 
 /** 메일 발송: 관리자가 확인한 내용으로 발송 */

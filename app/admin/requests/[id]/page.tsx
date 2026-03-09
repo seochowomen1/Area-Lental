@@ -602,7 +602,7 @@ export default async function AdminRequestDetail({
                   </div>
 
                   <p className="mt-4 text-xs text-gray-500">
-                    * 전체 승인/반려 처리 후 메일 확인 팝업이 표시됩니다.
+                    * 처리 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
                   </p>
                 </>
               ) : (
@@ -634,7 +634,7 @@ export default async function AdminRequestDetail({
                   </div>
 
                   <p className="mt-4 text-xs text-gray-500">
-                    * 승인/반려 처리 후 메일 확인 팝업이 표시됩니다.
+                    * 처리 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
                   </p>
                 </>
               )}
@@ -677,19 +677,19 @@ export default async function AdminRequestDetail({
               </div>
 
               <button type="submit" className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black">
-                저장 (승인/반려/취소 시 메일 확인)
+                저장
               </button>
               <p className="text-xs text-gray-500 mt-2">
-                * 승인/반려/취소로 변경하면 저장 후 메일 확인 팝업이 표시됩니다.
+                * 저장 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
               </p>
             </form>
           )}
         </div>
       </section>
 
-      {/* 이메일 확인 모달 */}
+      {/* 메일 발송 섹션 + 모달 */}
       <Suspense>
-        <EmailConfirmModal requestId={req.requestId} />
+        <EmailConfirmModal requestId={req.requestId} currentStatus={req.status} />
       </Suspense>
     </main>
   );
