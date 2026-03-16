@@ -47,15 +47,15 @@ export async function getHolidays(year: number, month: number): Promise<HolidayI
   }
 
   try {
+    // ServiceKey는 이미 인코딩된 키일 수 있으므로 URLSearchParams로 이중 인코딩하지 않음
     const params = new URLSearchParams({
-      ServiceKey: apiKey,
       solYear: String(year),
       solMonth: String(month).padStart(2, "0"),
       _type: "json",
       numOfRows: "50",
     });
 
-    const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?${params}`;
+    const url = `https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo?ServiceKey=${apiKey}&${params}`;
     const res = await fetch(url, { signal: AbortSignal.timeout(5000) });
 
     if (!res.ok) {
