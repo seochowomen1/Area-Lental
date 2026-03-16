@@ -178,17 +178,19 @@ export default function DatePickerCalendar({
                   "relative flex flex-col items-center justify-center border-b border-r py-1.5 text-xs transition",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
                   !isCurrentMonth && "bg-gray-50 text-gray-300 cursor-default",
+                  isCurrentMonth && (isSunday || isHoliday) && !isSelected && "cursor-not-allowed bg-rose-50/80",
+                  isCurrentMonth && (isPast || isBooked) && !isSunday && !isHoliday && !isSelected && "cursor-not-allowed bg-gray-50/80",
                   isCurrentMonth && !isDisabled && !isSelected && "bg-white text-slate-800 hover:bg-slate-50",
-                  isCurrentMonth && isDisabled && !isSelected && "cursor-not-allowed bg-white opacity-40",
                   isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
                 )}
               >
                 <span
                   className={cn(
                     "text-xs font-medium leading-tight",
-                    isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))] font-bold",
                     isCurrentMonth && (isSunday || isHoliday) && "text-rose-500",
-                    isCurrentMonth && isSaturday && !isHoliday && "text-blue-600",
+                    isCurrentMonth && isSaturday && !isHoliday && !isSunday && "text-blue-600",
+                    isCurrentMonth && isPast && !isSunday && !isHoliday && "text-gray-400",
+                    isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))] font-bold",
                   )}
                 >
                   {d.getDate()}

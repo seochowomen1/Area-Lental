@@ -367,6 +367,11 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
               const disabled = !c.inMonth || isCellDisabled(c.ymd);
               const isSelected = isStart || isEnd;
 
+              const isHoliday = c.inMonth && holidayMap.has(c.ymd);
+              const isPast = c.inMonth && c.ymd <= dateToYmdLocal(new Date());
+              const isBooked = c.inMonth && bookedDates.has(c.ymd);
+              const isClosed = isSunday || isHoliday;
+
               return (
                 <button
                   key={`${c.ymd || idx}`}
@@ -377,15 +382,22 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                     "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
                     !c.inMonth && "bg-gray-50 text-gray-300 cursor-default",
+                    c.inMonth && isClosed && !isSelected && !isBetween && "cursor-not-allowed bg-rose-50/80",
+                    c.inMonth && !isClosed && (isPast || isBooked) && !isSelected && !isBetween && !isPrep && "cursor-not-allowed bg-gray-50/80",
                     c.inMonth && !disabled && !isSelected && !isBetween && !isPrep && "bg-white text-slate-900 hover:bg-slate-50",
-                    c.inMonth && disabled && !isSelected && !isPrep && "cursor-not-allowed bg-white opacity-50",
                     isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
-                    isBetween && !isSelected && "bg-blue-50",
+                    isBetween && !isSelected && !isClosed && "bg-blue-50",
+                    isBetween && !isSelected && isClosed && "bg-rose-50/60",
                     isPrep && !isSelected && !isBetween && "bg-emerald-50 ring-2 ring-emerald-300 ring-inset",
                   )}
                   aria-pressed={isSelected}
                 >
-                  <span className={cn("font-medium", isToday && "text-[rgb(var(--brand-primary))]")}>{c.day || ""}</span>
+                  <span className={cn(
+                    "font-medium",
+                    isToday && "text-[rgb(var(--brand-primary))]",
+                    c.inMonth && isClosed && !isToday && "text-rose-500",
+                    c.inMonth && !isClosed && (isPast || isBooked) && !isToday && "text-gray-400",
+                  )}>{c.day || ""}</span>
                   {c.inMonth && (
                     <div className="mt-1 flex items-center gap-1">
                       {isPrep ? (

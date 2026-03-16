@@ -389,12 +389,18 @@ export default function SpaceBooking({
                     "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
                     !isCurrentMonth && "bg-gray-50 text-gray-300 cursor-default",
+                    isCurrentMonth && (isSunday || isHoliday) && !isSelected && "cursor-not-allowed bg-rose-50/80",
+                    isCurrentMonth && (isPast || isBooked) && !isSunday && !isHoliday && !isSelected && "cursor-not-allowed bg-gray-50/80",
                     isCurrentMonth && !isDisabled && !isSelected && "bg-white text-slate-900 hover:bg-slate-50",
-                    isCurrentMonth && isDisabled && !isSelected && "cursor-not-allowed bg-white opacity-50",
                     isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
                   )}
                 >
-                  <span className={cn("font-medium", isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))]")}>{d.getDate()}</span>
+                  <span className={cn(
+                    "font-medium",
+                    isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))]",
+                    isCurrentMonth && (isSunday || isHoliday) && !isToday && "text-rose-500",
+                    isCurrentMonth && (isPast || isBooked) && !isSunday && !isHoliday && !isToday && "text-gray-400",
+                  )}>{d.getDate()}</span>
                   {isCurrentMonth && (
                     <div className="mt-1 flex items-center gap-1">
                       <span
