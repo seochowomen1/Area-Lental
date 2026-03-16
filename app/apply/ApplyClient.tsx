@@ -15,6 +15,7 @@ import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
+import DatePickerCalendar from "@/components/DatePickerCalendar";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
@@ -923,31 +924,20 @@ export default function ApplyClient() {
               </div>
 
               <div>
-                <FieldLabel htmlFor="date">날짜 *</FieldLabel>
-                <Input
-                  id="date"
-                  type="date"
-                  value={selectedDate ?? ""}
-                  disabled={prefillLocked}
-                  min={todayYmdSeoul()}
-                  onChange={(e) => {
-                    const v = e.target.value;
-                    if (!v) {
-                      setValue("date", "", { shouldValidate: true, shouldDirty: true });
-                      return;
-                    }
-                    const d = new Date(v + "T00:00:00");
-                    if (d.getDay() === 0) {
-                      setValue("date", "", { shouldValidate: true, shouldDirty: true });
-                      setFormError("date", { type: "manual", message: "일요일은 휴관일로 선택할 수 없습니다." });
-                      return;
-                    }
-                    clearErrors("date");
-                    setValue("date", v, { shouldValidate: true, shouldDirty: true });
-                  }}
-                />
+                <FieldLabel>날짜 *</FieldLabel>
+                {prefillLocked ? (
+                  <Input type="date" value={selectedDate ?? ""} disabled />
+                ) : (
+                  <DatePickerCalendar
+                    value={selectedDate ?? ""}
+                    roomId={roomId}
+                    onChange={(ymd) => {
+                      clearErrors("date");
+                      setValue("date", ymd, { shouldValidate: true, shouldDirty: true });
+                    }}
+                  />
+                )}
                 {errors.date ? <FieldHelp className="text-red-600">{errors.date.message}</FieldHelp> : null}
-                {!prefillLocked ? <FieldHelp>* 일요일·공휴일은 휴관입니다.</FieldHelp> : null}
 
                 {/* 여러 회차(날짜/시간) 묶음 신청 */}
                 <div className="mt-3">
@@ -1439,25 +1429,14 @@ export default function ApplyClient() {
                 {/* 입력 영역 */}
                 <div className="px-5 py-4 space-y-3">
                   <div>
-                    <FieldLabel htmlFor="addDate" className="text-xs">날짜</FieldLabel>
-                    <Input
-                      id="addDate"
-                      type="date"
+                    <FieldLabel className="text-xs">날짜</FieldLabel>
+                    <DatePickerCalendar
                       value={addDate}
-                      min={todayYmdSeoul()}
+                      roomId={roomId}
                       disabled={!selectedDate}
-                      onChange={(e) => {
-                        const v = e.target.value;
-                        if (v) {
-                          const d = new Date(v + "T00:00:00");
-                          if (d.getDay() === 0) {
-                            setAddDate("");
-                            setAddDateError("일요일은 휴관일로 선택할 수 없습니다.");
-                            return;
-                          }
-                        }
+                      onChange={(ymd) => {
                         setAddDateError(null);
-                        setAddDate(v);
+                        setAddDate(ymd);
                       }}
                     />
                     {addDateError && <FieldHelp className="text-red-600">{addDateError}</FieldHelp>}
