@@ -12,7 +12,7 @@ export default function Home() {
     <div className="flex min-h-screen flex-col bg-gray-50">
       <SiteHeader title="대관신청" />
 
-      <main className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+      <main id="main-content" className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           <HomeCategoryCard
             title="강의실"

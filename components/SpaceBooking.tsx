@@ -19,6 +19,12 @@ function fmtYMD(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
+const DOW_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+function dateAriaLabel(d: Date, extra?: string) {
+  const label = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW_NAMES[d.getDay()]}요일`;
+  return extra ? `${label}, ${extra}` : label;
+}
+
 function toMinutes(hhmm: string) {
   const [h, m] = hhmm.split(":").map((v) => parseInt(v, 10));
   if (!Number.isFinite(h) || !Number.isFinite(m)) return NaN;
@@ -333,6 +339,7 @@ export default function SpaceBooking({
               type="button"
               className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
               onClick={() => setMonth((m) => addMonths(m, -1))}
+              aria-label="이전 달"
             >
               ◀
             </button>
@@ -344,6 +351,7 @@ export default function SpaceBooking({
                 setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
                 onSelectDate(fmtYMD(nextValidDate(today)));
               }}
+              aria-label="오늘로 이동"
             >
               오늘
             </button>
@@ -351,6 +359,7 @@ export default function SpaceBooking({
               type="button"
               className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
               onClick={() => setMonth((m) => addMonths(m, 1))}
+              aria-label="다음 달"
             >
               ▶
             </button>
@@ -379,12 +388,17 @@ export default function SpaceBooking({
               const holidayName = holidayMap.get(ymd);
               const isDisabled = !isCurrentMonth || isPast || isSunday || isHoliday || isBooked;
 
+              const statusHint = !isCurrentMonth ? "" : isSelected ? "선택됨" : isSunday ? "휴관" : isHoliday ? `공휴일 (${holidayName})` : isBooked ? "마감" : isPast ? "지난 날짜" : "선택 가능";
+
               return (
                 <button
                   key={ymd}
                   type="button"
                   disabled={isDisabled}
                   onClick={() => onSelectDate(ymd)}
+                  aria-label={dateAriaLabel(d, statusHint)}
+                  aria-current={isToday && isCurrentMonth ? "date" : undefined}
+                  aria-pressed={isSelected || undefined}
                   className={cn(
                     "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
                     "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
@@ -408,7 +422,7 @@ export default function SpaceBooking({
                           "inline-block h-2.5 w-2.5 rounded-full",
                           (isSunday || isHoliday) ? "bg-rose-400" : (isPast || isBooked) ? "bg-gray-400" : "bg-orange-500"
                         )}
-                        title={isSunday ? "휴관" : isHoliday ? `공휴일(${holidayName})` : isBooked ? "마감" : isPast ? "마감" : "선택 가능"}
+                        aria-hidden="true"
                       />
                       {isHoliday && !isSunday && (
                         <span className="text-[10px] leading-none text-rose-500 font-medium truncate max-w-[4rem]">{holidayName}</span>

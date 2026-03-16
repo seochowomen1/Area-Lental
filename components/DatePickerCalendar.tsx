@@ -39,6 +39,13 @@ function getCalendarGrid(monthStart: Date) {
   return days;
 }
 
+const DOW_NAMES = ["일", "월", "화", "수", "목", "금", "토"];
+
+function dateAriaLabel(d: Date, extra?: string) {
+  const label = `${d.getFullYear()}년 ${d.getMonth() + 1}월 ${d.getDate()}일 ${DOW_NAMES[d.getDay()]}요일`;
+  return extra ? `${label}, ${extra}` : label;
+}
+
 /* ── 컴포넌트 ────────────────────────────────────────── */
 /**
  * 신청 폼용 컴팩트 달력 날짜 선택기.
@@ -121,6 +128,7 @@ export default function DatePickerCalendar({
             type="button"
             className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-gray-50"
             onClick={() => setMonth((m) => addMonths(m, -1))}
+            aria-label="이전 달"
           >
             ◀
           </button>
@@ -131,6 +139,7 @@ export default function DatePickerCalendar({
               const today = new Date();
               setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
             }}
+            aria-label="오늘로 이동"
           >
             오늘
           </button>
@@ -138,6 +147,7 @@ export default function DatePickerCalendar({
             type="button"
             className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-gray-50"
             onClick={() => setMonth((m) => addMonths(m, 1))}
+            aria-label="다음 달"
           >
             ▶
           </button>
@@ -145,10 +155,10 @@ export default function DatePickerCalendar({
       </div>
 
       {/* 달력 그리드 */}
-      <div className="overflow-hidden rounded-lg border bg-white">
-        <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-[11px] font-semibold text-gray-600">
+      <div className="overflow-hidden rounded-lg border bg-white" role="grid" aria-label={`${monthLabel} 달력`}>
+        <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-[11px] font-semibold text-gray-600" role="row">
           {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
-            <div key={d} className={cn("py-1.5", d === "일" && "text-rose-500", d === "토" && "text-blue-600")}>
+            <div key={d} role="columnheader" className={cn("py-1.5", d === "일" && "text-rose-500", d === "토" && "text-blue-600")}>
               {d}
             </div>
           ))}
@@ -168,12 +178,17 @@ export default function DatePickerCalendar({
             const isBooked = bookedDates.has(ymd);
             const isDisabled = !isCurrentMonth || isPast || isSunday || isHoliday || isBooked;
 
+            const statusHint = !isCurrentMonth ? "" : isSelected ? "선택됨" : isSunday || isHoliday ? `휴관${holidayName ? ` (${holidayName})` : ""}` : isBooked ? "마감" : isPast ? "지난 날짜" : "선택 가능";
+
             return (
               <button
                 key={ymd}
                 type="button"
                 disabled={isDisabled}
                 onClick={() => onChange(ymd)}
+                aria-label={dateAriaLabel(d, statusHint)}
+                aria-current={isToday && isCurrentMonth ? "date" : undefined}
+                aria-pressed={isSelected || undefined}
                 className={cn(
                   "relative flex flex-col items-center justify-center border-b border-r py-1.5 text-xs transition",
                   "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
@@ -210,7 +225,7 @@ export default function DatePickerCalendar({
       </div>
 
       {/* 범례 */}
-      <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-gray-500">
+      <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-gray-500" aria-hidden="true">
         <div className="flex items-center gap-1">
           <span className="inline-block h-2 w-2 rounded-full bg-rose-400" />
           <span>휴관·공휴일</span>
