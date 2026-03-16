@@ -246,7 +246,7 @@ export default function ApplyClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicantName, setValue]);
 
-  // ✅ 날짜+공간 변경 시 가용시간 조회 → 불가 슬롯 반영
+  // ✅ 날짜+공간 변경 시 가용시간 조회 → 불가 슬롯 반영 + 공휴일 차단
   useEffect(() => {
     if (!selectedDate || !roomId) {
       setUnavailableSlots([]);
@@ -261,6 +261,15 @@ export default function ApplyClient() {
         );
         const data = await res.json();
         if (cancelled) return;
+
+        // 공휴일·휴관일이면 날짜 초기화 + 에러 표시
+        if (data?.reasonCode === "HOLIDAY_CLOSED" || data?.reasonCode === "NO_OPERATING_HOURS") {
+          setValue("date", "", { shouldValidate: true, shouldDirty: true });
+          setFormError("date", { type: "manual", message: data.reasonMessage ?? "해당 날짜는 휴관일입니다." });
+          setUnavailableSlots([]);
+          return;
+        }
+
         const blocked = (data?.slots ?? [])
           .filter((s: { start: string; end: string; available: boolean }) => !s.available)
           .map((s: { start: string; end: string }) => ({ start: s.start, end: s.end }));
@@ -270,7 +279,7 @@ export default function ApplyClient() {
       }
     })();
     return () => { cancelled = true; };
-  }, [selectedDate, roomId]);
+  }, [selectedDate, roomId, setValue, setFormError]);
 
   const isTueNight = useMemo(() => {
     return isTuesdayNightOverlap(selectedDate, startTime, endTime);
@@ -325,16 +334,19 @@ export default function ApplyClient() {
 
   // 추가 회차용 가용시간 조회 (날짜가 기본 회차와 다를 수 있으므로 별도 조회)
   const [addUnavailableSlots, setAddUnavailableSlots] = useState<UnavailableSlot[]>([]);
+  const [addDateError, setAddDateError] = useState<string | null>(null);
 
   useEffect(() => {
     const d = addDate || selectedDate;
     if (!d || !roomId) {
       setAddUnavailableSlots([]);
+      setAddDateError(null);
       return;
     }
     // 기본 회차와 같은 날짜면 같은 불가 슬롯 사용
     if (d === selectedDate) {
       setAddUnavailableSlots(unavailableSlots);
+      setAddDateError(null);
       return;
     }
     let cancelled = false;
@@ -346,6 +358,16 @@ export default function ApplyClient() {
         );
         const data = await res.json();
         if (cancelled) return;
+
+        // 공휴일·휴관일 차단
+        if (data?.reasonCode === "HOLIDAY_CLOSED" || data?.reasonCode === "NO_OPERATING_HOURS") {
+          setAddDate("");
+          setAddDateError(data.reasonMessage ?? "해당 날짜는 휴관일입니다.");
+          setAddUnavailableSlots([]);
+          return;
+        }
+        setAddDateError(null);
+
         const blocked = (data?.slots ?? [])
           .filter((s: { start: string; end: string; available: boolean }) => !s.available)
           .map((s: { start: string; end: string }) => ({ start: s.start, end: s.end }));
@@ -925,7 +947,7 @@ export default function ApplyClient() {
                   }}
                 />
                 {errors.date ? <FieldHelp className="text-red-600">{errors.date.message}</FieldHelp> : null}
-                {!prefillLocked ? <FieldHelp>* 일요일은 휴관입니다.</FieldHelp> : null}
+                {!prefillLocked ? <FieldHelp>* 일요일·공휴일은 휴관입니다.</FieldHelp> : null}
 
                 {/* 여러 회차(날짜/시간) 묶음 신청 */}
                 <div className="mt-3">
@@ -1424,8 +1446,21 @@ export default function ApplyClient() {
                       value={addDate}
                       min={todayYmdSeoul()}
                       disabled={!selectedDate}
-                      onChange={(e) => setAddDate(e.target.value)}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        if (v) {
+                          const d = new Date(v + "T00:00:00");
+                          if (d.getDay() === 0) {
+                            setAddDate("");
+                            setAddDateError("일요일은 휴관일로 선택할 수 없습니다.");
+                            return;
+                          }
+                        }
+                        setAddDateError(null);
+                        setAddDate(v);
+                      }}
                     />
+                    {addDateError && <FieldHelp className="text-red-600">{addDateError}</FieldHelp>}
                   </div>
 
                   <div className="grid grid-cols-2 gap-3">
