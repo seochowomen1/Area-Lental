@@ -43,7 +43,7 @@ function sortSessions(list: RentalRequest[]) {
  * - 묶음 신청인 경우 회차 목록 + 묶음 총액/할인/최종금액을 포함
  */
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth();
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

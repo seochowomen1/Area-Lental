@@ -11,12 +11,13 @@ function adminTokenFor(password: string): string {
 /**
  * Server Component/Route Handler에서 사용하는 관리자 인증 가드
  * - middleware에서도 보호되지만, SSR에서 직접 접근되는 페이지의 안정성을 위해 추가로 방어합니다.
+ * - ADMIN_PASSWORD_HASH (bcrypt) 또는 ADMIN_PASSWORD (레거시) 모두 지원
  */
 export async function assertAdminAuth(): Promise<void> {
-  const pw = (process.env.ADMIN_PASSWORD ?? "").trim();
-  if (!pw) redirect("/admin/login");
+  const tokenSource = (process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD || "").trim();
+  if (!tokenSource) redirect("/admin/login");
 
-  const expected = adminTokenFor(pw);
+  const expected = adminTokenFor(tokenSource);
   const token = cookies().get(ADMIN_COOKIE_NAME)?.value;
   if (!token || token !== expected) redirect("/admin/login");
 }

@@ -186,8 +186,8 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
       }
 
       return createdId;
-    } catch (err: any) {
-      onToast?.({ type: "error", message: err?.message ?? "등록에 실패했습니다." });
+    } catch (err: unknown) {
+      onToast?.({ type: "error", message: err instanceof Error ? err.message : "등록에 실패했습니다." });
     }
   }
 

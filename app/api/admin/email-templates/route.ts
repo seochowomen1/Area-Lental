@@ -8,8 +8,8 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /** 통합 템플릿 조회 */
-export async function GET() {
-  const auth = assertAdminApiAuth();
+export async function GET(req: Request) {
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
@@ -20,7 +20,7 @@ export async function GET() {
 
 /** 상태별 템플릿 저장 (카테고리 구분 없이 통합) */
 export async function PUT(req: Request) {
-  const auth = assertAdminApiAuth();
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

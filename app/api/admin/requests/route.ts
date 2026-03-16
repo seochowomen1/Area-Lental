@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 /** 반려/취소된 신청건 삭제 */
 export async function DELETE(req: Request) {
-  const auth = assertAdminApiAuth();
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

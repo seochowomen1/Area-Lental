@@ -387,9 +387,9 @@ export default function CalendarClient({
           const filtered = raw.filter((it: any) => it?.roomId === "all" || allowedRoomIds.has(String(it?.roomId)));
           setItems(filtered);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(e?.message ? String(e.message) : "알 수 없는 오류");
+          setError(e instanceof Error ? e.message : "알 수 없는 오류");
           setItems([]);
         }
       } finally {

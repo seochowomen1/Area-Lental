@@ -145,7 +145,7 @@ function kindWeight(k: CalendarKind): number {
 }
 
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth();
+  const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

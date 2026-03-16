@@ -30,14 +30,12 @@ function generateExpectedToken(): string | null {
  * Admin API routes are NOT protected by middleware because they live under `/api`.
  * Call this at the top of any `/api/admin/*` handler that must be admin-only.
  */
-export function assertAdminApiAuth(req?: Request): { ok: true } | { ok: false; reason: string; status?: number } {
-  // Rate limiting (req가 전달된 경우)
-  if (req) {
-    const ip = getClientIp(req);
-    const rl = rateLimit("admin-api", ip, ADMIN_API_MAX, ADMIN_API_WINDOW_MS);
-    if (!rl.allowed) {
-      return { ok: false, reason: "rate_limit_exceeded", status: 429 };
-    }
+export function assertAdminApiAuth(req: Request): { ok: true } | { ok: false; reason: string; status?: number } {
+  // Rate limiting
+  const ip = getClientIp(req);
+  const rl = rateLimit("admin-api", ip, ADMIN_API_MAX, ADMIN_API_WINDOW_MS);
+  if (!rl.allowed) {
+    return { ok: false, reason: "rate_limit_exceeded", status: 429 };
   }
 
   const expected = generateExpectedToken();

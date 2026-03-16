@@ -72,10 +72,10 @@ export default function RentalCalendar({ roomId, selectedDate, onSelectDate, dis
         if (!res.ok) throw new Error(data?.message ?? "가용일 정보를 불러오지 못했습니다.");
         if (cancelled) return;
         setUnavailable(new Set<string>(data.unavailable ?? []));
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (cancelled) return;
         setUnavailable(new Set());
-        setErr(e?.message ?? "가용일 정보를 불러오는 중 오류가 발생했습니다.");
+        setErr(e instanceof Error ? e.message : "가용일 정보를 불러오는 중 오류가 발생했습니다.");
       } finally {
         if (!cancelled) setLoading(false);
       }
