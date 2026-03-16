@@ -86,7 +86,7 @@ export default function AdminNavTabs() {
     <div className="space-y-3">
       {/* 카테고리 전환 */}
       <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-medium text-gray-500">공간:</span>
+        <span className="mr-1 text-xs font-medium text-slate-400">공간:</span>
         {CATEGORIES.map((cat) => {
           const isActive = cat.id === category;
           return (
@@ -94,10 +94,10 @@ export default function AdminNavTabs() {
               key={cat.id}
               href={buildCategoryHref(cat.id)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2",
+                "rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
                 isActive
                   ? `${cat.bg} ${cat.color}`
-                  : "border-gray-200 bg-white text-gray-500 hover:bg-gray-50"
+                  : "border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700"
               )}
             >
               {cat.label}
@@ -113,10 +113,10 @@ export default function AdminNavTabs() {
             key={t.label}
             href={t.href}
             className={cn(
-              "rounded-full px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2",
+              "rounded-full px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
               t.active
-                ? "bg-[rgb(var(--brand-primary))] text-white shadow-sm"
-                : "bg-white text-gray-700 shadow-sm ring-1 ring-gray-200 hover:bg-gray-50"
+                ? "bg-white text-slate-900 font-semibold shadow-sm"
+                : "bg-slate-700/50 text-slate-300 shadow-sm ring-1 ring-slate-600 hover:bg-slate-700"
             )}
           >
             {t.label}
