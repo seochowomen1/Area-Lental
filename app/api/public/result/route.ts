@@ -7,6 +7,7 @@ import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { maskName, maskPhone, maskAddress } from "@/lib/mask";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -156,10 +157,10 @@ export async function POST(req: Request) {
     startTime: representative.startTime,
     endTime: representative.endTime,
     createdAt: representative.createdAt,
-    applicantName: representative.applicantName,
-    phone: representative.phone,
+    applicantName: maskName(representative.applicantName),
+    phone: maskPhone(representative.phone),
     email: representative.email,
-    address: representative.address,
+    address: maskAddress(representative.address),
     orgName: representative.orgName,
     headcount: representative.headcount,
     purpose: representative.purpose,

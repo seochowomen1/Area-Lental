@@ -128,8 +128,8 @@ export async function sendAdminNewRequestEmail(req: RentalRequest) {
   const atts = Array.isArray(req.attachments) ? req.attachments : [];
 
   const subject = isGallery(req)
-    ? `[대관신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.applicantName}`
-    : `[대관신청] ${req.roomName} / ${req.date} ${req.startTime}-${req.endTime} / ${req.applicantName}`;
+    ? `[대관신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.requestId}`
+    : `[대관신청] ${req.roomName} / ${req.date} ${req.startTime}-${req.endTime} / ${req.requestId}`;
   const text =
 `새 대관 신청이 등록되었습니다.
 
@@ -160,8 +160,8 @@ export async function sendAdminNewRequestEmailBatch(reqs: RentalRequest[]) {
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(first.requestId)}`;
 
   const subject = isGallery(first)
-    ? `[대관신청] ${first.roomName} / 전시 ${list.length}일 / ${first.applicantName}`
-    : `[대관신청] ${first.roomName} / ${list.length}회차 / ${first.applicantName}`;
+    ? `[대관신청] ${first.roomName} / 전시 ${list.length}일 / ${first.requestId}`
+    : `[대관신청] ${first.roomName} / ${list.length}회차 / ${first.requestId}`;
   const sessions = list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n");
 
   const eqLabel = isGallery(first) ? "장비" : getRoomCategory(first) === "studio" ? "촬영장비(회차별 동일)" : "기자재(회차별 동일)";
