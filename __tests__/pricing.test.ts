@@ -33,7 +33,7 @@ describe("갤러리 요금 계산", () => {
       startTime: "09:00",
       endTime: "18:00",
       isPrepDay: false,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(20000);
     expect(result.totalFeeKRW).toBe(20000);
@@ -46,7 +46,7 @@ describe("갤러리 요금 계산", () => {
       startTime: "09:00",
       endTime: "13:00",
       isPrepDay: false,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(10000);
     expect(result.totalFeeKRW).toBe(10000);
@@ -59,7 +59,7 @@ describe("갤러리 요금 계산", () => {
       startTime: "09:00",
       endTime: "18:00",
       isPrepDay: false,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(0);
   });
@@ -71,7 +71,7 @@ describe("갤러리 요금 계산", () => {
       startTime: "09:00",
       endTime: "18:00",
       isPrepDay: true,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(0);
     expect(result.totalFeeKRW).toBe(0);
@@ -84,7 +84,7 @@ describe("갤러리 요금 계산", () => {
       startTime: "09:00",
       endTime: "18:00",
       isPrepDay: false,
-      equipment: { laptop: true, projector: true },
+      equipment: { laptop: true, projector: true, audio: false },
     });
     expect(result.equipmentFeeKRW).toBe(0);
   });
@@ -99,7 +99,7 @@ describe("강의실 요금 계산", () => {
       date: "2026-02-16",
       startTime: "09:00",
       endTime: "11:00",
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(100000);
     expect(result.durationHours).toBe(2);
@@ -165,7 +165,7 @@ describe("갤러리 1행 형식 요금 (computeBaseTotalKRW)", () => {
       galleryWeekdayCount: 3,
       gallerySaturdayCount: 1,
       galleryExhibitionDayCount: 4,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     expect(result.rentalFeeKRW).toBe(70000);
     expect(result.totalFeeKRW).toBe(70000);
@@ -184,7 +184,7 @@ describe("갤러리 1행 형식 요금 (computeBaseTotalKRW)", () => {
       gallerySaturdayCount: 1,
       galleryExhibitionDayCount: 4,
       isPrepDay: false,
-      equipment: {},
+      equipment: { laptop: false, projector: false, audio: false },
     });
     // batchId가 있으므로 기존 로직 적용 → 월요일 1일 = 20,000원
     expect(result.rentalFeeKRW).toBe(20000);
