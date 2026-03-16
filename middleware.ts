@@ -62,6 +62,8 @@ function withSecurityHeaders(res: NextResponse) {
   res.headers.set("X-XSS-Protection", "1; mode=block");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  // Note: 'unsafe-inline'은 Next.js 14 App Router가 인라인 스크립트/스타일을 사용하므로 필수.
+  // Next.js가 nonce 기반 CSP를 안정적으로 지원하면 전환 예정.
   res.headers.set(
     "Content-Security-Policy",
     [
@@ -74,6 +76,8 @@ function withSecurityHeaders(res: NextResponse) {
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
     ].join("; ")
   );
   return res;

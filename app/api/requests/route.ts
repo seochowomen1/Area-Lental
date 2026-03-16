@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
 import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
-import { UPLOAD, ROOMS } from "@/lib/config";
+import { UPLOAD, ROOMS, validateFileMagicBytes } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
 import { ensureHolidaysLoaded } from "@/lib/holidays";
@@ -385,6 +385,14 @@ export async function POST(req: Request) {
       if (!UPLOAD.allowedMime.includes(f.type)) {
         return NextResponse.json(
           { ok: false, code: "FILE_TYPE", message: `허용되지 않는 파일 형식입니다(PDF/JPG/PNG만 가능). (${f.name})` },
+          { status: 400 }
+        );
+      }
+      // 매직 바이트 검증: MIME 타입 스푸핑 방지
+      const magicCheck = validateFileMagicBytes(await f.arrayBuffer());
+      if (!magicCheck.ok) {
+        return NextResponse.json(
+          { ok: false, code: "FILE_TYPE", message: `파일 내용이 허용된 형식(PDF/JPG/PNG)과 일치하지 않습니다. (${f.name})` },
           { status: 400 }
         );
       }
