@@ -29,18 +29,9 @@ import {
   PLEDGE_FOOTER,
 } from "@/lib/pledge";
 import type { RentalRequest } from "@/lib/types";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort(
-      (a, b) =>
-        (a.batchSeq ?? 0) - (b.batchSeq ?? 0) ||
-        `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`)
-    );
-}
 
 /** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
 function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {

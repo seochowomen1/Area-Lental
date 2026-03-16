@@ -7,6 +7,9 @@ import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { maskName, maskPhone, maskAddress } from "@/lib/mask";
+import { auditLog } from "@/lib/auditLog";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,17 +20,6 @@ const RESULT_MAX_PER_MIN = 10;
 const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const sa = a.batchSeq ?? 0;
-      const sb = b.batchSeq ?? 0;
-      if (sa !== sb) return sa - sb;
-      return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
-    });
-}
 
 function normalizeEmail(email: string) {
   return (email ?? "").toString().trim().toLowerCase();
@@ -140,6 +132,13 @@ export async function POST(req: Request) {
   // - 묶음이면 전체 기준으로 판단
   const cancelable = !["취소", "반려"].includes(overallStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
 
+  auditLog({
+    action: "PI_ACCESS",
+    ip,
+    target: representative.requestId,
+    details: { email, isBatch, batchSize: sessions.length },
+  });
+
   return NextResponse.json({
     ok: true,
     status: overallStatus,
@@ -156,10 +155,10 @@ export async function POST(req: Request) {
     startTime: representative.startTime,
     endTime: representative.endTime,
     createdAt: representative.createdAt,
-    applicantName: representative.applicantName,
-    phone: representative.phone,
+    applicantName: maskName(representative.applicantName),
+    phone: maskPhone(representative.phone),
     email: representative.email,
-    address: representative.address,
+    address: maskAddress(representative.address),
     orgName: representative.orgName,
     headcount: representative.headcount,
     purpose: representative.purpose,

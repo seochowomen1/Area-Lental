@@ -45,7 +45,13 @@ export default function Home() {
       {/* 하단 푸터 */}
       <footer className="border-t border-slate-200 bg-white">
         <div className="mx-auto max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-end">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/privacy"
+              className="text-xs text-slate-500 hover:text-slate-700 transition-colors font-medium"
+            >
+              개인정보 처리방침
+            </Link>
             <Link
               href="/admin"
               className="text-xs text-slate-400 hover:text-slate-600 transition-colors"

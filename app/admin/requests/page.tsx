@@ -5,7 +5,9 @@ import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
+import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 import RequestTable, { type TableRowData } from "./RequestTable";
+import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
@@ -26,16 +28,6 @@ type GroupRow = {
 
 function groupKey(r: RentalRequest) {
   return r.batchId && r.batchId.trim() ? `batch:${r.batchId}` : `single:${r.requestId}`;
-}
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const aKey = `${a.date} ${a.startTime}`;
-      const bKey = `${b.date} ${b.startTime}`;
-      return aKey.localeCompare(bKey);
-    });
 }
 
 function sortByBatchSeq(list: RentalRequest[]) {
@@ -84,13 +76,6 @@ function formatPeriod(items: RentalRequest[]) {
     : s.length > 1 ? `${s.length}회` : "";
 
   return { datePart, timePart, countPart };
-}
-
-/* 카테고리 색상 매핑 */
-function categoryAccent(cat: RoomCategory) {
-  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
-  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
-  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
 }
 
 export default async function AdminRequestsPage({
@@ -373,12 +358,10 @@ export default async function AdminRequestsPage({
               <button className="rounded-full bg-[rgb(var(--brand-primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2">
                 검색
               </button>
-              <a
-                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              <ExcelDownloadButton
                 href={exportUrl}
-              >
-                엑셀 다운로드
-              </a>
+                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              />
             </div>
 
             <div className="flex items-center gap-3">

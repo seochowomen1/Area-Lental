@@ -6,6 +6,9 @@ import { REQUEST_ID_LABEL, statusLabel } from "@/lib/labels";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import type { RentalRequest } from "@/lib/types";
+import { auditLog } from "@/lib/auditLog";
+import { getClientIp } from "@/lib/rateLimit";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -24,18 +27,6 @@ function toMin(t: string) {
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
   return hh * 60 + mm;
 }
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const sa = a.batchSeq ?? 0;
-      const sb = b.batchSeq ?? 0;
-      if (sa !== sb) return sa - sb;
-      return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
-    });
-}
-
 
 /**
  * 출력용 신청서(Excel)
@@ -296,6 +287,11 @@ export async function GET(req: Request) {
   mergeRow(footerRow);
   wrapCells.push(XLSX.utils.encode_cell({ r: footerRow, c: 0 }));
 
+  const privacyRow = aoa.length;
+  aoa.push(["※ 개인정보 포함 — 개인정보보호법에 따라 안전하게 관리하세요. 무단 유출 시 법적 책임이 따릅니다.", "", "", "", "", "", "", ""]);
+  mergeRow(privacyRow);
+  wrapCells.push(XLSX.utils.encode_cell({ r: privacyRow, c: 0 }));
+
   const ws = XLSX.utils.aoa_to_sheet(aoa);
 
   // Column widths
@@ -330,6 +326,12 @@ export async function GET(req: Request) {
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const filename = `rental_application_${safeFileNamePart(representative.requestId)}.xlsx`;
+
+  auditLog({
+    action: "EXPORT_FORM",
+    ip: getClientIp(req),
+    target: requestId,
+  });
 
   return new NextResponse(buf, {
     status: 200,

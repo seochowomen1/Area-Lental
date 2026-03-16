@@ -1,6 +1,6 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE } from "@/lib/adminConstants";
+import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE, ADMIN_ACTIVITY_COOKIE, ADMIN_INACTIVITY_TIMEOUT_MS } from "@/lib/adminConstants";
 
 function toHex(buffer: ArrayBuffer) {
   const bytes = new Uint8Array(buffer);
@@ -152,7 +152,48 @@ export async function middleware(req: NextRequest) {
     for (let i = 0; i < a.length && i < b.length; i++) {
       match = match && a[i] === b[i];
     }
-    if (match) return withSecurityHeaders(NextResponse.next());
+    if (match) {
+      // 비활동 타임아웃 체크 (30분)
+      const lastActivityRaw = req.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value;
+      const lastActivityTs = lastActivityRaw ? Number(lastActivityRaw) : NaN;
+
+      if (!isNaN(lastActivityTs)) {
+        const elapsed = Date.now() - lastActivityTs;
+        if (elapsed > ADMIN_INACTIVITY_TIMEOUT_MS) {
+          // 세션 만료 — 쿠키 삭제 후 로그인 리다이렉트
+          if (pathname.startsWith("/api/admin")) {
+            const expiredRes = NextResponse.json(
+              { ok: false, message: "세션이 만료되었습니다. 다시 로그인해 주세요." },
+              { status: 401 }
+            );
+            expiredRes.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+            expiredRes.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+            return withSecurityHeaders(expiredRes);
+          }
+          const expiredUrl = req.nextUrl.clone();
+          expiredUrl.pathname = "/admin/login";
+          expiredUrl.searchParams.set("next", pathname);
+          expiredUrl.searchParams.set("err", "session_expired");
+          const redirectRes = NextResponse.redirect(expiredUrl);
+          redirectRes.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+          redirectRes.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+          return redirectRes;
+        }
+      }
+      // 활동쿠키 없거나 유효하지 않으면 새로 설정 (기존 세션 호환)
+
+      // 활동 쿠키 갱신
+      const isProduction = process.env.NODE_ENV === "production";
+      const res = NextResponse.next();
+      res.cookies.set(ADMIN_ACTIVITY_COOKIE, String(Date.now()), {
+        httpOnly: true,
+        sameSite: "strict",
+        secure: isProduction,
+        path: "/",
+        maxAge: 8 * 60 * 60,
+      });
+      return withSecurityHeaders(res);
+    }
   }
 
   // API 라우트는 JSON 401 응답

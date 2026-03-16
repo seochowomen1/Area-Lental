@@ -109,3 +109,6 @@ export type AppEnv = FullEnv | MockEnv;
 export function isMockEnv(env: AppEnv): env is MockEnv {
   return "MOCK_MODE" in env && env.MOCK_MODE === "true";
 }
+
+/** 개인정보 보존기한 (년) — 개인정보보호법 제21조 */
+export const RETENTION_YEARS = 3;

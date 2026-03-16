@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { ADMIN_COOKIE_NAME } from "@/lib/adminConstants";
+import { ADMIN_COOKIE_NAME, ADMIN_ACTIVITY_COOKIE } from "@/lib/adminConstants";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
 import { verifyAdminPassword, generateSessionToken, isAdminPasswordConfigured } from "@/lib/adminPassword";
@@ -92,6 +92,13 @@ export async function POST(req: Request) {
     path: "/",
     maxAge: 8 * 60 * 60,
   });
+  res.cookies.set(ADMIN_ACTIVITY_COOKIE, String(Date.now()), {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: isProduction,
+    path: "/",
+    maxAge: 8 * 60 * 60,
+  });
 
   logger.info("관리자 로그인 성공", { ip });
   auditLog({ action: "ADMIN_LOGIN", ip, details: { success: true } });
@@ -106,5 +113,6 @@ export async function DELETE(req: Request) {
   auditLog({ action: "ADMIN_LOGOUT", ip });
   const res = NextResponse.json({ ok: true });
   res.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+  res.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
   return res;
 }

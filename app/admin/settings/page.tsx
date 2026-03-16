@@ -4,6 +4,7 @@ import SettingsClient from "@/app/admin/settings/SettingsClient";
 
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
+import { categoryAccent } from "@/lib/requestUtils";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -16,12 +17,6 @@ const DAY_OPTIONS = [
   { value: 5, label: "금" },
   { value: 6, label: "토" }
 ];
-
-function categoryAccent(cat: RoomCategory) {
-  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
-  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
-  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
-}
 
 export default async function AdminSettingsPage({
   searchParams,

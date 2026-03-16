@@ -20,7 +20,13 @@ export type AuditAction =
   | "EMAIL_TEMPLATE_UPDATE"
   | "SHEETS_INIT"
   | "ADMIN_LOGIN"
-  | "ADMIN_LOGOUT";
+  | "ADMIN_LOGOUT"
+  | "STATS_VIEW"
+  | "EXPORT_LIST"
+  | "EXPORT_FORM"
+  | "PI_ACCESS"
+  | "DATA_RETENTION_CHECK"
+  | "DATA_RETENTION_PURGE";
 
 export interface AuditEntry {
   action: AuditAction;
@@ -38,7 +44,7 @@ export function auditLog(entry: AuditEntry): void {
     action: entry.action,
     ip: entry.ip ?? "unknown",
     target: entry.target ?? "",
-    ...entry.details,
+    ...(entry.details ? { details: entry.details } : {}),
   };
 
   if (isDev) {

@@ -7,6 +7,7 @@ import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,17 +20,6 @@ const LIST_WINDOW_MS = 60 * 1000;
 /** 이메일 직접 조회 제한: 이메일당 15분 내 5회 */
 const EMAIL_DIRECT_MAX = 5;
 const EMAIL_DIRECT_WINDOW_MS = 15 * 60 * 1000;
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const sa = a.batchSeq ?? 0;
-      const sb = b.batchSeq ?? 0;
-      if (sa !== sb) return sa - sb;
-      return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
-    });
-}
 
 function nowMinutesSeoul() {
   const now = new Date();

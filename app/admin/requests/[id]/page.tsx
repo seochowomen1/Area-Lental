@@ -15,8 +15,10 @@ import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, forma
 
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
+import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
+import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 import { Suspense } from "react";
 
 import {
@@ -29,12 +31,6 @@ export const runtime = "nodejs";
 
 /* ── helpers ── */
 
-function categoryAccent(cat: RoomCategory) {
-  if (cat === "studio") return { border: "border-violet-200", bg: "bg-violet-50", text: "text-violet-700", dot: "bg-violet-500" };
-  if (cat === "gallery") return { border: "border-emerald-200", bg: "bg-emerald-50", text: "text-emerald-700", dot: "bg-emerald-500" };
-  return { border: "border-blue-200", bg: "bg-blue-50", text: "text-blue-700", dot: "bg-blue-500" };
-}
-
 /** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
 function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
   if (req.galleryRemovalTime) return req.galleryRemovalTime;
@@ -45,12 +41,6 @@ function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
     } catch { /* ignore */ }
   }
   return undefined;
-}
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0) || `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`));
 }
 
 /* 정보 표시용 행 */
@@ -242,12 +232,11 @@ export default async function AdminRequestDetail({
                 신청서 · 서약서
               </Link>
             )}
-            <Link
+            <ExcelDownloadButton
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
+              label="Excel"
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              Excel
-            </Link>
+            />
           </div>
         </div>
       </div>

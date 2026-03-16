@@ -6,6 +6,8 @@ import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { pickFeeBasisSessions } from "@/lib/bundle";
 import { getRoomsByCategory, normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
+import { auditLog } from "@/lib/auditLog";
+import { getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -123,10 +125,18 @@ export async function GET(req: Request) {
   });
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
+  // 주의문구 헤더 행 삽입
+  const warningRow = [{ "": "※ 개인정보 포함 — 개인정보보호법에 따라 안전하게 관리하세요. 무단 유출 시 법적 책임이 따릅니다." }];
+  const ws = XLSX.utils.json_to_sheet([...warningRow, ...rows]);
   XLSX.utils.book_append_sheet(wb, ws, "requests");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  auditLog({
+    action: "EXPORT_LIST",
+    ip: getClientIp(req),
+    details: { category, roomId, status, rowCount: rows.length },
+  });
 
   return new NextResponse(buf, {
     status: 200,
