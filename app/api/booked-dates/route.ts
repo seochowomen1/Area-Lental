@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, overlaps, inRangeYmd } from "@/lib/datetime";
+import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { buildHourSlotsForDate } from "@/lib/operating";
 import type { RequestStatus } from "@/lib/types";
 
@@ -30,6 +31,10 @@ export async function GET(req: Request) {
     const m = parseInt(monthStr, 10);
     const lastDay = new Date(Date.UTC(year, m, 0)).getUTCDate();
 
+    // 공휴일 데이터 사전 로딩
+    await ensureHolidaysLoaded(year, m);
+    const holidays = await getHolidays(year, m);
+
     const db = getDatabase();
     const [requests, blocks, schedules] = await Promise.all([
       db.getAllRequests(),
@@ -44,7 +49,7 @@ export async function GET(req: Request) {
       const date = `${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`;
       const dow = dayOfWeek(date);
 
-      // 일요일은 스킵 (이미 휴관으로 처리됨)
+      // 일요일·공휴일은 스킵 (캘린더 UI에서 별도 표시)
       if (dow === 0) continue;
 
       const baseSlots = buildHourSlotsForDate(date);
@@ -93,7 +98,11 @@ export async function GET(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, bookedDates });
+    return NextResponse.json({
+      ok: true,
+      bookedDates,
+      holidays: holidays.map((h) => ({ date: h.date, name: h.name })),
+    });
   } catch (e: unknown) {
     console.error("[booked-dates] 조회 오류:", e instanceof Error ? e.message : e);
     return NextResponse.json(

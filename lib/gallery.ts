@@ -1,4 +1,5 @@
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
+import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
 
 export type GalleryOperatingWindow = { startTime: string; endTime: string };
 export type GallerySessionInput = {
@@ -16,6 +17,8 @@ export type GallerySessionInput = {
 export function galleryOperatingWindow(dateYmd: string): GalleryOperatingWindow | null {
   const dow = dayOfWeek(dateYmd); // 0 Sun ... 6 Sat
   if (dow === 0) return null;
+  // 공휴일 체크 (ensureHolidaysLoaded() 선행 필요)
+  if (isHolidayCached(dateYmd)) return null;
   if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
   if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
   return { startTime: "09:00", endTime: "18:00" };
@@ -23,7 +26,11 @@ export function galleryOperatingWindow(dateYmd: string): GalleryOperatingWindow 
 
 export function validateGalleryOperatingHours(dateYmd: string, startTime: string, endTime: string) {
   const w = galleryOperatingWindow(dateYmd);
-  if (!w) return { ok: false as const, message: "일요일은 휴관일로 신청할 수 없습니다." };
+  if (!w) {
+    const hName = getHolidayNameCached(dateYmd);
+    if (hName) return { ok: false as const, message: `공휴일(${hName})은 휴관일로 신청할 수 없습니다.` };
+    return { ok: false as const, message: "일요일은 휴관일로 신청할 수 없습니다." };
+  }
 
   const s = toMinutes(startTime);
   const e = toMinutes(endTime);
@@ -49,14 +56,14 @@ function addDaysYmd(dateYmd: string, deltaDays: number): string {
 
 /**
  * 전시 시작일 기준으로 선택 가능한 준비일 후보를 반환합니다.
- * 일요일(휴관)은 제외하며, 기본 7개까지 반환합니다.
+ * 일요일(휴관)·공휴일은 제외하며, 기본 7개까지 반환합니다.
  */
 export function getAvailablePrepDates(startDate: string, count = 7): string[] {
   const dates: string[] = [];
   let cur = addDaysYmd(startDate, -1);
   let safety = 0;
   while (dates.length < count && safety++ < 30) {
-    if (dayOfWeek(cur) !== 0) {
+    if (dayOfWeek(cur) !== 0 && !isHolidayCached(cur)) {
       dates.push(cur);
     }
     cur = addDaysYmd(cur, -1);
@@ -65,11 +72,14 @@ export function getAvailablePrepDates(startDate: string, count = 7): string[] {
 }
 
 /**
- * 기본(자동) 준비일을 계산합니다: 시작일 이전 1일, 일요일이면 더 이전
+ * 기본(자동) 준비일을 계산합니다: 시작일 이전 1일, 일요일·공휴일이면 더 이전
  */
 export function getDefaultPrepDate(startDate: string): string {
   let prep = addDaysYmd(startDate, -1);
-  while (dayOfWeek(prep) === 0) prep = addDaysYmd(prep, -1);
+  let safety = 0;
+  while ((dayOfWeek(prep) === 0 || isHolidayCached(prep)) && safety++ < 30) {
+    prep = addDaysYmd(prep, -1);
+  }
   return prep;
 }
 

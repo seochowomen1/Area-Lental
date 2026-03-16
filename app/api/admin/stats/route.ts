@@ -4,6 +4,7 @@ import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { computeFeesForRequest, computeFeesForBundle } from "@/lib/pricing";
 import { dayOfWeek } from "@/lib/datetime";
+import { ensureHolidaysLoaded, isHolidayCached } from "@/lib/holidays";
 import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
@@ -40,14 +41,14 @@ function emptyStats(): CategoryStats {
   return { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
 }
 
-/** 날짜 범위를 일별로 순회하여 월별 전시일수(일요일 제외)를 계산 */
+/** 날짜 범위를 일별로 순회하여 월별 전시일수(일요일·공휴일 제외)를 계산 */
 function countDaysByMonth(startDate: string, endDate: string): Map<string, number> {
   const result = new Map<string, number>();
   const cur = new Date(startDate + "T00:00:00Z");
   const end = new Date(endDate + "T00:00:00Z");
   while (cur <= end) {
     const ymd = cur.toISOString().slice(0, 10);
-    if (dayOfWeek(ymd) !== 0) {
+    if (dayOfWeek(ymd) !== 0 && !isHolidayCached(ymd)) {
       const month = getMonth(ymd);
       result.set(month, (result.get(month) ?? 0) + 1);
     }
@@ -70,6 +71,11 @@ export async function GET(req: Request) {
       return NextResponse.json({ ok: false, message: "유효하지 않은 연도입니다." }, { status: 400 });
     }
     const year = String(yearNum);
+
+    // 해당 연도 공휴일 데이터 사전 로딩
+    await Promise.all(
+      Array.from({ length: 12 }, (_, i) => ensureHolidaysLoaded(yearNum, i + 1))
+    );
 
     const db = getDatabase();
     const allRequests = await db.getAllRequests();

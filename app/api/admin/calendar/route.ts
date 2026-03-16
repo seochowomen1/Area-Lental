@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { dayOfWeek, inRangeYmd } from "@/lib/datetime";
 import { galleryOperatingWindow } from "@/lib/gallery";
+import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
 
@@ -64,6 +65,7 @@ type CalendarResponse = {
   blocks: boolean;
   schedules: boolean;
   items: CalendarItem[];
+  holidays?: Array<{ date: string; name: string }>;
 };
 
 function isYmd(v: string) {
@@ -344,6 +346,19 @@ export async function GET(req: Request) {
     return `${a.roomName} ${a.id}`.localeCompare(`${b.roomName} ${b.id}`);
   });
 
+  // 공휴일 데이터 로딩 (from ~ to 범위의 월)
+  const fromMonth = { y: parseInt(from.slice(0, 4), 10), m: parseInt(from.slice(5, 7), 10) };
+  const toMonth = { y: parseInt(to.slice(0, 4), 10), m: parseInt(to.slice(5, 7), 10) };
+  const holidayList: Array<{ date: string; name: string }> = [];
+  for (let y = fromMonth.y, mo = fromMonth.m; y < toMonth.y || (y === toMonth.y && mo <= toMonth.m); mo++) {
+    if (mo > 12) { mo = 1; y++; }
+    await ensureHolidaysLoaded(y, mo);
+    const hols = await getHolidays(y, mo);
+    for (const h of hols) {
+      if (h.date >= from && h.date <= to) holidayList.push({ date: h.date, name: h.name });
+    }
+  }
+
   const payload: CalendarResponse = {
     ok: true,
     from,
@@ -353,7 +368,8 @@ export async function GET(req: Request) {
     status,
     blocks: includeBlocks,
     schedules: includeSchedules,
-    items
+    items,
+    holidays: holidayList,
   };
 
   return NextResponse.json(payload, { status: 200 });

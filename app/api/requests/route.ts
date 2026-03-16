@@ -4,6 +4,7 @@ import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput
 import { UPLOAD, ROOMS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
+import { ensureHolidaysLoaded } from "@/lib/holidays";
 import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
 import { buildGallerySessionsFromPeriod, validateGalleryOperatingHours } from "@/lib/gallery";
 import { getGoogleClient } from "@/lib/google";
@@ -288,6 +289,15 @@ export async function POST(req: Request) {
         }
       }
     }
+
+    // 공휴일 데이터 사전 로딩 (회차별 운영시간 검증 전)
+    const uniqueMonths = new Set(sessions.map((s) => s.date.slice(0, 7)));
+    await Promise.all(
+      Array.from(uniqueMonths).map((ym) => {
+        const [y, mo] = ym.split("-");
+        return ensureHolidaysLoaded(parseInt(y, 10), parseInt(mo, 10));
+      })
+    );
 
     // 운영시간/충돌 검증은 회차별로 수행
     const all = await db.getAllRequests();
