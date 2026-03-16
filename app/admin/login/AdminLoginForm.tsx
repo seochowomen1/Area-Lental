@@ -8,8 +8,11 @@ import { useState, type FormEvent } from "react";
 export default function AdminLoginForm() {
   const sp = useSearchParams();
   const next = sp.get("next") ?? "/admin";
+  const errParam = sp.get("err");
   const [pw, setPw] = useState("");
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(
+    errParam === "session_expired" ? "장시간 미사용으로 세션이 만료되었습니다. 다시 로그인해 주세요." : null
+  );
   const [loading, setLoading] = useState(false);
 
   async function onLogin(e: FormEvent) {
