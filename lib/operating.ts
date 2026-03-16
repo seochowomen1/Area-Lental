@@ -1,11 +1,13 @@
 import { OPERATING_RULES } from "@/lib/config";
 import { dayOfWeek, toMinutes, todayYmdSeoul } from "@/lib/datetime";
+import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
 
 export type TimeRange = { start: string; end: string; label?: string };
 
 export type DateAvailabilityReasonCode =
   | "PAST"
   | "SUNDAY_CLOSED"
+  | "HOLIDAY_CLOSED"
   | "NO_OPERATING_HOURS"
   | "FULLY_BOOKED_OR_BLOCKED"
   | "UNKNOWN";
@@ -29,6 +31,8 @@ function pad2(n: number) {
 export function operatingRangesForDate(dateYmd: string): TimeRange[] {
   const dow = dayOfWeek(dateYmd); // 0=Sun
   if (dow === 0) return [];
+  // 공휴일 체크 (ensureHolidaysLoaded() 선행 필요)
+  if (isHolidayCached(dateYmd)) return [];
   if (dow === 6) return [{ ...OPERATING_RULES.saturday, label: "토요일" }];
   if (dow === 2) return [{ ...OPERATING_RULES.tuesday, label: "화요일" }];
   return [{ ...OPERATING_RULES.weekday, label: "평일" }];
@@ -83,6 +87,10 @@ export function buildHourSlotsForDate(dateYmd: string): HourSlot[] {
 export function validateOperatingHours(dateYmd: string, startTime: string, endTime: string): { ok: true } | { ok: false; message: string } {
   const dow = dayOfWeek(dateYmd);
   if (dow === 0) return { ok: false, message: "일요일은 대관 신청이 불가합니다." };
+  if (isHolidayCached(dateYmd)) {
+    const hName = getHolidayNameCached(dateYmd);
+    return { ok: false, message: hName ? `공휴일(${hName})은 대관 신청이 불가합니다.` : "공휴일은 대관 신청이 불가합니다." };
+  }
 
   const s = toMinutes(startTime);
   const e = toMinutes(endTime);
@@ -139,6 +147,12 @@ export function explainNoAvailability(dateYmd: string, opts?: { todayYmd?: strin
     return { code: "SUNDAY_CLOSED", message: "일요일은 휴관으로 대관이 불가합니다." };
   }
 
+  if (isHolidayCached(dateYmd)) {
+    const hName = getHolidayNameCached(dateYmd);
+    const msg = hName ? `공휴일(${hName})은 휴관으로 대관이 불가합니다.` : "공휴일은 휴관으로 대관이 불가합니다.";
+    return { code: "HOLIDAY_CLOSED", message: msg };
+  }
+
   const ranges = operatingRangesForDate(dateYmd);
   if (ranges.length === 0) {
     return { code: "NO_OPERATING_HOURS", message: "해당 날짜는 운영 시간이 없습니다." };
@@ -173,7 +187,7 @@ export function operatingNoticeText(roomId?: string): string {
   const weekday = fmtRangeShort(OPERATING_RULES.weekday.start, OPERATING_RULES.weekday.end);
   const tue = fmtRangeShort(OPERATING_RULES.tuesday.start, OPERATING_RULES.tuesday.end);
   const sat = fmtRangeShort(OPERATING_RULES.saturday.start, OPERATING_RULES.saturday.end);
-  return `평일 ${weekday} / 화 ${tue} / 토 ${sat} (일 휴관)`;
+  return `평일 ${weekday} / 화 ${tue} / 토 ${sat} (일·공휴일 휴관)`;
 }
 
 function fmtHourColonToken(t: string) {
@@ -206,7 +220,7 @@ export function operatingNoticeLines(roomId?: string): Array<{ label: string; te
   return [
     { label: "평일", text: weekday },
     { label: "화요일", text: tue },
-    { label: "주말", text: `토 ${sat} (일요일 휴관)` }
+    { label: "주말", text: `토 ${sat} (일·공휴일 휴관)` }
   ];
 }
 

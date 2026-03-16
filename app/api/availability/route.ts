@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, overlaps, todayYmdSeoul } from "@/lib/datetime";
+import { ensureHolidaysLoaded } from "@/lib/holidays";
 import { buildHourSlotsForDate, explainNoAvailability } from "@/lib/operating";
 import { logger } from "@/lib/logger";
 import type { RequestStatus } from "@/lib/types";
@@ -51,7 +52,11 @@ export async function GET(req: Request) {
       );
     }
 
-    // 1) 날짜 자체가 불가한 경우(과거/일요일 등)
+    // 공휴일 데이터 사전 로딩
+    const [yearStr, monthStr] = date.split("-");
+    await ensureHolidaysLoaded(parseInt(yearStr, 10), parseInt(monthStr, 10));
+
+    // 1) 날짜 자체가 불가한 경우(과거/일요일/공휴일 등)
     const today = todayYmdSeoul();
     const baseSlots = buildHourSlotsForDate(date);
     if (date < today || baseSlots.length === 0) {

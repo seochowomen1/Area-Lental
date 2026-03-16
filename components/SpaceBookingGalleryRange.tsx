@@ -66,8 +66,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
 
-  // 월 변경 시 예약 마감 날짜를 조회
+  // 월 변경 시 예약 마감 날짜 + 공휴일 조회
   useEffect(() => {
     const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
     fetch(`/api/booked-dates?roomId=gallery&month=${monthKey}`)
@@ -75,6 +76,13 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       .then((data) => {
         if (data.ok && Array.isArray(data.bookedDates)) {
           setBookedDates(new Set(data.bookedDates));
+        }
+        if (Array.isArray(data.holidays)) {
+          const m = new Map<string, string>();
+          for (const h of data.holidays) m.set(h.date, h.name);
+          setHolidayMap(m);
+        } else {
+          setHolidayMap(new Map());
         }
       })
       .catch(() => {});
@@ -91,14 +99,14 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     let prepYmd = dateToYmdLocal(new Date(toDateLocal(startDate).getFullYear(), toDateLocal(startDate).getMonth(), toDateLocal(startDate).getDate() - 1));
     let safety = 0;
     while (isYmd(prepYmd) && safety++ < 30) {
-      if (dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd)) break;
+      if (dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd) && !holidayMap.has(prepYmd)) break;
       const d = toDateLocal(prepYmd);
       d.setDate(d.getDate() - 1);
       prepYmd = dateToYmdLocal(d);
     }
-    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd)) return prepYmd;
+    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd) && !holidayMap.has(prepYmd)) return prepYmd;
     return "";
-  }, [startDate, bookedDates]);
+  }, [startDate, bookedDates, holidayMap]);
 
   // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
@@ -241,8 +249,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
   function isCellDisabled(ymd: string) {
     if (!isYmd(ymd)) return true;
-    // 일요일은 선택 불가
+    // 일요일·공휴일은 선택 불가
     if (dayOfWeekLocal(ymd) === 0) return true;
+    if (holidayMap.has(ymd)) return true;
     // 예약 마감 날짜는 선택 불가
     if (bookedDates.has(ymd)) return true;
     // 과거 및 당일 선택 불가 (준비일이 과거가 되므로 익일부터 선택 가능)
@@ -370,8 +379,8 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                     <div className="mt-1 flex items-center gap-1">
                       {isPrep ? (
                         <span className="text-[9px] font-bold text-emerald-700">준비</span>
-                      ) : isSunday ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" title="휴관" />
+                      ) : (isSunday || holidayMap.has(c.ymd)) ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" title={holidayMap.get(c.ymd) ?? "휴관"} />
                       ) : bookedDates.has(c.ymd) ? (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
                       ) : isStart ? (

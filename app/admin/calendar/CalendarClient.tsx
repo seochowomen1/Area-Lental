@@ -52,6 +52,7 @@ type CalendarResponse = {
   blocks: boolean;
   schedules: boolean;
   items: CalendarItem[];
+  holidays?: Array<{ date: string; name: string }>;
 };
 
 function isYmd(v: string) {
@@ -259,6 +260,7 @@ export default function CalendarClient({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<CalendarItem[]>([]);
+  const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
 
   // URL → State 동기화 (새로고침/공유 링크/탭 이동 후에도 필터 유지)
   useEffect(() => {
@@ -386,6 +388,12 @@ export default function CalendarClient({
           // 카테고리 외 요청은 숨김(단, "all"은 공통 차단/시간표로 간주하여 유지)
           const filtered = raw.filter((it: any) => it?.roomId === "all" || allowedRoomIds.has(String(it?.roomId)));
           setItems(filtered);
+          // 공휴일 맵 세팅
+          if (Array.isArray(data.holidays)) {
+            const hm = new Map<string, string>();
+            for (const h of data.holidays) hm.set(h.date, h.name);
+            setHolidays(hm);
+          }
         }
       } catch (e: unknown) {
         if (!cancelled) {
@@ -616,9 +624,16 @@ export default function CalendarClient({
                   <div className={cn("text-sm font-semibold", inMonth ? "text-gray-900" : "text-gray-400")}>
                     {d.getUTCDate()}
                   </div>
-                  {isToday ? (
-                    <span className="inline-flex h-2 w-2 rounded-full bg-[rgb(var(--brand-primary))]" aria-label="오늘" />
-                  ) : null}
+                  <div className="flex items-center gap-1">
+                    {holidays.has(ymd) && (
+                      <span className="rounded bg-rose-100 px-1 py-0.5 text-[10px] font-semibold text-rose-600 leading-none" title={`공휴일: ${holidays.get(ymd)}`}>
+                        {holidays.get(ymd)}
+                      </span>
+                    )}
+                    {isToday ? (
+                      <span className="inline-flex h-2 w-2 rounded-full bg-[rgb(var(--brand-primary))]" aria-label="오늘" />
+                    ) : null}
+                  </div>
                 </div>
 
                 <div className="mt-1 space-y-0.5">

@@ -52,7 +52,7 @@ export const OPERATING_RULES = {
  * 사용자 화면에 고정 노출할 운영시간 안내 문구
  * (대표 사이트 톤/표기 방식에 맞춰 한 줄로 유지)
  */
-export const OPERATING_NOTICE_TEXT = "평일 10~17 / 화 10~20 / 토 10~12 (일 휴관)";
+export const OPERATING_NOTICE_TEXT = "평일 10~17 / 화 10~20 / 토 10~12 (일·공휴일 휴관)";
 
 export const UPLOAD = {
   maxFiles: 3,

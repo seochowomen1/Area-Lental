@@ -121,8 +121,9 @@ export default function SpaceBooking({
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
   const { days } = useMemo(() => getCalendarGrid(month), [month]);
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
 
-  // 월 변경 시 예약 마감 날짜를 조회
+  // 월 변경 시 예약 마감 날짜 + 공휴일 조회
   useEffect(() => {
     const monthKey = `${month.getFullYear()}-${pad2(month.getMonth() + 1)}`;
     fetch(`/api/booked-dates?roomId=${encodeURIComponent(roomId)}&month=${monthKey}`)
@@ -130,6 +131,13 @@ export default function SpaceBooking({
       .then((data) => {
         if (data.ok && Array.isArray(data.bookedDates)) {
           setBookedDates(new Set(data.bookedDates));
+        }
+        if (Array.isArray(data.holidays)) {
+          const m = new Map<string, string>();
+          for (const h of data.holidays) m.set(h.date, h.name);
+          setHolidayMap(m);
+        } else {
+          setHolidayMap(new Map());
         }
       })
       .catch(() => {});
@@ -168,9 +176,10 @@ export default function SpaceBooking({
     const [y, m, d] = selectedDate.split("-").map((v) => parseInt(v, 10));
     const dt = new Date(y, m - 1, d);
     if (dt.getDay() === 0) return "일요일은 휴관으로 대관이 불가합니다.";
+    if (holidayMap.has(selectedDate)) return `공휴일(${holidayMap.get(selectedDate)})은 휴관으로 대관이 불가합니다.`;
 
     return "해당 날짜에 표시할 시간이 없습니다.";
-  }, [busy, slots.length, meta?.reasonMessage, selectedDate]);
+  }, [busy, slots.length, meta?.reasonMessage, selectedDate, holidayMap]);
 
 
   const maxMinutes = Math.max(60, Math.min(durationLimitHours * 60, 24 * 60));
@@ -366,7 +375,9 @@ export default function SpaceBooking({
               const isPast = ymd < fmtYMD(new Date());
               const isSunday = d.getDay() === 0;
               const isBooked = bookedDates.has(ymd);
-              const isDisabled = !isCurrentMonth || isPast || isSunday || isBooked;
+              const isHoliday = holidayMap.has(ymd);
+              const holidayName = holidayMap.get(ymd);
+              const isDisabled = !isCurrentMonth || isPast || isSunday || isHoliday || isBooked;
 
               return (
                 <button
@@ -389,10 +400,13 @@ export default function SpaceBooking({
                       <span
                         className={cn(
                           "inline-block h-2.5 w-2.5 rounded-full",
-                          isSunday ? "bg-gray-300" : (isPast || isBooked) ? "bg-gray-400" : "bg-orange-500"
+                          (isSunday || isHoliday) ? "bg-rose-400" : (isPast || isBooked) ? "bg-gray-400" : "bg-orange-500"
                         )}
-                        title={isSunday ? "휴관" : isBooked ? "마감" : isPast ? "마감" : "선택 가능"}
+                        title={isSunday ? "휴관" : isHoliday ? `공휴일(${holidayName})` : isBooked ? "마감" : isPast ? "마감" : "선택 가능"}
                       />
+                      {isHoliday && !isSunday && (
+                        <span className="text-[10px] leading-none text-rose-500 font-medium truncate max-w-[4rem]">{holidayName}</span>
+                      )}
                     </div>
                   )}
                 </button>
@@ -411,8 +425,8 @@ export default function SpaceBooking({
             <span>마감</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" aria-hidden />
-            <span>휴관</span>
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" aria-hidden />
+            <span>휴관·공휴일</span>
           </div>
         </div>
 
