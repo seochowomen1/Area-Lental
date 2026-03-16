@@ -2,6 +2,7 @@ import type { RentalRequest } from "@/lib/types";
 import { toMinutes, dayOfWeek } from "@/lib/datetime";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_FEE_KRW, LECTURE_EQUIPMENT_LABELS, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
+import { GALLERY_FEE_KRW } from "@/lib/constants";
 
 export type FeeBreakdown = {
   durationHours: number;
@@ -45,14 +46,14 @@ export function computeBaseTotalKRW(
       req.startDate && req.endDate &&
       ((req.galleryWeekdayCount ?? 0) > 0 || (req.gallerySaturdayCount ?? 0) > 0 || (req.galleryExhibitionDayCount ?? 0) > 0)
     ) {
-      const rentalFeeKRW = (req.galleryWeekdayCount ?? 0) * 20000 + (req.gallerySaturdayCount ?? 0) * 10000;
+      const rentalFeeKRW = (req.galleryWeekdayCount ?? 0) * GALLERY_FEE_KRW.WEEKDAY + (req.gallerySaturdayCount ?? 0) * GALLERY_FEE_KRW.SATURDAY;
       return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW: 0, totalFeeKRW: rentalFeeKRW };
     }
     // ── 기존 다행(배치) 형식: 개별 일자로 1일분 요금 ──
     const dow = dayOfWeek(req.date);
     const isSaturday = dow === 6;
     const isSunday = dow === 0;
-    const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? 10000 : 20000;
+    const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? GALLERY_FEE_KRW.SATURDAY : GALLERY_FEE_KRW.WEEKDAY;
     const equipmentFeeKRW = 0;
     const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
     return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };

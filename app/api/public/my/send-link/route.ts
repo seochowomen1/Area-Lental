@@ -3,6 +3,7 @@ import { getBaseEnv } from "@/lib/env";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { sendApplicantMyReservationsLinkEmail } from "@/lib/mail";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { normalizeEmail } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,10 +12,6 @@ export const revalidate = 0;
 /** 이메일 발송: IP당 1시간 3회 + 이메일당 1시간 3회 */
 const EMAIL_MAX_ATTEMPTS = 3;
 const EMAIL_WINDOW_MS = 60 * 60 * 1000;
-
-function normalizeEmail(email: string) {
-  return (email ?? "").toString().trim().toLowerCase();
-}
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => null);

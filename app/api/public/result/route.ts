@@ -10,6 +10,7 @@ import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { maskName, maskPhone, maskAddress } from "@/lib/mask";
 import { auditLog } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
+import { normalizeEmail } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +21,6 @@ const RESULT_MAX_PER_MIN = 10;
 const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
-
-function normalizeEmail(email: string) {
-  return (email ?? "").toString().trim().toLowerCase();
-}
 
 function approvalLabel(status: string, decidedBy?: string) {
   if (status === "승인") return "승인완료";

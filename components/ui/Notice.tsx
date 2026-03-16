@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { NOTICE_BASE, NOTICE_VARIANT, type NoticeVariant, CARD_PAD } from "@/components/ui/presets";
 
-type Props = {
+export type NoticeProps = {
   title?: ReactNode;
   children: ReactNode;
   className?: string;
@@ -12,6 +12,7 @@ type Props = {
   pad?: keyof typeof CARD_PAD;
   icon?: ReactNode;
 };
+type Props = NoticeProps;
 
 export default function Notice({
   title,

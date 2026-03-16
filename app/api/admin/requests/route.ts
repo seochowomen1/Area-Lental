@@ -3,6 +3,8 @@ import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { getDatabase } from "@/lib/database";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
+import { jsonError, handleApiError } from "@/lib/apiResponse";
+import { ADMIN_LIMITS } from "@/lib/constants";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,7 +13,7 @@ export const dynamic = "force-dynamic";
 export async function DELETE(req: Request) {
   const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+    return jsonError("Unauthorized", 401);
   }
 
   try {
@@ -19,16 +21,16 @@ export async function DELETE(req: Request) {
     const requestIds = body.requestIds;
 
     if (!Array.isArray(requestIds) || requestIds.length === 0) {
-      return NextResponse.json({ ok: false, message: "삭제할 항목을 선택해주세요." }, { status: 400 });
+      return jsonError("삭제할 항목을 선택해주세요.", 400);
     }
 
-    if (requestIds.length > 200) {
-      return NextResponse.json({ ok: false, message: "한 번에 최대 200건까지 삭제할 수 있습니다." }, { status: 400 });
+    if (requestIds.length > ADMIN_LIMITS.DELETE_MAX_REQUESTS) {
+      return jsonError(`한 번에 최대 ${ADMIN_LIMITS.DELETE_MAX_REQUESTS}건까지 삭제할 수 있습니다.`, 400);
     }
 
     // 모든 요청이 문자열인지 확인
     if (!requestIds.every((id) => typeof id === "string" && id.trim())) {
-      return NextResponse.json({ ok: false, message: "잘못된 신청번호가 포함되어 있습니다." }, { status: 400 });
+      return jsonError("잘못된 신청번호가 포함되어 있습니다.", 400);
     }
 
     const db = getDatabase();
@@ -44,9 +46,9 @@ export async function DELETE(req: Request) {
       const req = targetMap.get(id);
       if (!req) continue; // 이미 스프레드시트에서 삭제됨 → 무시
       if (!DELETABLE_STATUSES.has(req.status)) {
-        return NextResponse.json(
-          { ok: false, message: `${id}은(는) ${req.status} 상태이므로 삭제할 수 없습니다. 반려 또는 취소된 건만 삭제 가능합니다.` },
-          { status: 400 },
+        return jsonError(
+          `${id}은(는) ${req.status} 상태이므로 삭제할 수 없습니다. 반려 또는 취소된 건만 삭제 가능합니다.`,
+          400,
         );
       }
       existingIds.push(id);
@@ -59,7 +61,6 @@ export async function DELETE(req: Request) {
 
     return NextResponse.json({ ok: true, deletedCount: existingIds.length, skippedCount: requestIds.length - existingIds.length });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "삭제 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return handleApiError(e, "신청건 삭제");
   }
 }

@@ -5,6 +5,7 @@ import { dayOfWeek, overlaps } from "@/lib/datetime";
 import { validateOperatingHours } from "@/lib/operating";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
+import { jsonError, isYmd, handleApiError } from "@/lib/apiResponse";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -20,15 +21,6 @@ type Block = {
   endTime: string; // HH:MM
   reason: string;
 };
-
-function jsonError(message: string, status: number, code?: string) {
-  return NextResponse.json({ ok: false, code: code ?? "ERROR", message }, { status });
-}
-
-function isYmd(v: unknown): v is string {
-  if (typeof v !== "string") return false;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
 
 function isHHMM(v: unknown): v is string {
   if (typeof v !== "string") return false;
@@ -168,8 +160,7 @@ export async function POST(req: Request) {
     auditLog({ action: "BLOCK_CREATE", ip: getClientIp(req), target: result?.id ?? roomId, details: { roomId, date, startTime, endTime, reason } });
     return NextResponse.json({ ok: true, created: result });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return jsonError(msg, 500, "SERVER_ERROR");
+    return handleApiError(e, "차단 처리");
   }
 }
 
@@ -186,7 +177,6 @@ export async function DELETE(req: Request) {
     auditLog({ action: "BLOCK_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return jsonError(msg, 500, "SERVER_ERROR");
+    return handleApiError(e, "차단 처리");
   }
 }

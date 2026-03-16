@@ -682,7 +682,7 @@ export async function updateRequestStatus(args: {
     // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정
     const target = all[idx0];
     const batchId = (target.batchId ?? "").trim();
-    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() == batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
+    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() === batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
 
     const rateVal = typeof args.discountRatePct === "number" ? args.discountRatePct : (target.discountRatePct ?? 0);
     const amtVal = typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (target.discountAmountKRW ?? 0);

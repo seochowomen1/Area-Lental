@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import type { RequestStatus } from "@/lib/types";
+import { REQUEST_LIMITS } from "@/lib/constants";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
 
@@ -191,9 +192,9 @@ export async function POST(req: Request) {
 
       // ✅ 갤러리: 전시 기간 최대 30일(포함)
       const rangeDays = diffDaysInclusive(startDate, endDate);
-      if (rangeDays > 30) {
+      if (rangeDays > REQUEST_LIMITS.GALLERY_MAX_EXHIBITION_DAYS) {
         return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", message: "전시 기간은 최대 30일까지 신청할 수 있습니다." },
+          { ok: false, code: "VALIDATION_ERROR", message: `전시 기간은 최대 ${REQUEST_LIMITS.GALLERY_MAX_EXHIBITION_DAYS}일까지 신청할 수 있습니다.` },
           { status: 400 }
         );
       }
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
     if (!sessions.length) {
       return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: "이용일시를 확인해주세요." }, { status: 400 });
     }
-    const maxBatch = input.roomId === "gallery" ? 500 : 20; // gallery는 전시기간 제한 없음(기술 안전장치만)
+    const maxBatch = input.roomId === "gallery" ? REQUEST_LIMITS.GALLERY_MAX_SESSIONS : REQUEST_LIMITS.BATCH_MAX_SESSIONS;
     if (sessions.length > maxBatch) {
       return NextResponse.json(
         {
