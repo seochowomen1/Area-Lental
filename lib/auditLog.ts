@@ -24,7 +24,9 @@ export type AuditAction =
   | "STATS_VIEW"
   | "EXPORT_LIST"
   | "EXPORT_FORM"
-  | "PI_ACCESS";
+  | "PI_ACCESS"
+  | "DATA_RETENTION_CHECK"
+  | "DATA_RETENTION_PURGE";
 
 export interface AuditEntry {
   action: AuditAction;

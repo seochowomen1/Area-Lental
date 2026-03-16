@@ -1,10 +1,13 @@
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
 import { IconGallery, IconLecture, IconStudio } from "@/components/home/Icons";
+import Notice from "@/components/ui/Notice";
 import { getDatabase } from "@/lib/database";
 import { getRoomsByCategory } from "@/lib/space";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+const RETENTION_YEARS = 3;
 
 export default async function AdminHomePage() {
   const db = getDatabase();
@@ -20,8 +23,28 @@ export default async function AdminHomePage() {
   const studioPending = pending.filter((r) => studioRoomIds.has(r.roomId)).length;
   const galleryPending = pending.filter((r) => galleryRoomIds.has(r.roomId)).length;
 
+  // 보존기한(3년) 경과 건 체크
+  const cutoff = new Date();
+  cutoff.setFullYear(cutoff.getFullYear() - RETENTION_YEARS);
+  const expiredCount = allRequests.filter((r) => {
+    const d = new Date(r.createdAt);
+    return !isNaN(d.getTime()) && d < cutoff;
+  }).length;
+
   return (
     <div className="space-y-4">
+      {expiredCount > 0 && (
+        <Notice title="개인정보 보존기한 만료 안내" variant="warn">
+          <p>
+            보존기한(3년)이 경과된 신청 건이 <strong className="text-amber-700">{expiredCount}건</strong> 있습니다.
+            개인정보보호법 제21조에 따라 파기가 필요합니다.
+          </p>
+          <p className="mt-1 text-xs text-slate-500">
+            기준일: {cutoff.toISOString().slice(0, 10)} 이전 접수 건
+          </p>
+        </Notice>
+      )}
+
       <div className="rounded-xl bg-white p-5 shadow">
         <h1 className="text-lg font-semibold text-gray-900">공간별 대관신청 관리</h1>
         <p className="mt-1 text-sm text-gray-600">
