@@ -88,10 +88,21 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       .catch(() => {});
   }, [month]);
 
+  // 전시일 수 계산: 일요일·공휴일 제외
   const days = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return 0;
-    return diffDaysInclusive(startDate, endDate);
-  }, [startDate, endDate]);
+    let count = 0;
+    let cur = startDate;
+    let guard = 0;
+    while (cur <= endDate && guard++ < 400) {
+      const dow = dayOfWeekLocal(cur);
+      if (dow !== 0 && !holidayMap.has(cur)) count++;
+      const d = toDateLocal(cur);
+      d.setDate(d.getDate() + 1);
+      cur = dateToYmdLocal(d);
+    }
+    return count;
+  }, [startDate, endDate, holidayMap]);
 
   // 기본 준비일 계산: 시작일 이전 1일(일요일·예약 마감일이면 직전 영업일)
   const defaultPrepDate = useMemo(() => {
@@ -118,12 +129,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     let saturdays = 0;
     const prepDays = defaultPrepDate ? 1 : 0;
 
-    // 전시 기간 카운트
+    // 전시 기간 카운트 (일요일·공휴일 제외)
     let cur = startDate;
     let guard = 0;
     while (cur <= endDate && guard++ < 400) {
       const dow = dayOfWeekLocal(cur);
-      if (dow !== 0) {
+      if (dow !== 0 && !holidayMap.has(cur)) {
         if (dow === 6) saturdays++;
         else weekdays++;
       }
@@ -134,7 +145,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
     const total = weekdays * 20000 + saturdays * 10000;
     return { weekdays, saturdays, prepDays, total };
-  }, [startDate, endDate, defaultPrepDate]);
+  }, [startDate, endDate, defaultPrepDate, holidayMap]);
 
   const canSubmit = Boolean(startDate) && Boolean(endDate) && !error;
 
@@ -278,7 +289,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         <p className="font-semibold">우리동네 갤러리(4층) 신청 안내</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
           <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
-          <li>일요일은 자동 제외되며, 공휴일은 자동 제외되지 않습니다(차단시간으로 관리).</li>
+          <li>일요일·공휴일은 휴관으로 자동 제외됩니다.</li>
           <li>준비(세팅)일 1일은 <span className="font-semibold">무료</span>로 포함됩니다. (신청서에서 날짜 선택 가능)</li>
           <li>전시 기간은 최대 30일까지 신청할 수 있습니다.</li>
           <li>전시 마지막 날 <span className="font-semibold">17시까지 철수 완료</span> 필수</li>
@@ -380,7 +391,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                       {isPrep ? (
                         <span className="text-[9px] font-bold text-emerald-700">준비</span>
                       ) : (isSunday || holidayMap.has(c.ymd)) ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" title={holidayMap.get(c.ymd) ?? "휴관"} />
+                        <>
+                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" title={holidayMap.get(c.ymd) ?? "휴관"} />
+                          {holidayMap.has(c.ymd) && !isSunday && (
+                            <span className="text-[9px] leading-none text-rose-500 font-medium truncate max-w-[3.5rem]">{holidayMap.get(c.ymd)}</span>
+                          )}
+                        </>
                       ) : bookedDates.has(c.ymd) ? (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
                       ) : isStart ? (
@@ -422,7 +438,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         </div>
 
         <p className="mt-2 text-xs text-gray-500">
-          ※ 날짜를 클릭하여 시작일과 종료일을 선택 · 일요일 휴관 · 최대 30일
+          ※ 날짜를 클릭하여 시작일과 종료일을 선택 · 일요일·공휴일 휴관 · 최대 30일
           {startDate && !endDate ? <><br />※ <b>종료일</b>을 선택해 주세요.</> : null}
         </p>
       </div>
@@ -431,7 +447,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
         {!error && days > 0 ? (
           <div className="space-y-1">
-            <FieldHelp>선택 기간: {days}일 (일요일 자동 제외)</FieldHelp>
+            <FieldHelp>선택 기간: {days}일 (일요일·공휴일 자동 제외)</FieldHelp>
             {defaultPrepDate && (
               <FieldHelp>
                 준비일: {defaultPrepDate} ({dowLabel(defaultPrepDate)}) — 신청서에서 변경 가능
