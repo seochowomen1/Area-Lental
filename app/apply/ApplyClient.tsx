@@ -68,6 +68,10 @@ export default function ApplyClient() {
   const [prefillLocked, setPrefillLocked] = useState(false);
   const [confirmData, setConfirmData] = useState<RequestInput | null>(null);
 
+  // ✅ 정규수업/차단/기존예약으로 불가한 슬롯 관리
+  type UnavailableSlot = { start: string; end: string };
+  const [unavailableSlots, setUnavailableSlots] = useState<UnavailableSlot[]>([]);
+
   // ✅ 여러 회차(날짜/시간이 달라도 됨)를 1회 신청으로 묶기(강의실 동일)
   type ExtraSession = { date: string; startTime: string; endTime: string };
   const [extraSessions, setExtraSessions] = useState<ExtraSession[]>([]);
@@ -242,6 +246,32 @@ export default function ApplyClient() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [applicantName, setValue]);
 
+  // ✅ 날짜+공간 변경 시 가용시간 조회 → 불가 슬롯 반영
+  useEffect(() => {
+    if (!selectedDate || !roomId) {
+      setUnavailableSlots([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/availability?roomId=${encodeURIComponent(roomId)}&date=${encodeURIComponent(selectedDate)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        const blocked = (data?.slots ?? [])
+          .filter((s: { start: string; end: string; available: boolean }) => !s.available)
+          .map((s: { start: string; end: string }) => ({ start: s.start, end: s.end }));
+        setUnavailableSlots(blocked);
+      } catch {
+        if (!cancelled) setUnavailableSlots([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selectedDate, roomId]);
+
   const isTueNight = useMemo(() => {
     return isTuesdayNightOverlap(selectedDate, startTime, endTime);
   }, [selectedDate, startTime, endTime]);
@@ -251,18 +281,28 @@ export default function ApplyClient() {
     return operatingRangesForDate(selectedDate);
   }, [selectedDate]);
 
+  // 불가 슬롯을 빠르게 조회하기 위한 Set (30분 단위 시작 시간)
+  const blockedStartSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of unavailableSlots) set.add(s.start);
+    return set;
+  }, [unavailableSlots]);
+
   const startOptions = useMemo(() => {
     const set = new Set<string>();
     for (const r of allowedRanges) {
       const rs = toMinutes(r.start);
       const re = toMinutes(r.end);
       for (let t = rs; t + 60 <= re; t += 30) {
-        // start는 end-1시간(최소)까지만
-        set.add(fromMinutes(t));
+        const time = fromMinutes(t);
+        // 해당 30분 슬롯이 불가(수업/차단/기존예약)면 시작 시간에서 제외
+        if (!blockedStartSet.has(time)) {
+          set.add(time);
+        }
       }
     }
     return Array.from(set).sort();
-  }, [allowedRanges]);
+  }, [allowedRanges, blockedStartSet]);
 
   const endOptions = useMemo(() => {
     // startTime이 속한 구간을 찾아서 그 안에서만 종료시간을 뽑는다(화요일 야간/주간 분리 대응)
@@ -272,15 +312,58 @@ export default function ApplyClient() {
     if (!r) return [] as string[];
 
     // 최소 1시간, 최대 6시간(360분), 30분 단위
+    // 불가 슬롯을 만나면 그 이후 종료 시간은 모두 차단
     const cap = Math.min(toMinutes(r.end), stM + 360);
     const ends: string[] = [];
     for (let t = stM + 60; t <= cap; t += 30) {
+      // startTime~t 범위 내 마지막 30분 슬롯(t-30)이 불가면 중단
+      if (blockedStartSet.has(fromMinutes(t - 30))) break;
       ends.push(fromMinutes(t));
     }
     return ends;
-  }, [allowedRanges, startTime]);
+  }, [allowedRanges, startTime, blockedStartSet]);
 
-  // 추가 회차용 시간 옵션(운영시간 규칙만 반영)
+  // 추가 회차용 가용시간 조회 (날짜가 기본 회차와 다를 수 있으므로 별도 조회)
+  const [addUnavailableSlots, setAddUnavailableSlots] = useState<UnavailableSlot[]>([]);
+
+  useEffect(() => {
+    const d = addDate || selectedDate;
+    if (!d || !roomId) {
+      setAddUnavailableSlots([]);
+      return;
+    }
+    // 기본 회차와 같은 날짜면 같은 불가 슬롯 사용
+    if (d === selectedDate) {
+      setAddUnavailableSlots(unavailableSlots);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/availability?roomId=${encodeURIComponent(roomId)}&date=${encodeURIComponent(d)}`,
+          { cache: "no-store" }
+        );
+        const data = await res.json();
+        if (cancelled) return;
+        const blocked = (data?.slots ?? [])
+          .filter((s: { start: string; end: string; available: boolean }) => !s.available)
+          .map((s: { start: string; end: string }) => ({ start: s.start, end: s.end }));
+        setAddUnavailableSlots(blocked);
+      } catch {
+        if (!cancelled) setAddUnavailableSlots([]);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [addDate, selectedDate, roomId, unavailableSlots]);
+
+  const addBlockedStartSet = useMemo(() => {
+    const set = new Set<string>();
+    for (const s of addUnavailableSlots) set.add(s.start);
+    return set;
+  }, [addUnavailableSlots]);
+
+  // 추가 회차용 시간 옵션(운영시간 + 가용시간 규칙 반영)
   const addAllowedRanges = useMemo(() => {
     const d = addDate || selectedDate;
     if (!d) return operatingRangesForDate("2099-12-31");
@@ -292,10 +375,13 @@ export default function ApplyClient() {
     for (const r of addAllowedRanges) {
       const rs = toMinutes(r.start);
       const re = toMinutes(r.end);
-      for (let t = rs; t + 60 <= re; t += 30) set.add(fromMinutes(t));
+      for (let t = rs; t + 60 <= re; t += 30) {
+        const time = fromMinutes(t);
+        if (!addBlockedStartSet.has(time)) set.add(time);
+      }
     }
     return Array.from(set).sort();
-  }, [addAllowedRanges]);
+  }, [addAllowedRanges, addBlockedStartSet]);
 
   const addEndOptions = useMemo(() => {
     const stM = toMinutes(addStartTime);
@@ -303,9 +389,12 @@ export default function ApplyClient() {
     if (!r) return [] as string[];
     const cap = Math.min(toMinutes(r.end), stM + 360);
     const ends: string[] = [];
-    for (let t = stM + 60; t <= cap; t += 30) ends.push(fromMinutes(t));
+    for (let t = stM + 60; t <= cap; t += 30) {
+      if (addBlockedStartSet.has(fromMinutes(t - 30))) break;
+      ends.push(fromMinutes(t));
+    }
     return ends;
-  }, [addAllowedRanges, addStartTime]);
+  }, [addAllowedRanges, addStartTime, addBlockedStartSet]);
 
   useEffect(() => {
     if (!addDate) return;
