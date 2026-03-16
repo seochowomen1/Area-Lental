@@ -24,6 +24,10 @@ describe("maskName", () => {
   test("영문 이름", () => {
     expect(maskName("Kim")).toBe("K○○");
   });
+
+  test("공백만 있는 입력", () => {
+    expect(maskName("   ")).toBe("");
+  });
 });
 
 describe("maskPhone", () => {
@@ -71,6 +75,10 @@ describe("maskEmail", () => {
 
   test("@ 없는 문자열", () => {
     expect(maskEmail("noatsign")).toBe("noatsign");
+  });
+
+  test("빈 로컬 파트 (@domain.com)", () => {
+    expect(maskEmail("@domain.com")).toBe("***@domain.com");
   });
 });
 

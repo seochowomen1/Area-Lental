@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { RETENTION_YEARS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
@@ -7,9 +8,6 @@ import { getClientIp } from "@/lib/rateLimit";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-/** 보존기한: 3년 (개인정보 수집 동의서 기준) */
-const RETENTION_YEARS = 3;
 
 function isExpired(createdAt: string): boolean {
   const created = new Date(createdAt);

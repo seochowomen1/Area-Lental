@@ -9,6 +9,7 @@ import { ROOMS } from "@/lib/space";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { maskName, maskPhone, maskAddress } from "@/lib/mask";
 import { auditLog } from "@/lib/auditLog";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,17 +20,6 @@ const RESULT_MAX_PER_MIN = 10;
 const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const sa = a.batchSeq ?? 0;
-      const sb = b.batchSeq ?? 0;
-      if (sa !== sb) return sa - sb;
-      return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
-    });
-}
 
 function normalizeEmail(email: string) {
   return (email ?? "").toString().trim().toLowerCase();

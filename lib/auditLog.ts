@@ -44,7 +44,7 @@ export function auditLog(entry: AuditEntry): void {
     action: entry.action,
     ip: entry.ip ?? "unknown",
     target: entry.target ?? "",
-    ...entry.details,
+    ...(entry.details ? { details: entry.details } : {}),
   };
 
   if (isDev) {

@@ -154,9 +154,11 @@ export async function middleware(req: NextRequest) {
     }
     if (match) {
       // 비활동 타임아웃 체크 (30분)
-      const lastActivity = req.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value;
-      if (lastActivity) {
-        const elapsed = Date.now() - Number(lastActivity);
+      const lastActivityRaw = req.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value;
+      const lastActivityTs = lastActivityRaw ? Number(lastActivityRaw) : NaN;
+
+      if (!isNaN(lastActivityTs)) {
+        const elapsed = Date.now() - lastActivityTs;
         if (elapsed > ADMIN_INACTIVITY_TIMEOUT_MS) {
           // 세션 만료 — 쿠키 삭제 후 로그인 리다이렉트
           if (pathname.startsWith("/api/admin")) {
@@ -178,6 +180,7 @@ export async function middleware(req: NextRequest) {
           return redirectRes;
         }
       }
+      // 활동쿠키 없거나 유효하지 않으면 새로 설정 (기존 세션 호환)
 
       // 활동 쿠키 갱신
       const isProduction = process.env.NODE_ENV === "production";

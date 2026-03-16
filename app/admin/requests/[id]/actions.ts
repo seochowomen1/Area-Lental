@@ -10,6 +10,7 @@ import { normalizeDiscount, computeBaseTotalKRW } from "@/lib/pricing";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { ROOMS_BY_ID, normalizeRoomCategory } from "@/lib/space";
 import { auditLog } from "@/lib/auditLog";
+import { sortSessions } from "@/lib/requestUtils";
 
 function getIpFromHeaders(): string {
   const h = headers();
@@ -19,10 +20,6 @@ function getIpFromHeaders(): string {
     h.get("cf-connecting-ip") ||
     "unknown"
   );
-}
-
-function sortSessions(list: RentalRequest[]) {
-  return (Array.isArray(list) ? list : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
 }
 
 function categoryOf(r: RentalRequest) {
@@ -65,9 +62,14 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
     discountReason: isGallery ? "" : discountReason,
   });
 
-  if (status === "승인" || status === "반려") {
+  if (status === "승인" || status === "반려" || status === "취소") {
+    const actionMap: Record<string, "REQUEST_APPROVE" | "REQUEST_REJECT" | "REQUEST_CANCEL"> = {
+      "승인": "REQUEST_APPROVE",
+      "반려": "REQUEST_REJECT",
+      "취소": "REQUEST_CANCEL",
+    };
     auditLog({
-      action: status === "승인" ? "REQUEST_APPROVE" : "REQUEST_REJECT",
+      action: actionMap[status],
       ip: getIpFromHeaders(),
       target: current.requestId,
       details: {
@@ -195,5 +197,13 @@ export async function sendConfirmedEmailAction(requestId: string, formData: Form
   }
 
   await sendCustomDecisionEmail(to, subject, body);
+
+  auditLog({
+    action: "EMAIL_SEND",
+    ip: getIpFromHeaders(),
+    target: requestId,
+    details: { to, subject },
+  });
+
   redirect(`/admin/requests/${encodeURIComponent(requestId)}?mailed=1`);
 }

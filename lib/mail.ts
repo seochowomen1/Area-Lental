@@ -4,6 +4,7 @@ import type { RentalRequest } from "@/lib/types";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { getTemplate, renderTemplate, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
+import { maskPhone } from "@/lib/mask";
 
 function isGallery(r: RentalRequest) {
   return r.roomId === "gallery";
@@ -69,11 +70,6 @@ function formatEquipmentForEmail(r: RentalRequest): string {
   const details = getSelectedEquipmentDetails(r.equipment, cat);
   if (details.length === 0) return "선택 없음";
   return details.map((eq) => `${eq.label} (${formatKRW(eq.feeKRW)})`).join(", ");
-}
-
-function maskPhone(phone: string) {
-  if (phone.length < 7) return phone;
-  return phone.slice(0, 3) + "****" + phone.slice(-2);
 }
 
 async function maybeSend(mail: { to: string; subject: string; text: string }) {

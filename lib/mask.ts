@@ -48,7 +48,10 @@ export function maskEmail(email: string): string {
   const local = trimmed.slice(0, atIdx);
   const domain = trimmed.slice(atIdx);
 
-  if (local.length <= 1) {
+  if (local.length === 0) {
+    return "***" + domain;
+  }
+  if (local.length === 1) {
     return local[0] + "***" + domain;
   }
   return local.slice(0, 2) + "***" + domain;

@@ -8,6 +8,7 @@ import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
+import { sortSessions } from "@/lib/requestUtils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -26,18 +27,6 @@ function toMin(t: string) {
   if (!Number.isFinite(hh) || !Number.isFinite(mm)) return 0;
   return hh * 60 + mm;
 }
-
-function sortSessions(list: RentalRequest[]) {
-  return list
-    .slice()
-    .sort((a, b) => {
-      const sa = a.batchSeq ?? 0;
-      const sb = b.batchSeq ?? 0;
-      if (sa !== sb) return sa - sb;
-      return `${a.date} ${a.startTime}`.localeCompare(`${b.date} ${b.startTime}`);
-    });
-}
-
 
 /**
  * 출력용 신청서(Excel)

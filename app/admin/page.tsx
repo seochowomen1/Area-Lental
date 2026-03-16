@@ -1,13 +1,12 @@
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
 import { IconGallery, IconLecture, IconStudio } from "@/components/home/Icons";
 import Notice from "@/components/ui/Notice";
+import { RETENTION_YEARS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { getRoomsByCategory } from "@/lib/space";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-const RETENTION_YEARS = 3;
 
 export default async function AdminHomePage() {
   const db = getDatabase();
