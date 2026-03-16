@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 
 import { getDatabase } from "@/lib/database";
 import type { RequestStatus, RentalRequest } from "@/lib/types";
@@ -8,6 +9,17 @@ import { getDefaultDecidedBy } from "@/lib/adminAuth";
 import { normalizeDiscount, computeBaseTotalKRW } from "@/lib/pricing";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { ROOMS_BY_ID, normalizeRoomCategory } from "@/lib/space";
+import { auditLog } from "@/lib/auditLog";
+
+function getIpFromHeaders(): string {
+  const h = headers();
+  return (
+    h.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    h.get("x-real-ip") ||
+    h.get("cf-connecting-ip") ||
+    "unknown"
+  );
+}
 
 function sortSessions(list: RentalRequest[]) {
   return (Array.isArray(list) ? list : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
@@ -52,6 +64,18 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
     discountAmountKRW: isGallery ? 0 : normalized.discountAmountKRW,
     discountReason: isGallery ? "" : discountReason,
   });
+
+  if (status === "승인" || status === "반려") {
+    auditLog({
+      action: status === "승인" ? "REQUEST_APPROVE" : "REQUEST_REJECT",
+      ip: getIpFromHeaders(),
+      target: current.requestId,
+      details: {
+        decidedAt: new Date().toISOString(),
+        ...(status === "반려" ? { rejectReason } : {}),
+      },
+    });
+  }
 
   const cat = categoryOf(current);
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(cat)}&saved=1`);
@@ -144,6 +168,18 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
       });
     })
   );
+
+  auditLog({
+    action: actionStatus === "승인" ? "REQUEST_APPROVE" : "REQUEST_REJECT",
+    ip: getIpFromHeaders(),
+    target: current.batchId ?? current.requestId,
+    details: {
+      decidedAt: new Date().toISOString(),
+      batchId: current.batchId,
+      selectedIds: effectiveSelected,
+      ...(actionStatus === "반려" ? { rejectReason } : {}),
+    },
+  });
 
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
 }

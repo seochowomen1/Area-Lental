@@ -5,6 +5,8 @@ import { ROOMS_BY_ID } from "@/lib/space";
 import { computeFeesForRequest, computeFeesForBundle } from "@/lib/pricing";
 import { dayOfWeek } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
+import { auditLog } from "@/lib/auditLog";
+import { getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -243,6 +245,12 @@ export async function GET(req: Request) {
         gallery,
       });
     }
+
+    auditLog({
+      action: "STATS_VIEW",
+      ip: getClientIp(req),
+      details: { year },
+    });
 
     return NextResponse.json({ ok: true, year, months });
   } catch (e: unknown) {

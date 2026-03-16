@@ -6,6 +6,8 @@ import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { pickFeeBasisSessions } from "@/lib/bundle";
 import { getRoomsByCategory, normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
+import { auditLog } from "@/lib/auditLog";
+import { getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -127,6 +129,12 @@ export async function GET(req: Request) {
   XLSX.utils.book_append_sheet(wb, ws, "requests");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
+
+  auditLog({
+    action: "EXPORT_LIST",
+    ip: getClientIp(req),
+    details: { category, roomId, status, rowCount: rows.length },
+  });
 
   return new NextResponse(buf, {
     status: 200,

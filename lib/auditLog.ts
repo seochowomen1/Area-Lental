@@ -20,7 +20,11 @@ export type AuditAction =
   | "EMAIL_TEMPLATE_UPDATE"
   | "SHEETS_INIT"
   | "ADMIN_LOGIN"
-  | "ADMIN_LOGOUT";
+  | "ADMIN_LOGOUT"
+  | "STATS_VIEW"
+  | "EXPORT_LIST"
+  | "EXPORT_FORM"
+  | "PI_ACCESS";
 
 export interface AuditEntry {
   action: AuditAction;

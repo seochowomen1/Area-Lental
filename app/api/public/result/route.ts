@@ -8,6 +8,7 @@ import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { maskName, maskPhone, maskAddress } from "@/lib/mask";
+import { auditLog } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -140,6 +141,13 @@ export async function POST(req: Request) {
   // - 이미 취소된 건이 포함되면 불가
   // - 묶음이면 전체 기준으로 판단
   const cancelable = !["취소", "반려"].includes(overallStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
+
+  auditLog({
+    action: "PI_ACCESS",
+    ip,
+    target: representative.requestId,
+    details: { email, isBatch, batchSize: sessions.length },
+  });
 
   return NextResponse.json({
     ok: true,

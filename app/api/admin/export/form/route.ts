@@ -6,6 +6,8 @@ import { REQUEST_ID_LABEL, statusLabel } from "@/lib/labels";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW } from "@/lib/pricing";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import type { RentalRequest } from "@/lib/types";
+import { auditLog } from "@/lib/auditLog";
+import { getClientIp } from "@/lib/rateLimit";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -330,6 +332,12 @@ export async function GET(req: Request) {
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   const filename = `rental_application_${safeFileNamePart(representative.requestId)}.xlsx`;
+
+  auditLog({
+    action: "EXPORT_FORM",
+    ip: getClientIp(req),
+    target: requestId,
+  });
 
   return new NextResponse(buf, {
     status: 200,
