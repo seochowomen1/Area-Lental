@@ -6,6 +6,7 @@ import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
 import RequestTable, { type TableRowData } from "./RequestTable";
+import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
@@ -373,12 +374,10 @@ export default async function AdminRequestsPage({
               <button className="rounded-full bg-[rgb(var(--brand-primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2">
                 검색
               </button>
-              <a
-                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              <ExcelDownloadButton
                 href={exportUrl}
-              >
-                엑셀 다운로드
-              </a>
+                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              />
             </div>
 
             <div className="flex items-center gap-3">

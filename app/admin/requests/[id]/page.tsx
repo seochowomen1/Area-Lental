@@ -17,6 +17,7 @@ import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } f
 import type { RentalRequest, RequestStatus } from "@/lib/types";
 
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
+import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 import { Suspense } from "react";
 
 import {
@@ -242,12 +243,11 @@ export default async function AdminRequestDetail({
                 신청서 · 서약서
               </Link>
             )}
-            <Link
+            <ExcelDownloadButton
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
+              label="Excel"
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
-            >
-              Excel
-            </Link>
+            />
           </div>
         </div>
       </div>

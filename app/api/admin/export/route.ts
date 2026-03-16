@@ -125,7 +125,9 @@ export async function GET(req: Request) {
   });
 
   const wb = XLSX.utils.book_new();
-  const ws = XLSX.utils.json_to_sheet(rows);
+  // 주의문구 헤더 행 삽입
+  const warningRow = [{ "": "※ 개인정보 포함 — 개인정보보호법에 따라 안전하게 관리하세요. 무단 유출 시 법적 책임이 따릅니다." }];
+  const ws = XLSX.utils.json_to_sheet([...warningRow, ...rows]);
   XLSX.utils.book_append_sheet(wb, ws, "requests");
 
   const buf = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
