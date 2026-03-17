@@ -43,11 +43,15 @@ export default function PrivacyPolicyPage() {
               <tbody>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">필수</td>
-                  <td className="border border-slate-300 px-3 py-2">성명(대표자 성명), 생년월일, 연락처(전화번호), 이메일(E-mail), 주소</td>
+                  <td className="border border-slate-300 px-3 py-2">성명(대표자 성명), 생년월일, 연락처(전화번호), 이메일(E-mail), 주소, 단체명, 인원 수, 사용 목적, 서약자 성명</td>
                 </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">선택</td>
-                  <td className="border border-slate-300 px-3 py-2">단체명, 첨부파일(전시 관련 자료)</td>
+                  <td className="border border-slate-300 px-3 py-2">첨부파일(전시 관련 자료)</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2 font-medium">갤러리 전용</td>
+                  <td className="border border-slate-300 px-3 py-2">전시명, 전시 목적, 장르·내용, 인지 경로, 특이사항(각 선택)</td>
                 </tr>
               </tbody>
             </table>
@@ -144,6 +148,11 @@ export default function PrivacyPolicyPage() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2">v1.2</td>
+                  <td className="border border-slate-300 px-3 py-2">2026.03.17</td>
+                  <td className="border border-slate-300 px-3 py-2">수집 항목 전수 반영(단체명·인원 수·사용 목적·서약자 성명 필수 명시, 갤러리 전용 항목 추가)</td>
+                </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2">v1.1</td>
                   <td className="border border-slate-300 px-3 py-2">2026.03.17</td>
