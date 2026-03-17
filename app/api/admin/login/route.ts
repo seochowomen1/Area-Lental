@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { ADMIN_COOKIE_NAME, ADMIN_ACTIVITY_COOKIE } from "@/lib/adminConstants";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { logger } from "@/lib/logger";
+import { handleApiError } from "@/lib/apiResponse";
 import { verifyAdminPassword, generateSessionToken, isAdminPasswordConfigured } from "@/lib/adminPassword";
 import { auditLog } from "@/lib/auditLog";
 
@@ -103,8 +104,8 @@ export async function POST(req: Request) {
   logger.info("관리자 로그인 성공", { ip });
   auditLog({ action: "ADMIN_LOGIN", ip, details: { success: true } });
   return res;
-  } catch {
-    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
+  } catch (e: unknown) {
+    return handleApiError(e, "관리자 로그인");
   }
 }
 

@@ -2,6 +2,7 @@
 
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 type PrivacyModalProps = {
   open: boolean;
@@ -11,6 +12,8 @@ type PrivacyModalProps = {
 };
 
 export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: PrivacyModalProps) {
+  const focusTrapRef = useFocusTrap(open);
+
   useEffect(() => {
     if (!open) return;
 
@@ -26,10 +29,12 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: Pri
 
   return (
     <div
+      ref={focusTrapRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
       aria-labelledby="privacy-modal-title"
+      aria-describedby="privacy-modal-desc"
     >
       <button
         type="button"
@@ -54,17 +59,18 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: Pri
           </button>
         </div>
 
-        <div className="max-h-[70vh] overflow-auto px-5 py-4 text-sm text-slate-700">
+        <div id="privacy-modal-desc" className="max-h-[70vh] overflow-auto px-5 py-4 text-sm text-slate-700">
           <h4 className="text-center text-sm font-bold text-slate-900">
             개인정보 수집 · 이용에 관한 안내 (* 필수항목)
           </h4>
 
           <table className="mt-4 w-full border-collapse text-xs">
+            <caption className="sr-only">개인정보 수집·이용 항목 안내</caption>
             <thead>
               <tr>
-                <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보 수집 · 이용 목적</th>
-                <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">수집하려는 개인정보 항목</th>
-                <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보의 보유 및 이용 기간</th>
+                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보 수집 · 이용 목적</th>
+                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">수집하려는 개인정보 항목</th>
+                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보의 보유 및 이용 기간</th>
               </tr>
             </thead>
             <tbody>

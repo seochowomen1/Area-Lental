@@ -163,9 +163,9 @@ class MockDatabase implements Database {
  */
 class SheetsDatabase implements Database {
   private sheets = import("./sheets");
-  private requestsCache = new TtlCache<RentalRequest[]>(10_000); // 10초 TTL
-  private schedulesCache = new TtlCache<ClassSchedule[]>(30_000); // 30초 TTL
-  private blocksCache = new TtlCache<BlockedSlot[]>(30_000); // 30초 TTL
+  private requestsCache = new TtlCache<RentalRequest[]>(30_000); // 30초 TTL (관리자 뷰 안정성)
+  private schedulesCache = new TtlCache<ClassSchedule[]>(90_000); // 90초 TTL (변경 빈도 낮음)
+  private blocksCache = new TtlCache<BlockedSlot[]>(60_000); // 60초 TTL
 
   async getAllRequests() {
     const cached = this.requestsCache.get();

@@ -3,12 +3,13 @@
 import * as React from "react";
 import { CHECKBOX_HELP, CHECKBOX_INPUT, CHECKBOX_TEXT, CHECKBOX_WRAP } from "@/components/ui/presets";
 
-type Props = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & {
+export type CheckboxProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & {
   label: React.ReactNode;
   help?: React.ReactNode;
   error?: React.ReactNode;
   containerClassName?: string;
 };
+type Props = CheckboxProps;
 
 /**
  * Field 톤 체크박스 (텍스트/간격/보더/hover 통일)

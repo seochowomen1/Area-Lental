@@ -113,7 +113,7 @@ export default async function AdminRequestFormPage({
 
   /* ── group rooms by section ── */
   type RoomGroup = { label: string; rooms: SpaceRoom[] };
-  let roomGroups: RoomGroup[] = [];
+  const roomGroups: RoomGroup[] = [];
   if (isLecture) {
     const special = categoryRooms.filter((r) => r.feeKRW >= 100000);
     const general = categoryRooms.filter((r) => r.feeKRW < 100000);

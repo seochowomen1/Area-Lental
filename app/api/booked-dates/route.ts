@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { dayOfWeek, overlaps, inRangeYmd } from "@/lib/datetime";
 import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { buildHourSlotsForDate } from "@/lib/operating";
+import { handleApiError } from "@/lib/apiResponse";
 import type { RequestStatus } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -104,10 +105,6 @@ export async function GET(req: Request) {
       holidays: holidays.map((h) => ({ date: h.date, name: h.name })),
     });
   } catch (e: unknown) {
-    console.error("[booked-dates] 조회 오류:", e instanceof Error ? e.message : e);
-    return NextResponse.json(
-      { ok: false, message: "예약 현황 조회 중 오류가 발생했습니다.", bookedDates: [] },
-      { status: 500 },
-    );
+    return handleApiError(e, "예약 현황 조회");
   }
 }

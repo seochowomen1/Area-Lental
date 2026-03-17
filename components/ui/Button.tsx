@@ -4,9 +4,10 @@ import * as React from "react";
 import { cn } from "@/lib/cn";
 import { BUTTON_BASE, BUTTON_VARIANT, type ButtonVariant } from "@/components/ui/presets";
 
-type Props = React.ButtonHTMLAttributes<HTMLButtonElement> & {
+export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
 };
+type Props = ButtonProps;
 
 const Button = React.forwardRef<HTMLButtonElement, Props>(
   ({ className, variant = "primary", type, ...props }, ref) => {

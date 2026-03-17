@@ -1106,9 +1106,10 @@ export default function ApplyClient() {
               <div>
                 <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
                 <input type="hidden" {...register("birth")} />
-                <div className="flex items-center gap-1">
+                <div className="flex items-center gap-1" role="group" aria-label="생년월일 입력">
                   <input
                     id="birthYear"
+                    aria-label="생년(4자리)"
                     className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     maxLength={4}
                     placeholder="YYYY"
@@ -1121,9 +1122,10 @@ export default function ApplyClient() {
                       handleBirthSync(v, birthMonth, birthDay);
                     }}
                   />
-                  <span className="text-slate-400">-</span>
+                  <span className="text-slate-400" aria-hidden="true">-</span>
                   <input
                     ref={birthMonthRef}
+                    aria-label="월(2자리)"
                     className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     maxLength={2}
                     placeholder="MM"
@@ -1136,9 +1138,10 @@ export default function ApplyClient() {
                       handleBirthSync(birthYear, v, birthDay);
                     }}
                   />
-                  <span className="text-slate-400">-</span>
+                  <span className="text-slate-400" aria-hidden="true">-</span>
                   <input
                     ref={birthDayRef}
+                    aria-label="일(2자리)"
                     className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     maxLength={2}
                     placeholder="DD"

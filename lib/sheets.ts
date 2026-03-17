@@ -271,12 +271,10 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
     SHEET_REQUESTS
   );
 
-  // optional columns (없으면 -1)
-  const opt = (name: string) => {
-    const m = new Map<string, number>();
-    header.forEach((h, i) => m.set(String(h).trim(), i));
-    return m.get(name) ?? -1;
-  };
+  // optional columns (없으면 -1) — 인덱스 맵은 한 번만 생성
+  const optMap = new Map<string, number>();
+  header.forEach((h, i) => optMap.set(String(h).trim(), i));
+  const opt = (name: string) => optMap.get(name) ?? -1;
   const iDiscountRate = opt("discountRatePct");
   const iDiscountAmount = opt("discountAmountKRW");
   const iDiscountReason = opt("discountReason");
@@ -682,7 +680,7 @@ export async function updateRequestStatus(args: {
     // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정
     const target = all[idx0];
     const batchId = (target.batchId ?? "").trim();
-    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() == batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
+    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() === batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
 
     const rateVal = typeof args.discountRatePct === "number" ? args.discountRatePct : (target.discountRatePct ?? 0);
     const amtVal = typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (target.discountAmountKRW ?? 0);

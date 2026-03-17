@@ -3,6 +3,7 @@ import { assertAdminApiAuth } from "@/lib/adminApiAuth";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
+import { handleApiError } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -27,7 +28,6 @@ export async function POST(req: Request) {
     auditLog({ action: "EMAIL_SEND", ip: getClientIp(req), target: to, details: { subject } });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "메일 발송 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return handleApiError(e, "메일 발송");
   }
 }

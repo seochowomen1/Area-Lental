@@ -21,6 +21,8 @@ type RLEntry = { count: number; resetAt: number };
 const pageRLStore = new Map<string, RLEntry>();
 const PAGE_RL_MAX = 120;          // IP당 최대 요청 수
 const PAGE_RL_WINDOW = 60_000;    // 1분 윈도우
+const PAGE_RL_MAX_ENTRIES = 10_000; // 맵 최대 크기
+let pageRLCleanupCounter = 0;
 
 function getIp(req: NextRequest): string {
   return (
@@ -35,8 +37,10 @@ function getIp(req: NextRequest): string {
 function pageRateLimit(ip: string): { ok: boolean; retryAfter?: number } {
   const now = Date.now();
 
-  // 주기적 정리 (1% 확률)
-  if (Math.random() < 0.01) {
+  // 100회마다 또는 맵이 상한에 도달하면 만료 엔트리 정리
+  pageRLCleanupCounter++;
+  if (pageRLCleanupCounter >= 100 || pageRLStore.size > PAGE_RL_MAX_ENTRIES) {
+    pageRLCleanupCounter = 0;
     for (const [k, v] of pageRLStore) {
       if (v.resetAt <= now) pageRLStore.delete(k);
     }
@@ -62,6 +66,8 @@ function withSecurityHeaders(res: NextResponse) {
   res.headers.set("X-XSS-Protection", "1; mode=block");
   res.headers.set("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
   res.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  // Note: 'unsafe-inline'은 Next.js 14 App Router가 인라인 스크립트/스타일을 사용하므로 필수.
+  // Next.js가 nonce 기반 CSP를 안정적으로 지원하면 전환 예정.
   res.headers.set(
     "Content-Security-Policy",
     [
@@ -74,6 +80,8 @@ function withSecurityHeaders(res: NextResponse) {
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
+      "object-src 'none'",
+      "upgrade-insecure-requests",
     ].join("; ")
   );
   return res;

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
 import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
-import { UPLOAD, ROOMS } from "@/lib/config";
+import { UPLOAD, ROOMS, validateFileMagicBytes } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
 import { ensureHolidaysLoaded } from "@/lib/holidays";
@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import type { RequestStatus } from "@/lib/types";
+import { REQUEST_LIMITS } from "@/lib/constants";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
 
@@ -191,9 +192,9 @@ export async function POST(req: Request) {
 
       // ✅ 갤러리: 전시 기간 최대 30일(포함)
       const rangeDays = diffDaysInclusive(startDate, endDate);
-      if (rangeDays > 30) {
+      if (rangeDays > REQUEST_LIMITS.GALLERY_MAX_EXHIBITION_DAYS) {
         return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", message: "전시 기간은 최대 30일까지 신청할 수 있습니다." },
+          { ok: false, code: "VALIDATION_ERROR", message: `전시 기간은 최대 ${REQUEST_LIMITS.GALLERY_MAX_EXHIBITION_DAYS}일까지 신청할 수 있습니다.` },
           { status: 400 }
         );
       }
@@ -234,7 +235,7 @@ export async function POST(req: Request) {
     if (!sessions.length) {
       return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: "이용일시를 확인해주세요." }, { status: 400 });
     }
-    const maxBatch = input.roomId === "gallery" ? 500 : 20; // gallery는 전시기간 제한 없음(기술 안전장치만)
+    const maxBatch = input.roomId === "gallery" ? REQUEST_LIMITS.GALLERY_MAX_SESSIONS : REQUEST_LIMITS.BATCH_MAX_SESSIONS;
     if (sessions.length > maxBatch) {
       return NextResponse.json(
         {
@@ -384,6 +385,14 @@ export async function POST(req: Request) {
       if (!UPLOAD.allowedMime.includes(f.type)) {
         return NextResponse.json(
           { ok: false, code: "FILE_TYPE", message: `허용되지 않는 파일 형식입니다(PDF/JPG/PNG만 가능). (${f.name})` },
+          { status: 400 }
+        );
+      }
+      // 매직 바이트 검증: MIME 타입 스푸핑 방지
+      const magicCheck = validateFileMagicBytes(await f.arrayBuffer());
+      if (!magicCheck.ok) {
+        return NextResponse.json(
+          { ok: false, code: "FILE_TYPE", message: `파일 내용이 허용된 형식(PDF/JPG/PNG)과 일치하지 않습니다. (${f.name})` },
           { status: 400 }
         );
       }

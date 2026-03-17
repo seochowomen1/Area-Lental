@@ -1,5 +1,6 @@
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
 import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
+import { GALLERY_FEE_KRW } from "@/lib/constants";
 
 export type GalleryOperatingWindow = { startTime: string; endTime: string };
 export type GallerySessionInput = {
@@ -152,7 +153,7 @@ export function computeGalleryStats(startDate: string, endDate: string, customPr
     else if (dow >= 1 && dow <= 5) weekdayCount++;
   }
 
-  const totalFeeKRW = weekdayCount * 20000 + saturdayCount * 10000;
+  const totalFeeKRW = weekdayCount * GALLERY_FEE_KRW.WEEKDAY + saturdayCount * GALLERY_FEE_KRW.SATURDAY;
 
   return {
     prepDate: prep?.date ?? null,

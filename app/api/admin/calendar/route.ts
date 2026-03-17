@@ -6,6 +6,7 @@ import { galleryOperatingWindow } from "@/lib/gallery";
 import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
+import { handleApiError } from "@/lib/apiResponse";
 
 /** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
 function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
@@ -374,7 +375,6 @@ export async function GET(req: Request) {
 
   return NextResponse.json(payload, { status: 200 });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return handleApiError(e, "캘린더 조회");
   }
 }

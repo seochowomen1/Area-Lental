@@ -62,6 +62,27 @@ export const UPLOAD = {
 };
 
 /**
+ * 파일 매직 바이트(시그니처)로 실제 파일 형식을 검증합니다.
+ * MIME 타입 스푸핑 방지용.
+ */
+export function validateFileMagicBytes(buf: ArrayBuffer): { ok: boolean; detectedType: string } {
+  const bytes = new Uint8Array(buf).slice(0, 8);
+  // PDF: %PDF
+  if (bytes[0] === 0x25 && bytes[1] === 0x50 && bytes[2] === 0x44 && bytes[3] === 0x46) {
+    return { ok: true, detectedType: "application/pdf" };
+  }
+  // PNG: 89 50 4E 47
+  if (bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4E && bytes[3] === 0x47) {
+    return { ok: true, detectedType: "image/png" };
+  }
+  // JPEG: FF D8 FF
+  if (bytes[0] === 0xFF && bytes[1] === 0xD8 && bytes[2] === 0xFF) {
+    return { ok: true, detectedType: "image/jpeg" };
+  }
+  return { ok: false, detectedType: "unknown" };
+}
+
+/**
  * MOCK_MODE=true 일 때는 Google/SMTP 없이도 로컬에서 “전체 흐름(신청→관리자목록→승인/반려→출력/엑셀)” 테스트가 가능하도록
  * 환경변수를 최소 요구로 낮춥니다.
  */

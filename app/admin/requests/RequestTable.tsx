@@ -43,10 +43,10 @@ function StatusBadge({ status }: { status: string }) {
   const label = labelMap[status] ?? status;
   const base = "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
   let cls = "border-gray-200 bg-gray-50 text-gray-700";
-  if (status === "접수") cls = "border-amber-200 bg-amber-50 text-amber-800";
-  else if (status === "승인") cls = "border-emerald-200 bg-emerald-50 text-emerald-700";
-  else if (status === "반려") cls = "border-rose-200 bg-rose-50 text-rose-700";
-  else if (status === "취소") cls = "border-gray-200 bg-gray-100 text-gray-600";
+  if (status === "접수") cls = "border-amber-300 bg-amber-50 text-amber-900";
+  else if (status === "승인") cls = "border-emerald-300 bg-emerald-50 text-emerald-800";
+  else if (status === "반려") cls = "border-rose-300 bg-rose-50 text-rose-800";
+  else if (status === "취소") cls = "border-gray-300 bg-gray-100 text-gray-700";
   return <span className={`${base} ${cls}`}>{label}</span>;
 }
 
@@ -170,30 +170,31 @@ export default function RequestTable({
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
+          <caption className="sr-only">대관 신청 목록</caption>
           <thead className="border-b bg-gray-50/80 text-left">
             <tr>
               {hasDeletable && (
-                <th className="w-10 px-2 py-3 text-center">
+                <th scope="col" className="w-10 px-2 py-3 text-center">
                   <input
                     type="checkbox"
                     checked={allDeletableSelected}
                     onChange={toggleAll}
                     className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
-                    title="반려/취소 건 전체 선택"
+                    aria-label="반려/취소 건 전체 선택"
                   />
                 </th>
               )}
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">{idLabel}</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">공간</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">일시</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">신청자</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">단체/인원</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">상태</th>
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">총액</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">{idLabel}</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">공간</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">일시</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">신청자</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">단체/인원</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">상태</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">총액</th>
               {!isGalleryCategory && (
-                <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">할인</th>
+                <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">할인</th>
               )}
-              <th className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">최종금액</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">최종금액</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -213,6 +214,7 @@ export default function RequestTable({
                         checked={selected.has(r.key)}
                         onChange={() => toggle(r.key)}
                         className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                        aria-label={`${r.primaryId} 선택`}
                       />
                     ) : null}
                   </td>

@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { computeFeesForBundle, computeFeesForRequest, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { normalizeRoomCategory } from "@/lib/space";
+import { handleApiError } from "@/lib/apiResponse";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
@@ -10,6 +11,7 @@ import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { maskName, maskPhone, maskAddress } from "@/lib/mask";
 import { auditLog } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
+import { normalizeEmail } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -20,10 +22,6 @@ const RESULT_MAX_PER_MIN = 10;
 const RESULT_WINDOW_MS = 60 * 1000;
 
 // NOTE: 묶음 상태는 lib/bundle.ts의 analyzeBundle()로 계산
-
-function normalizeEmail(email: string) {
-  return (email ?? "").toString().trim().toLowerCase();
-}
 
 function approvalLabel(status: string, decidedBy?: string) {
   if (status === "승인") return "승인완료";
@@ -219,7 +217,7 @@ export async function POST(req: Request) {
       galleryPrepDate: representative.galleryPrepDate ?? "",
     } : {}),
   });
-  } catch {
-    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
+  } catch (e: unknown) {
+    return handleApiError(e, "신청 결과 조회");
   }
 }

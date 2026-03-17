@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import Button from "@/components/ui/Button";
 import { PLEDGE_FOOTER, PLEDGE_INTRO, PLEDGE_SECTIONS, GALLERY_PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
 import { operatingNoticeText } from "@/lib/operating";
+import { useFocusTrap } from "@/lib/useFocusTrap";
 
 type Props = {
   open: boolean;
@@ -16,6 +17,8 @@ type Props = {
 export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree }: Props) {
   const isGallery = roomId === "gallery";
   const sections = isGallery ? GALLERY_PLEDGE_SECTIONS : PLEDGE_SECTIONS;
+  const focusTrapRef = useFocusTrap(open);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -29,6 +32,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
 
   return (
     <div
+      ref={focusTrapRef}
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"

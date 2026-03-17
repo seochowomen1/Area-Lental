@@ -6,24 +6,12 @@ import { overlaps } from "@/lib/datetime";
 import { validateOperatingHoursByDayOfWeek } from "@/lib/operating";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
+import { jsonError, isYmd, handleApiError } from "@/lib/apiResponse";
 import type { ClassSchedule } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-// NOTE: 실제 타입은 lib/types의 ClassSchedule을 따릅니다.
-// (effectiveFrom/effectiveTo는 선택 값이므로, 엄격한 로컬 타입 정의로 인해 빌드 단계에서 타입 불일치가
-// 발생하지 않도록 별도의 로컬 타입을 두지 않습니다.)
-
-function jsonError(message: string, status: number, code?: string) {
-  return NextResponse.json({ ok: false, code: code ?? "ERROR", message }, { status });
-}
-
-function isYmd(v: unknown): v is string {
-  if (typeof v !== "string") return false;
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
 
 function isHHMM(v: unknown): v is string {
   if (typeof v !== "string") return false;
@@ -115,8 +103,7 @@ export async function POST(req: Request) {
     auditLog({ action: "SCHEDULE_CREATE", ip: getClientIp(req), target: result?.id ?? title, details: { title, roomId, dayOfWeek, startTime, endTime } });
     return NextResponse.json({ ok: true, created: result });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return jsonError(msg, 500, "SERVER_ERROR");
+    return handleApiError(e, "수업시간 처리");
   }
 }
 
@@ -178,8 +165,7 @@ export async function PATCH(req: Request) {
     auditLog({ action: "SCHEDULE_UPDATE", ip: getClientIp(req), target: id, details: { title, roomId, dayOfWeek } });
     return NextResponse.json({ ok: true, updated });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return jsonError(msg, 500, "SERVER_ERROR");
+    return handleApiError(e, "수업시간 처리");
   }
 }
 
@@ -196,7 +182,6 @@ export async function DELETE(req: Request) {
     auditLog({ action: "SCHEDULE_DELETE", ip: getClientIp(req), target: id });
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return jsonError(msg, 500, "SERVER_ERROR");
+    return handleApiError(e, "수업시간 처리");
   }
 }

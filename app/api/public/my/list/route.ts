@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { ROOMS } from "@/lib/space";
+import { handleApiError } from "@/lib/apiResponse";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
@@ -155,7 +156,7 @@ export async function GET(req: Request) {
   const cancelled = groups.filter((g) => ["취소", "반려"].includes(g.status));
 
   return NextResponse.json({ ok: true, email, current, past, cancelled });
-  } catch {
-    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
+  } catch (e: unknown) {
+    return handleApiError(e, "내 예약 조회");
   }
 }
