@@ -8,6 +8,7 @@ import { getRoomsByCategory, normalizeRoomCategory } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
+import { handleApiError } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -146,7 +147,6 @@ export async function GET(req: Request) {
     }
   });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "요청 처리 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return handleApiError(e, "엑셀 내보내기");
   }
 }

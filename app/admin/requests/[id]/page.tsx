@@ -15,6 +15,7 @@ import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, forma
 
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import type { RentalRequest, RequestStatus } from "@/lib/types";
+import { logger } from "@/lib/logger";
 import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
@@ -81,7 +82,7 @@ export default async function AdminRequestDetail({
   try {
     req = await db.getRequestById(params.id);
   } catch (e) {
-    console.error("[admin/requests/[id]] getRequestById error:", e);
+    logger.error("신청 상세 조회 오류", { requestId: params.id, error: e instanceof Error ? e.message : String(e) });
   }
 
   if (!req) {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
-import { normalizeEmail } from "@/lib/apiResponse";
+import { normalizeEmail, handleApiError } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -80,7 +80,7 @@ export async function POST(req: Request) {
   }
 
   return NextResponse.json({ ok: true, message: "예약이 취소되었습니다." });
-  } catch {
-    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
+  } catch (e: unknown) {
+    return handleApiError(e, "예약 취소");
   }
 }

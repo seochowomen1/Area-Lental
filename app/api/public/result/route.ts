@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { computeFeesForBundle, computeFeesForRequest, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { normalizeRoomCategory } from "@/lib/space";
+import { handleApiError } from "@/lib/apiResponse";
 import type { RentalRequest } from "@/lib/types";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
@@ -216,7 +217,7 @@ export async function POST(req: Request) {
       galleryPrepDate: representative.galleryPrepDate ?? "",
     } : {}),
   });
-  } catch {
-    return NextResponse.json({ ok: false, message: "요청 처리 중 오류가 발생했습니다." }, { status: 500 });
+  } catch (e: unknown) {
+    return handleApiError(e, "신청 결과 조회");
   }
 }

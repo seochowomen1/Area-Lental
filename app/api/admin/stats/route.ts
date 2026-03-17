@@ -8,6 +8,7 @@ import { ensureHolidaysLoaded, isHolidayCached } from "@/lib/holidays";
 import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
+import { handleApiError } from "@/lib/apiResponse";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -260,7 +261,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ ok: true, year, months });
   } catch (e: unknown) {
-    const message = e instanceof Error ? e.message : "통계 조회 중 오류가 발생했습니다.";
-    return NextResponse.json({ ok: false, message }, { status: 500 });
+    return handleApiError(e, "통계 조회");
   }
 }
