@@ -53,10 +53,12 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
   const emailParam = (searchParams.get("email") ?? "").toString().trim().toLowerCase();
+  const birthParam = (searchParams.get("birth") ?? "").toString().trim();
 
   let email = "";
+  let requireBirthVerification = false;
 
-  // 토큰 인증 우선, 이메일 직접 조회는 추가 Rate Limit 적용
+  // 토큰 인증 우선, 이메일 직접 조회는 생년월일 2차 인증 + 추가 Rate Limit 적용
   if (token) {
     const verified = verifyApplicantLinkToken(token);
     if (!verified.ok) {
@@ -64,13 +66,21 @@ export async function GET(req: Request) {
     }
     email = verified.email;
   } else if (emailParam && emailParam.includes("@")) {
-    // 이메일 직접 조회: 이메일 기반 추가 Rate Limit (열거 공격 방지)
+    // 이메일 직접 조회: 생년월일 2차 인증 필수
+    if (!birthParam || !/^\d{4}-\d{2}-\d{2}$/.test(birthParam)) {
+      return NextResponse.json(
+        { ok: false, message: "본인 확인을 위해 생년월일을 입력해 주세요." },
+        { status: 400 }
+      );
+    }
+    // 이메일 기반 추가 Rate Limit (열거 공격 방지)
     const rlEmail = rateLimit("my-list-email", emailParam, EMAIL_DIRECT_MAX, EMAIL_DIRECT_WINDOW_MS);
     if (!rlEmail.allowed) {
       // 이메일 존재 여부 노출 방지: 동일 응답 반환
       return NextResponse.json({ ok: true, email: emailParam, current: [], past: [], cancelled: [] });
     }
     email = emailParam;
+    requireBirthVerification = true;
   } else {
     return NextResponse.json(
       { ok: false, message: "토큰 또는 이메일이 필요합니다." },
@@ -80,6 +90,15 @@ export async function GET(req: Request) {
   const db = getDatabase();
   const all = await db.getAllRequests();
   const mine = all.filter((r) => (r.email ?? "").toLowerCase() === email);
+
+  // 이메일 직접 조회 시 생년월일 2차 인증: DB 기록과 일치하는지 확인
+  if (requireBirthVerification) {
+    const hasMatchingBirth = mine.some((r) => (r.birth ?? "") === birthParam);
+    if (!hasMatchingBirth) {
+      // 존재 여부 노출 방지: 빈 결과 반환 (에러 메시지를 다르게 하지 않음)
+      return NextResponse.json({ ok: true, email, current: [], past: [], cancelled: [] });
+    }
+  }
 
   const map = new Map<string, RentalRequest[]>();
   for (const r of mine) {
