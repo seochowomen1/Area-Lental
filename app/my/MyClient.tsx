@@ -84,18 +84,19 @@ function StatusBadge({ status }: { status: string }) {
 type Props = {
   token: string;
   initialEmail?: string;
+  initialBirth?: string;
 };
 
-export default function MyClient({ token: urlToken, initialEmail = "" }: Props) {
+export default function MyClient({ token: urlToken, initialEmail = "", initialBirth = "" }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
-  const [birth, setBirth] = useState("");
+  const [birth, setBirth] = useState(initialBirth);
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<ApiResp | null>(null);
 
   const [activeToken, setActiveToken] = useState(urlToken);
   const [activeEmail, setActiveEmail] = useState(initialEmail);
-  const [activeBirth, setActiveBirth] = useState("");
+  const [activeBirth, setActiveBirth] = useState(initialBirth);
   const [searchSeq, setSearchSeq] = useState(0);
 
   useEffect(() => {
