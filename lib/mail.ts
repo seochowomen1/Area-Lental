@@ -4,7 +4,7 @@ import type { RentalRequest } from "@/lib/types";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { getTemplate, renderTemplate, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
-import { maskPhone } from "@/lib/mask";
+import { maskPhone, maskEmail } from "@/lib/mask";
 
 function isGallery(r: RentalRequest) {
   return r.roomId === "gallery";
@@ -75,13 +75,13 @@ function formatEquipmentForEmail(r: RentalRequest): string {
 async function maybeSend(mail: { to: string; subject: string; text: string }) {
   const base = getBaseEnv();
   if (isMockMode()) {
-    console.log("\n[MOCK EMAIL]", { ...mail, preview: mail.text.slice(0, 160) + "..." });
+    console.log("\n[MOCK EMAIL]", { to: maskEmail(mail.to), subject: mail.subject });
     return;
   }
   const tr = transporter();
   if (!tr) {
     // SMTP 미설정 상태에서는 메일 발송을 생략하되, 흐름이 깨지지 않도록 함
-    console.warn("[MAIL] SMTP 미설정으로 발송 생략", { to: mail.to, subject: mail.subject, appBaseUrl: base.APP_BASE_URL });
+    console.warn("[MAIL] SMTP 미설정으로 발송 생략", { to: maskEmail(mail.to), subject: mail.subject });
     return;
   }
 

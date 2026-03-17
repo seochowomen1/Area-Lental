@@ -19,11 +19,12 @@ class Logger {
 
   private log(level: LogLevel, message: string, context?: LogContext) {
     const timestamp = new Date().toISOString();
+    const sanitizedContext = context ? this.sanitize(context) : undefined;
     const logEntry = {
       timestamp,
       level,
       message,
-      ...context,
+      ...sanitizedContext,
     };
 
     if (this.isDev) {
@@ -36,8 +37,8 @@ class Logger {
       }[level];
       
       console.log(`${emoji} [${level.toUpperCase()}] ${message}`);
-      if (context && Object.keys(context).length > 0) {
-        console.log('  Context:', context);
+      if (sanitizedContext && Object.keys(sanitizedContext).length > 0) {
+        console.log('  Context:', sanitizedContext);
       }
     } else {
       // 프로덕션: JSON 형태로 출력 (로그 수집 도구 연동용)

@@ -79,7 +79,7 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: Pri
                   시설 대관 신청업무 처리 및<br />의사소통 경로 확보
                 </td>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  이름(또는 단체명), 대표자 성명,<br />연락처, 성별, E-mail, 주소, 생년월일
+                  성명(대표자 성명), 생년월일, 연락처,<br />E-mail, 주소, 단체명(선택)
                 </td>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
                   수집일로부터 3년 및 대관목적<br />달성 시 지체없이 해당정보 파기
