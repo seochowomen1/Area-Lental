@@ -93,7 +93,8 @@ export default function PrivacyPolicyPage() {
               <li>삭제 요구</li>
               <li>처리정지 요구</li>
             </ul>
-            <p className="mt-2">위 권리 행사는 서면, 전화, 이메일 등을 통해 하실 수 있으며, 센터는 이에 대해 지체 없이 조치하겠습니다.</p>
+            <p className="mt-2">위 권리 행사는 서면, 전화(070-7163-2953), 이메일(seochowomen1@naver.com)을 통해 하실 수 있으며, 센터는 이에 대해 지체 없이 조치하겠습니다.</p>
+            <p className="mt-1">진행 중인 대관 신청(접수·승인 상태)의 개인정보 삭제를 요청하시는 경우, 해당 신청이 취소 처리된 후 삭제됩니다.</p>
           </Section>
 
           {/* 제7조 */}
@@ -101,7 +102,7 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취하고 있습니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>관리자 비밀번호 암호화 저장(bcrypt)</li>
-              <li>개인정보 접근 기록 감사 로그 관리</li>
+              <li>개인정보 접근 기록 감사 로그 관리(최소 1년 보존 후 파기)</li>
               <li>공개 API 응답 시 개인정보 마스킹 처리</li>
               <li>보안 헤더(CSP, X-Content-Type-Options 등) 적용</li>
               <li>API 호출 빈도 제한(Rate Limiting)</li>
