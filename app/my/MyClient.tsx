@@ -95,6 +95,8 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
 
   const [activeToken, setActiveToken] = useState(urlToken);
   const [activeEmail, setActiveEmail] = useState(initialEmail);
+  const [activeBirth, setActiveBirth] = useState("");
+  const [searchSeq, setSearchSeq] = useState(0);
 
   useEffect(() => {
     if (urlToken) {
@@ -122,7 +124,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
       params.set("token", activeToken);
     } else if (activeEmail) {
       params.set("email", activeEmail);
-      if (birth) params.set("birth", birth);
+      if (activeBirth) params.set("birth", activeBirth);
     }
 
     fetch(`/api/public/my/list?${params.toString()}`)
@@ -142,7 +144,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
         }
       })
       .finally(() => setLoading(false));
-  }, [activeToken, activeEmail, urlToken]);
+  }, [activeToken, activeEmail, activeBirth, searchSeq, urlToken]);
 
   const view = useMemo(() => {
     if (!resp) return null;
@@ -163,6 +165,8 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
     setResp(null);
     setActiveToken("");
     setActiveEmail(v);
+    setActiveBirth(birth);
+    setSearchSeq((s) => s + 1);
   }
 
   function openResult(requestId: string) {
@@ -237,6 +241,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                     onClick={() => {
                       setResp(null);
                       setActiveEmail("");
+                      setActiveBirth("");
                       setActiveToken("");
                       clearSavedToken();
                     }}
