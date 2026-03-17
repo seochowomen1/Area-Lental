@@ -62,7 +62,7 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보 수집·이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 다음 기준에 따라 보유합니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li><strong>보유 기간:</strong> 수집일로부터 <strong>3년</strong></li>
-              <li><strong>근거:</strong> 시설 대관 관리 및 통계 목적</li>
+              <li><strong>근거:</strong> 시설 대관 신청업무 처리 및 의사소통 경로 확보</li>
               <li>보유 기간 경과 또는 처리 목적 달성 시 지체 없이 파기</li>
             </ul>
           </Section>
