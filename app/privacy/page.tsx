@@ -43,7 +43,7 @@ export default function PrivacyPolicyPage() {
               <tbody>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">필수</td>
-                  <td className="border border-slate-300 px-3 py-2">성명, 생년월일, 연락처(전화번호), 이메일, 주소</td>
+                  <td className="border border-slate-300 px-3 py-2">성명(대표자 성명), 생년월일, 연락처(전화번호), 이메일(E-mail), 주소</td>
                 </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">선택</td>
@@ -109,18 +109,53 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보 처리에 관한 업무를 총괄해서 책임지고, 개인정보 처리와 관련한 정보주체의 불만 처리 및 피해 구제 등을 위하여 아래와 같이 개인정보 보호책임자를 지정하고 있습니다.</p>
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
               <p><strong>개인정보 보호책임자</strong></p>
-              <p className="mt-1">서초여성가족플라자 서초센터 시설관리 담당</p>
-              <p className="mt-1">문의: 센터 시설관리 담당자에게 연락</p>
+              <p className="mt-1">담당: 서초여성가족플라자 서초센터 시설총무</p>
+              <p className="mt-1">전화: 070-7163-2953</p>
+              <p className="mt-1">이메일: seochowomen1@naver.com</p>
             </div>
           </Section>
 
           {/* 제9조 */}
-          <Section number={9} title="개인정보 처리방침의 변경">
+          <Section number={9} title="개인정보 침해 구제">
+            <p>정보주체는 개인정보침해로 인한 구제를 받기 위하여 개인정보분쟁조정위원회, 한국인터넷진흥원 개인정보침해신고센터 등에 분쟁해결이나 상담 등을 신청할 수 있습니다.</p>
+            <ul className="mt-2 list-disc pl-5 space-y-1">
+              <li>개인정보분쟁조정위원회: (국번없이) 1833-6972 (<a href="https://www.kopico.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.kopico.go.kr</a>)</li>
+              <li>개인정보침해신고센터: (국번없이) 118 (<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">privacy.kisa.or.kr</a>)</li>
+              <li>대검찰청 사이버수사과: (국번없이) 1301 (<a href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.spo.go.kr</a>)</li>
+              <li>경찰청 사이버수사국: (국번없이) 182 (<a href="https://ecrm.cyber.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ecrm.cyber.go.kr</a>)</li>
+            </ul>
+          </Section>
+
+          {/* 제10조 */}
+          <Section number={10} title="개인정보 처리방침의 변경">
             <p>이 개인정보 처리방침은 시행일로부터 적용되며, 변경 사항이 있는 경우 시행 7일 전부터 본 페이지를 통해 공지합니다.</p>
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
-              <p><strong>공고일:</strong> 2026년 3월 16일</p>
-              <p><strong>시행일:</strong> 2026년 3월 16일</p>
+              <p><strong>공고일:</strong> 2026년 3월 17일</p>
+              <p><strong>시행일:</strong> 2026년 3월 17일</p>
             </div>
+
+            <h4 className="mt-4 text-sm font-semibold text-slate-800">변경 이력</h4>
+            <table className="mt-2 w-full border-collapse text-sm">
+              <thead>
+                <tr>
+                  <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-left font-semibold">버전</th>
+                  <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-left font-semibold">시행일</th>
+                  <th className="border border-slate-300 bg-slate-50 px-3 py-2 text-left font-semibold">변경 내용</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2">v1.1</td>
+                  <td className="border border-slate-300 px-3 py-2">2026.03.17</td>
+                  <td className="border border-slate-300 px-3 py-2">보호책임자 연락처 구체화, 침해 구제 기관 안내(제9조) 추가, 수집 항목 표기 통일</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2">v1.0</td>
+                  <td className="border border-slate-300 px-3 py-2">2026.03.16</td>
+                  <td className="border border-slate-300 px-3 py-2">최초 제정</td>
+                </tr>
+              </tbody>
+            </table>
           </Section>
         </div>
       </main>
