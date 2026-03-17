@@ -43,11 +43,15 @@ export default function PrivacyPolicyPage() {
               <tbody>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">필수</td>
-                  <td className="border border-slate-300 px-3 py-2">성명(대표자 성명), 생년월일, 연락처(전화번호), 이메일(E-mail), 주소</td>
+                  <td className="border border-slate-300 px-3 py-2">성명(대표자 성명), 생년월일, 연락처(전화번호), 이메일(E-mail), 주소, 단체명, 인원 수, 사용 목적, 서약자 성명</td>
                 </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2 font-medium">선택</td>
-                  <td className="border border-slate-300 px-3 py-2">단체명, 첨부파일(전시 관련 자료)</td>
+                  <td className="border border-slate-300 px-3 py-2">첨부파일(전시 관련 자료)</td>
+                </tr>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2 font-medium">갤러리 전용</td>
+                  <td className="border border-slate-300 px-3 py-2">전시명, 전시 목적, 장르·내용, 인지 경로, 특이사항(각 선택)</td>
                 </tr>
               </tbody>
             </table>
@@ -58,7 +62,7 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보 수집·이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 다음 기준에 따라 보유합니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li><strong>보유 기간:</strong> 수집일로부터 <strong>3년</strong></li>
-              <li><strong>근거:</strong> 시설 대관 관리 및 통계 목적</li>
+              <li><strong>근거:</strong> 시설 대관 신청업무 처리 및 의사소통 경로 확보</li>
               <li>보유 기간 경과 또는 처리 목적 달성 시 지체 없이 파기</li>
             </ul>
           </Section>
@@ -89,7 +93,8 @@ export default function PrivacyPolicyPage() {
               <li>삭제 요구</li>
               <li>처리정지 요구</li>
             </ul>
-            <p className="mt-2">위 권리 행사는 서면, 전화, 이메일 등을 통해 하실 수 있으며, 센터는 이에 대해 지체 없이 조치하겠습니다.</p>
+            <p className="mt-2">위 권리 행사는 서면, 전화(070-7163-2953), 이메일(seochowomen1@naver.com)을 통해 하실 수 있으며, 센터는 이에 대해 지체 없이 조치하겠습니다.</p>
+            <p className="mt-1">진행 중인 대관 신청(접수·승인 상태)의 개인정보 삭제를 요청하시는 경우, 해당 신청이 취소 처리된 후 삭제됩니다.</p>
           </Section>
 
           {/* 제7조 */}
@@ -97,7 +102,7 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보의 안전성 확보를 위해 다음과 같은 조치를 취하고 있습니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>관리자 비밀번호 암호화 저장(bcrypt)</li>
-              <li>개인정보 접근 기록 감사 로그 관리</li>
+              <li>개인정보 접근 기록 감사 로그 관리(최소 1년 보존 후 파기)</li>
               <li>공개 API 응답 시 개인정보 마스킹 처리</li>
               <li>보안 헤더(CSP, X-Content-Type-Options 등) 적용</li>
               <li>API 호출 빈도 제한(Rate Limiting)</li>
@@ -144,6 +149,11 @@ export default function PrivacyPolicyPage() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2">v1.2</td>
+                  <td className="border border-slate-300 px-3 py-2">2026.03.17</td>
+                  <td className="border border-slate-300 px-3 py-2">수집 항목 전수 반영(단체명·인원 수·사용 목적·서약자 성명 필수 명시, 갤러리 전용 항목 추가)</td>
+                </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2">v1.1</td>
                   <td className="border border-slate-300 px-3 py-2">2026.03.17</td>

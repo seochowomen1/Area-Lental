@@ -9,6 +9,7 @@ import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
 import { handleApiError } from "@/lib/apiResponse";
+import { maskName, maskPhone, maskEmail } from "@/lib/mask";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,6 +56,7 @@ export async function GET(req: Request) {
   const status = url.searchParams.get("status") ?? "all";
   const q = (url.searchParams.get("q") ?? "").trim().toLowerCase();
   const date = (url.searchParams.get("date") ?? "").trim();
+  const maskPii = url.searchParams.get("mask") === "true";
 
   const db = getDatabase();
   const all = await db.getAllRequests();
@@ -94,9 +96,9 @@ export async function GET(req: Request) {
       room: r.roomName,
       date: r.date,
       time: isGallery ? "하루 전체" : `${r.startTime}-${r.endTime}`,
-      applicantName: r.applicantName,
-      phone: r.phone,
-      email: r.email,
+      applicantName: maskPii ? maskName(r.applicantName) : r.applicantName,
+      phone: maskPii ? maskPhone(r.phone) : r.phone,
+      email: maskPii ? maskEmail(r.email) : r.email,
       orgName: r.orgName,
       headcount: r.headcount,
       equipment: isGallery

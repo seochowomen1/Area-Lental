@@ -1,6 +1,7 @@
 import Notice from "@/components/ui/Notice";
 
 import SettingsClient from "@/app/admin/settings/SettingsClient";
+import DataRetentionPanel from "@/components/admin/DataRetentionPanel";
 
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
@@ -72,6 +73,10 @@ export default async function AdminSettingsPage({
 
       <div className="mt-6">
         <SettingsClient rooms={allRooms} dayOptions={DAY_OPTIONS} initialSchedules={schedules} initialBlocks={blocks} category={category} />
+      </div>
+
+      <div className="mt-8">
+        <DataRetentionPanel />
       </div>
     </div>
   );

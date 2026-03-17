@@ -480,9 +480,11 @@ export default async function AdminRequestFormPage({
                       의사소통 경로 확보
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      이름(또는 단체명), 대표자 성명,
+                      성명(대표자 성명), 생년월일, 연락처,
                       <br />
-                      연락처, 성별, E-mail, 주소, 생년월일
+                      E-mail, 주소, 단체명, 인원 수,
+                      <br />
+                      사용 목적, 서약자 성명
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 대관목적

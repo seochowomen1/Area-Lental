@@ -89,6 +89,7 @@ type Props = {
 export default function MyClient({ token: urlToken, initialEmail = "" }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
+  const [birth, setBirth] = useState("");
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<ApiResp | null>(null);
 
@@ -121,6 +122,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
       params.set("token", activeToken);
     } else if (activeEmail) {
       params.set("email", activeEmail);
+      if (birth) params.set("birth", birth);
     }
 
     fetch(`/api/public/my/list?${params.toString()}`)
@@ -184,7 +186,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
             <Card>
               <form onSubmit={handleSearch} className="space-y-3">
                 <p className="text-sm text-slate-700">
-                  신청 시 입력한 <span className="font-semibold">이메일</span>을 입력하면 신청 내역을 바로 조회할 수 있습니다.
+                  신청 시 입력한 <span className="font-semibold">이메일</span>과 <span className="font-semibold">생년월일</span>을 입력하면 신청 내역을 조회할 수 있습니다.
                 </p>
 
                 <div className="flex flex-col gap-2 sm:flex-row sm:gap-3">
@@ -195,14 +197,21 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                     placeholder="example@domain.com"
                     className="w-full flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-[rgb(var(--brand-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-primary)/0.15)]"
                   />
+                  <input
+                    type="date"
+                    value={birth}
+                    onChange={(e) => setBirth(e.target.value)}
+                    placeholder="생년월일"
+                    className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-[rgb(var(--brand-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-primary)/0.15)] sm:w-44"
+                  />
                   <button
                     type="submit"
-                    disabled={loading || !email.trim()}
+                    disabled={loading || !email.trim() || !birth}
                     className={cn(
                       BUTTON_BASE,
                       BUTTON_VARIANT.primary,
                       "shrink-0 justify-center rounded-xl px-6 py-2.5",
-                      (loading || !email.trim()) && "opacity-60"
+                      (loading || !email.trim() || !birth) && "opacity-60"
                     )}
                   >
                     {loading ? "조회 중..." : "조회하기"}

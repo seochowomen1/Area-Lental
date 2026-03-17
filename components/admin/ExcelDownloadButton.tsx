@@ -10,7 +10,10 @@ type Props = {
 
 export default function ExcelDownloadButton({ href, label = "엑셀 다운로드", className }: Props) {
   const [showConfirm, setShowConfirm] = useState(false);
+  const [maskPii, setMaskPii] = useState(false);
   const cancelRef = useRef<HTMLButtonElement>(null);
+
+  const downloadHref = maskPii ? `${href}&mask=true` : href;
 
   useEffect(() => {
     if (!showConfirm) return;
@@ -54,6 +57,15 @@ export default function ExcelDownloadButton({ href, label = "엑셀 다운로드
             <p className="mt-2 text-xs text-slate-500">
               무단 유출·공유 시 법적 책임이 따를 수 있습니다.
             </p>
+            <label className="mt-4 flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={maskPii}
+                onChange={(e) => setMaskPii(e.target.checked)}
+                className="h-4 w-4 rounded border-gray-300 text-[rgb(var(--brand-primary))] focus:ring-[rgb(var(--brand-primary))]"
+              />
+              <span className="text-sm text-slate-700">개인정보 마스킹 처리 (이름·전화·이메일)</span>
+            </label>
             <div className="mt-5 flex justify-end gap-2">
               <button
                 ref={cancelRef}
@@ -64,7 +76,7 @@ export default function ExcelDownloadButton({ href, label = "엑셀 다운로드
                 취소
               </button>
               <a
-                href={href}
+                href={downloadHref}
                 onClick={() => setShowConfirm(false)}
                 className="inline-flex items-center rounded-xl bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
