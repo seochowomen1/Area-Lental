@@ -12,13 +12,14 @@ export const revalidate = 0;
 export default function MyPage({
   searchParams,
 }: {
-  searchParams: { token?: string; email?: string };
+  searchParams: { token?: string; email?: string; birth?: string };
 }) {
   return (
     <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-gray-400">로딩 중...</div>}>
       <MyClient
         token={searchParams.token ?? ""}
         initialEmail={searchParams.email ?? ""}
+        initialBirth={searchParams.birth ?? ""}
       />
     </Suspense>
   );

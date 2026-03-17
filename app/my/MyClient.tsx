@@ -84,17 +84,20 @@ function StatusBadge({ status }: { status: string }) {
 type Props = {
   token: string;
   initialEmail?: string;
+  initialBirth?: string;
 };
 
-export default function MyClient({ token: urlToken, initialEmail = "" }: Props) {
+export default function MyClient({ token: urlToken, initialEmail = "", initialBirth = "" }: Props) {
   const router = useRouter();
   const [email, setEmail] = useState(initialEmail);
-  const [birth, setBirth] = useState("");
+  const [birth, setBirth] = useState(initialBirth);
   const [loading, setLoading] = useState(false);
   const [resp, setResp] = useState<ApiResp | null>(null);
 
   const [activeToken, setActiveToken] = useState(urlToken);
   const [activeEmail, setActiveEmail] = useState(initialEmail);
+  const [activeBirth, setActiveBirth] = useState(initialBirth);
+  const [searchSeq, setSearchSeq] = useState(0);
 
   useEffect(() => {
     if (urlToken) {
@@ -122,7 +125,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
       params.set("token", activeToken);
     } else if (activeEmail) {
       params.set("email", activeEmail);
-      if (birth) params.set("birth", birth);
+      if (activeBirth) params.set("birth", activeBirth);
     }
 
     fetch(`/api/public/my/list?${params.toString()}`)
@@ -142,7 +145,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
         }
       })
       .finally(() => setLoading(false));
-  }, [activeToken, activeEmail, urlToken]);
+  }, [activeToken, activeEmail, activeBirth, searchSeq, urlToken]);
 
   const view = useMemo(() => {
     if (!resp) return null;
@@ -163,6 +166,8 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
     setResp(null);
     setActiveToken("");
     setActiveEmail(v);
+    setActiveBirth(birth);
+    setSearchSeq((s) => s + 1);
   }
 
   function openResult(requestId: string) {
@@ -237,6 +242,7 @@ export default function MyClient({ token: urlToken, initialEmail = "" }: Props) 
                     onClick={() => {
                       setResp(null);
                       setActiveEmail("");
+                      setActiveBirth("");
                       setActiveToken("");
                       clearSavedToken();
                     }}
