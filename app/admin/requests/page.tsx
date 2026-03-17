@@ -142,34 +142,33 @@ export default async function AdminRequestsPage({
 
   const filteredGroups = groups
     .filter((g) => {
-      if (roomId === "all") return true;
-      return g.representative.roomId === roomId;
-    })
-    .filter((g) => (status === "all" ? true : g.groupStatus === status))
-    .filter((g) => {
-      if (!date) return true;
-      // 갤러리 1행 형식: 날짜 범위 내 포함 여부 확인
-      const rep = g.representative;
-      if (rep.roomId === "gallery" && !rep.batchId && rep.startDate && rep.endDate) {
-        return date >= rep.startDate && date <= rep.endDate;
+      // 단일 패스: 공간 → 상태 → 날짜 → 검색 필터 결합
+      if (roomId !== "all" && g.representative.roomId !== roomId) return false;
+      if (status !== "all" && g.groupStatus !== status) return false;
+      if (date) {
+        const rep = g.representative;
+        if (rep.roomId === "gallery" && !rep.batchId && rep.startDate && rep.endDate) {
+          if (date < rep.startDate || date > rep.endDate) return false;
+        } else if (!g.items.some((r) => r.date === date)) {
+          return false;
+        }
       }
-      return g.items.some((r) => r.date === date);
-    })
-    .filter((g) => {
-      if (!qLower) return true;
-      const hay = [
-        g.representative.requestId,
-        ...g.items.map((r) => r.requestId),
-        g.representative.applicantName,
-        g.representative.phone,
-        g.representative.email,
-        g.representative.orgName,
-        g.representative.roomName,
-        g.representative.purpose,
-      ]
-        .join(" ")
-        .toLowerCase();
-      return hay.includes(qLower);
+      if (qLower) {
+        const hay = [
+          g.representative.requestId,
+          ...g.items.map((r) => r.requestId),
+          g.representative.applicantName,
+          g.representative.phone,
+          g.representative.email,
+          g.representative.orgName,
+          g.representative.roomName,
+          g.representative.purpose,
+        ]
+          .join(" ")
+          .toLowerCase();
+        if (!hay.includes(qLower)) return false;
+      }
+      return true;
     })
     .sort((a, b) => (a.createdAt < b.createdAt ? 1 : -1));
 

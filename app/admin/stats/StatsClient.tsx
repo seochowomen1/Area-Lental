@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 
 type CategoryStats = {
@@ -55,17 +55,20 @@ export default function StatsClient() {
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
 
-  // 연간 합계
-  const emptyC = { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
-  const yearTotal = data?.months?.reduce(
-    (acc, m) => ({
-      lecture: { uniqueApplicants: acc.lecture.uniqueApplicants + m.lecture.uniqueApplicants, totalDays: acc.lecture.totalDays + m.lecture.totalDays, totalRevenue: acc.lecture.totalRevenue + m.lecture.totalRevenue },
-      studio: { uniqueApplicants: acc.studio.uniqueApplicants + m.studio.uniqueApplicants, totalDays: acc.studio.totalDays + m.studio.totalDays, totalRevenue: acc.studio.totalRevenue + m.studio.totalRevenue },
-      lectureStudio: { uniqueApplicants: acc.lectureStudio.uniqueApplicants + m.lectureStudio.uniqueApplicants, totalDays: acc.lectureStudio.totalDays + m.lectureStudio.totalDays, totalRevenue: acc.lectureStudio.totalRevenue + m.lectureStudio.totalRevenue },
-      gallery: { uniqueApplicants: acc.gallery.uniqueApplicants + m.gallery.uniqueApplicants, totalDays: acc.gallery.totalDays + m.gallery.totalDays, totalRevenue: acc.gallery.totalRevenue + m.gallery.totalRevenue },
-    }),
-    { lecture: { ...emptyC }, studio: { ...emptyC }, lectureStudio: { ...emptyC }, gallery: { ...emptyC } }
-  );
+  // 연간 합계 (데이터 변경 시에만 재계산)
+  const yearTotal = useMemo(() => {
+    if (!data?.months) return undefined;
+    const emptyC = { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
+    return data.months.reduce(
+      (acc, m) => ({
+        lecture: { uniqueApplicants: acc.lecture.uniqueApplicants + m.lecture.uniqueApplicants, totalDays: acc.lecture.totalDays + m.lecture.totalDays, totalRevenue: acc.lecture.totalRevenue + m.lecture.totalRevenue },
+        studio: { uniqueApplicants: acc.studio.uniqueApplicants + m.studio.uniqueApplicants, totalDays: acc.studio.totalDays + m.studio.totalDays, totalRevenue: acc.studio.totalRevenue + m.studio.totalRevenue },
+        lectureStudio: { uniqueApplicants: acc.lectureStudio.uniqueApplicants + m.lectureStudio.uniqueApplicants, totalDays: acc.lectureStudio.totalDays + m.lectureStudio.totalDays, totalRevenue: acc.lectureStudio.totalRevenue + m.lectureStudio.totalRevenue },
+        gallery: { uniqueApplicants: acc.gallery.uniqueApplicants + m.gallery.uniqueApplicants, totalDays: acc.gallery.totalDays + m.gallery.totalDays, totalRevenue: acc.gallery.totalRevenue + m.gallery.totalRevenue },
+      }),
+      { lecture: { ...emptyC }, studio: { ...emptyC }, lectureStudio: { ...emptyC }, gallery: { ...emptyC } }
+    );
+  }, [data?.months]);
 
   return (
     <div>

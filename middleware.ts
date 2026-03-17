@@ -21,6 +21,8 @@ type RLEntry = { count: number; resetAt: number };
 const pageRLStore = new Map<string, RLEntry>();
 const PAGE_RL_MAX = 120;          // IP당 최대 요청 수
 const PAGE_RL_WINDOW = 60_000;    // 1분 윈도우
+const PAGE_RL_MAX_ENTRIES = 10_000; // 맵 최대 크기
+let pageRLCleanupCounter = 0;
 
 function getIp(req: NextRequest): string {
   return (
@@ -35,8 +37,10 @@ function getIp(req: NextRequest): string {
 function pageRateLimit(ip: string): { ok: boolean; retryAfter?: number } {
   const now = Date.now();
 
-  // 주기적 정리 (1% 확률)
-  if (Math.random() < 0.01) {
+  // 100회마다 또는 맵이 상한에 도달하면 만료 엔트리 정리
+  pageRLCleanupCounter++;
+  if (pageRLCleanupCounter >= 100 || pageRLStore.size > PAGE_RL_MAX_ENTRIES) {
+    pageRLCleanupCounter = 0;
     for (const [k, v] of pageRLStore) {
       if (v.resetAt <= now) pageRLStore.delete(k);
     }

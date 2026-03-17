@@ -271,12 +271,10 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
     SHEET_REQUESTS
   );
 
-  // optional columns (없으면 -1)
-  const opt = (name: string) => {
-    const m = new Map<string, number>();
-    header.forEach((h, i) => m.set(String(h).trim(), i));
-    return m.get(name) ?? -1;
-  };
+  // optional columns (없으면 -1) — 인덱스 맵은 한 번만 생성
+  const optMap = new Map<string, number>();
+  header.forEach((h, i) => optMap.set(String(h).trim(), i));
+  const opt = (name: string) => optMap.get(name) ?? -1;
   const iDiscountRate = opt("discountRatePct");
   const iDiscountAmount = opt("discountAmountKRW");
   const iDiscountReason = opt("discountReason");
