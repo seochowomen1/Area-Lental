@@ -404,43 +404,43 @@ export default function BlankFormPage({ params }: { params: { category: string }
 
             {/* 4. 개인정보 수집·이용 안내 */}
             <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
-              <h3 className="text-center text-[11px] font-bold text-blue-900 print:text-[9px]">
-                개인정보 수집 · 이용에 관한 안내
+              <h3 className="text-center text-[11px] font-bold text-gray-900 print:text-[9px]">
+                개인정보 수집 · 이용에 관한 안내 (* 필수항목)
               </h3>
               <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
                 <thead>
                   <tr>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">개인정보의 수집이용 목적</th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">수집이용하려는 개인정보 항목</th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">개인정보 이용기간 및 보유기간</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">개인정보 수집 · 이용 목적</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">수집하려는 개인정보 항목</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">개인정보의 보유 및 이용 기간</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      E-스튜디오 대관 신청업무 처리 및<br />
-                      본인 식별, 의사소통, 수수료 등<br />
-                      관련 업무
+                      시설 대관 신청업무 처리 및<br />
+                      의사소통 경로 확보
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      이름, 연락처, E-mail, 주소
+                      성명(대표자 성명), 생년월일, 연락처,<br />
+                      E-mail, 주소, 단체명, 인원 수,<br />
+                      사용 목적, 서약자 성명
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      E-스튜디오 이용완료 일 해당<br />1년
+                      수집일로부터 3년 및 대관목적<br />달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
                 </tbody>
               </table>
               <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
-                ※ 위의 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다.
-                다만 위 제공사항은 이용신청에 반드시 필요한 사항으로 거부하실 경우 이용에 일부 제한이 있습니다.
+                ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 대관 신청·진행에 일부 제한이 있습니다.
               </p>
               <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
                 <span className="font-bold text-gray-900">[필수]</span>
                 <span>위와 같이 개인정보의 수집 및 이용에 동의합니까?</span>
                 <span className="ml-auto flex items-center gap-2">
-                  <span>□ 동의함</span>
-                  <span>□ 동의하지 않음</span>
+                  <span>□ 동의</span>
+                  <span>□ 미동의</span>
                 </span>
               </div>
             </div>
