@@ -11,10 +11,10 @@ export default function PrintActions() {
         인쇄 / PDF 저장
       </button>
       <a
-        href="/"
+        href="/admin"
         className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
       >
-        홈으로
+        관리자 홈으로
       </a>
     </div>
   );
