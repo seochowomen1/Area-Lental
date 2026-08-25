@@ -22,11 +22,30 @@ export async function GET() {
     checks.database = { ok: false, message: msg };
   }
 
-  // 필수 환경변수 확인
-  const requiredEnvVars = ["ADMIN_PASSWORD_HASH", "SECRET_HMAC_KEY"];
-  const missingVars = requiredEnvVars.filter((v) => !process.env[v]);
+  // 필수 환경변수 확인 (앱이 실제로 사용하는 변수 기준)
+  const missingVars: string[] = [];
+  // 관리자 인증: 해시(권장) 또는 평문(레거시) 중 최소 하나
+  if (!process.env.ADMIN_PASSWORD_HASH && !process.env.ADMIN_PASSWORD) {
+    missingVars.push("ADMIN_PASSWORD_HASH(또는 ADMIN_PASSWORD)");
+  }
+  // 매직링크 서명 시크릿 (운영 필수)
+  if (!process.env.PUBLIC_LINK_SECRET) {
+    missingVars.push("PUBLIC_LINK_SECRET");
+  }
+  // Google Sheets(운영 DB) — MOCK_MODE가 아닐 때만 필수
+  if (process.env.MOCK_MODE !== "true") {
+    if (!process.env.GOOGLE_SERVICE_ACCOUNT_JSON) missingVars.push("GOOGLE_SERVICE_ACCOUNT_JSON");
+    if (!process.env.GOOGLE_SHEET_ID) missingVars.push("GOOGLE_SHEET_ID");
+  }
+
+  const warnings: string[] = [];
+  // 평문 비밀번호 운영 경고 (해시 미설정 시)
+  if (!process.env.ADMIN_PASSWORD_HASH && process.env.ADMIN_PASSWORD) {
+    warnings.push("ADMIN_PASSWORD(평문) 사용 중 — ADMIN_PASSWORD_HASH(bcrypt) 전환 권장");
+  }
+
   checks.env = missingVars.length === 0
-    ? { ok: true }
+    ? (warnings.length ? { ok: true, message: `경고: ${warnings.join("; ")}` } : { ok: true })
     : { ok: false, message: `누락: ${missingVars.join(", ")}` };
 
   const allOk = Object.values(checks).every((c) => c.ok);
