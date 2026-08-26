@@ -20,6 +20,7 @@ import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
 import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
+import GianCopyButton from "@/components/admin/GianCopyButton";
 import { Suspense } from "react";
 
 import {
@@ -180,6 +181,71 @@ export default async function AdminRequestDetail({
   const accent = categoryAccent(normalizedCategory);
   const categoryLabel = getCategoryLabel(normalizedCategory);
 
+  /* ── 기안 데이터 복사 페이로드 (2026-08-26) ──
+     그룹웨어 대관 기안 작성 도구가 파싱하는 JSON. 필드 변경 시 version을 올릴 것 */
+  const gianPayload = {
+    _type: "area-lental-gian",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    category: normalizedCategory,
+    categoryLabel,
+    requestId: req.requestId,
+    status: displayStatus,
+    createdAt: req.createdAt,
+    applicant: {
+      name: req.applicantName,
+      birth: req.birth,
+      address: req.address,
+      phone: req.phone,
+      email: req.email,
+      orgName: req.orgName,
+      headcount: req.headcount,
+    },
+    room: { id: req.roomId, name: req.roomName },
+    sessions: sessions.map((s) => ({
+      date: s.date,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      status: s.status,
+      ...(s.isPrepDay ? { isPrepDay: true } : {}),
+    })),
+    ...(isGallery
+      ? {
+          gallery: {
+            exhibitionTitle: req.exhibitionTitle ?? "",
+            exhibitionPurpose: req.exhibitionPurpose ?? "",
+            genreContent: req.genreContent ?? "",
+            startDate: req.startDate ?? "",
+            endDate: req.endDate ?? "",
+            prepDate: galleryPrepDate,
+            removalTime: resolveGalleryRemovalTime(req) ?? "",
+            weekdayCount: galleryWeekdayCount,
+            saturdayCount: gallerySaturdayCount,
+            exhibitionDayCount: galleryExhibitionDayCount,
+          },
+        }
+      : {}),
+    purpose: req.purpose,
+    equipment: equipmentDetails.map((e) => ({ label: e.label, feeKRW: e.feeKRW })),
+    fees: {
+      rentalFeeKRW: feeBasis.rentalFeeKRW,
+      equipmentFeeKRW: feeBasis.equipmentFeeKRW,
+      totalFeeKRW: feeBasis.totalFeeKRW,
+      discountRatePct: feeBasis.discountRatePct,
+      discountAmountKRW: feeBasis.discountAmountKRW,
+      discountReason: feeBasis.discountReason,
+      finalFeeKRW: feeBasis.finalFeeKRW,
+      ...(usingApprovedBasis ? { note: "승인 회차 기준 요금" } : {}),
+    },
+    pledge: {
+      pledgeDate: req.pledgeDate,
+      pledgeName: req.pledgeName,
+      privacyAgree: req.privacyAgree,
+      pledgeAgree: req.pledgeAgree,
+    },
+    adminMemo: req.adminMemo ?? "",
+  };
+
   return (
     <main className="mx-auto max-w-5xl space-y-5 p-6">
 
@@ -238,6 +304,7 @@ export default async function AdminRequestDetail({
               label="Excel"
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             />
+            <GianCopyButton payload={gianPayload} />
           </div>
         </div>
       </div>
