@@ -2,6 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
+import { nowIsoSeoul } from "@/lib/datetime";
 
 import { getDatabase } from "@/lib/database";
 import type { RequestStatus, RentalRequest } from "@/lib/types";
@@ -73,7 +74,7 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
       ip: getIpFromHeaders(),
       target: current.requestId,
       details: {
-        decidedAt: new Date().toISOString(),
+        decidedAt: nowIsoSeoul(),
         ...(status === "반려" ? { rejectReason } : {}),
       },
     });
@@ -176,7 +177,7 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     ip: getIpFromHeaders(),
     target: current.batchId ?? current.requestId,
     details: {
-      decidedAt: new Date().toISOString(),
+      decidedAt: nowIsoSeoul(),
       batchId: current.batchId,
       selectedIds: effectiveSelected,
       ...(actionStatus === "반려" ? { rejectReason } : {}),

@@ -20,7 +20,7 @@ import {
   normalizeRoomCategory,
   type SpaceRoom,
 } from "@/lib/space";
-import { dayOfWeek } from "@/lib/datetime";
+import { dayOfWeek, todayYmdSeoul } from "@/lib/datetime";
 import { operatingNoticeLines } from "@/lib/operating";
 import {
   PLEDGE_TITLE,
@@ -149,18 +149,19 @@ export default async function AdminRequestFormPage({
       ? `${feeBasis.discountRatePct.toFixed(0)}% 할인`
       : "";
 
-  const now = new Date();
-  const printDate = `${now.getFullYear()}.${String(now.getMonth() + 1).padStart(2, "0")}.${String(now.getDate()).padStart(2, "0")}`;
+  /* ── 날짜 (2026-08-26 수정)
+     createdAt·pledgeDate는 KST 벽시계 문자열(nowIsoSeoul/todayYmdSeoul 산출)이므로
+     Date 파싱(서버 TZ 의존) 대신 문자열 자릿수를 그대로 포맷한다.
+     - 서명란 날짜 = 신청일(createdAt) / 서약서 서명란 = 서약일(pledgeDate)
+     - printDate(출력일)는 푸터 표기 전용 — KST 기준으로 산출 */
+  const ymdToDots = (s?: string) => (s ? s.slice(0, 10).replace(/-/g, ".") : "");
+  const printDate = ymdToDots(todayYmdSeoul());
+  const applyDate = ymdToDots(req.createdAt) || printDate;
+  const pledgeSignDate = ymdToDots(req.pledgeDate) || applyDate;
 
-  // 전자 동의 일시
+  // 전자 동의 일시 (신청 일시 — 날짜+시각)
   const consentDate = req.createdAt
-    ? new Date(req.createdAt).toLocaleDateString("ko-KR", {
-        year: "numeric",
-        month: "2-digit",
-        day: "2-digit",
-        hour: "2-digit",
-        minute: "2-digit",
-      })
+    ? `${ymdToDots(req.createdAt)} ${req.createdAt.slice(11, 16)}`
     : printDate;
 
   /* ── pledge data ── */
@@ -533,7 +534,7 @@ export default async function AdminRequestFormPage({
                 위와 같이 서초여성가족플라자 서초센터 {categoryLabel} 대관을
                 신청합니다.
               </p>
-              <p className="mt-2">{printDate}</p>
+              <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
                 신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
               </p>
@@ -810,7 +811,7 @@ export default async function AdminRequestFormPage({
               <p>
                 위와 같이 서초여성가족플라자 서초센터 E-스튜디오 대관을 신청합니다.
               </p>
-              <p className="mt-2">{printDate}</p>
+              <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
                 신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
               </p>
@@ -1128,7 +1129,7 @@ export default async function AdminRequestFormPage({
                 위와 같이 서초여성가족플라자 서초센터 우리동네 갤러리 대관을
                 신청합니다.
               </p>
-              <p className="mt-2">{printDate}</p>
+              <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
                 신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
               </p>
@@ -1262,7 +1263,7 @@ export default async function AdminRequestFormPage({
 
           {/* ── 서명란 ── */}
           <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
-            <p>{printDate}</p>
+            <p>{pledgeSignDate}</p>
             <p className="mt-2">
               서약자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
             </p>
