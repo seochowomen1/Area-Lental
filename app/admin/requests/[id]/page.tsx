@@ -74,9 +74,17 @@ export default async function AdminRequestDetail({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { category?: string };
+  searchParams?: { category?: string; formError?: string };
 }) {
   await assertAdminAuth();
+  const formErrorMessage =
+    searchParams?.formError === "discountReason"
+      ? "할인을 적용하려면 할인 근거를 선택해야 합니다. 저장되지 않았습니다."
+      : searchParams?.formError === "rejectReason"
+        ? "반려 시 반려 사유를 입력해야 합니다. 저장되지 않았습니다."
+        : searchParams?.formError === "status"
+          ? "처리 상태 값이 올바르지 않습니다. 저장되지 않았습니다."
+          : "";
 
   const db = getDatabase();
   let req: RentalRequest | null = null;
@@ -248,6 +256,12 @@ export default async function AdminRequestDetail({
 
   return (
     <main className="mx-auto max-w-5xl space-y-5 p-6">
+
+      {formErrorMessage && (
+        <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700">
+          {formErrorMessage}
+        </div>
+      )}
 
       {/* ═══ 1. 헤더 바 ═══ */}
       <div className={`rounded-xl border ${accent.border} ${accent.bg} px-5 py-4`}>

@@ -36,6 +36,7 @@ export default function SingleStatusFields({ defaultStatus, defaultRejectReason 
           name="rejectReason"
           defaultValue={defaultRejectReason}
           disabled={!isReject}
+          required={isReject}
           className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 ${
             isReject
               ? "border-gray-200 bg-white"

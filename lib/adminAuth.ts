@@ -22,7 +22,9 @@ export async function assertAdminAuth(): Promise<void> {
   if (!token || token !== expected) redirect("/admin/login");
 }
 
-/** 관리자 처리자 표시(현재는 계정 시스템이 없으므로 고정값) */
+/** 관리자 처리자 표시 — 관리자는 시설총무 담당 1인 운영이므로 직책명 고정값 (2026-10 행정감사 후속) */
+export const ADMIN_DECIDED_BY = "시설총무";
+
 export function getDefaultDecidedBy(): string {
-  return "관리자";
+  return ADMIN_DECIDED_BY;
 }

@@ -3,6 +3,7 @@ import { getDatabase } from "@/lib/database";
 import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { normalizeEmail, handleApiError } from "@/lib/apiResponse";
+import { recordAudit } from "@/lib/auditLog";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,6 +79,21 @@ export async function POST(req: Request) {
       adminMemo: r.adminMemo ?? "",
     });
   }
+
+  const first = group[0];
+  await recordAudit({
+    action: "REQUEST_CANCEL_BY_USER",
+    ip,
+    actor: "신청자",
+    target: first.batchId ?? first.requestId,
+    summary: [
+      `${first.status} → 취소(신청자)`,
+      first.roomName || first.roomId,
+      group.length > 1 ? `묶음 ${group.length}회` : (first.startDate && first.endDate ? `${first.startDate}~${first.endDate}` : `${first.date} ${first.startTime}-${first.endTime}`),
+      first.orgName || first.applicantName,
+    ].join(" · "),
+    details: { requestIds: group.map((r) => r.requestId), prevStatuses: group.map((r) => r.status) },
+  });
 
   return NextResponse.json({ ok: true, message: "예약이 취소되었습니다." });
   } catch (e: unknown) {

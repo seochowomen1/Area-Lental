@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getGoogleClient } from "@/lib/google";
 import { requireGoogleEnv } from "@/lib/env";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
+import { AUDIT_HEADERS, REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +41,10 @@ const SHEETS_CONFIG = [
   {
     title: "blocks",
     headers: ["id", "roomId", "date", "startTime", "endTime", "reason", "endDate"],
+  },
+  {
+    title: "audit_log",
+    headers: [...AUDIT_HEADERS],
   },
 ];
 

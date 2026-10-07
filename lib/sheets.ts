@@ -1085,3 +1085,59 @@ export async function saveEmailTemplate(
     });
   }
 }
+
+// ─────────────────────────────────────────────
+// 감사로그 시트 (audit_log) — 2026-10 행정감사 후속
+// 시트가 없으면 자동 생성 후 헤더를 채웁니다.
+// ─────────────────────────────────────────────
+const SHEET_AUDIT = "audit_log";
+export const AUDIT_HEADERS = ["timestamp", "action", "target", "actor", "summary", "details", "ip"] as const;
+let auditSheetReady = false;
+
+async function ensureAuditSheet(): Promise<void> {
+  if (auditSheetReady) return;
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID });
+  const exists = (meta.data.sheets ?? []).some((s) => s.properties?.title === SHEET_AUDIT);
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: SHEET_AUDIT } } }] },
+    });
+  }
+  const head = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_AUDIT}!1:1`,
+  });
+  if (!(head.data.values?.[0]?.length)) {
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_AUDIT}!A1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[...AUDIT_HEADERS]] },
+    });
+  }
+  auditSheetReady = true;
+}
+
+export async function appendAuditRow(row: {
+  timestamp: string;
+  action: string;
+  target: string;
+  actor: string;
+  summary: string;
+  details: string;
+  ip: string;
+}): Promise<void> {
+  if (isMockMode()) return;
+  await ensureAuditSheet();
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_AUDIT}!A:G`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[row.timestamp, row.action, row.target, row.actor, row.summary, row.details, row.ip]] },
+  });
+}

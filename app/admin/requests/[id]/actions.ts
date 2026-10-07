@@ -10,7 +10,7 @@ import { getDefaultDecidedBy } from "@/lib/adminAuth";
 import { normalizeDiscount, computeBaseTotalKRW } from "@/lib/pricing";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { ROOMS_BY_ID, normalizeRoomCategory } from "@/lib/space";
-import { auditLog } from "@/lib/auditLog";
+import { recordAudit } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 
 function getIpFromHeaders(): string {
@@ -21,6 +21,20 @@ function getIpFromHeaders(): string {
     h.get("cf-connecting-ip") ||
     "unknown"
   );
+}
+
+const VALID_STATUSES: ReadonlySet<string> = new Set(["접수", "승인", "반려", "취소"]);
+
+function fmtDiscount(rate?: number, amount?: number): string {
+  const r = Number(rate ?? 0);
+  const a = Number(amount ?? 0);
+  if (!(a > 0)) return "없음";
+  return `${Number.isInteger(r) ? r : r.toFixed(2)}% (${a.toLocaleString()}원)`;
+}
+
+function describeWhen(r: RentalRequest): string {
+  if (r.startDate && r.endDate) return `${r.startDate}~${r.endDate}`;
+  return `${r.date} ${r.startTime}-${r.endTime}`;
 }
 
 function categoryOf(r: RentalRequest) {
@@ -37,6 +51,9 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
   const status = String(formData.get("status") || "").trim() as RequestStatus;
   const rejectReason = String(formData.get("rejectReason") || "").trim();
   const adminMemo = String(formData.get("adminMemo") || "").trim();
+  const backUrl = `/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(categoryOf(current))}`;
+  if (!VALID_STATUSES.has(status)) redirect(`${backUrl}&formError=status`);
+  if (status === "반려" && !rejectReason) redirect(`${backUrl}&formError=rejectReason`);
 
   const discountModeRaw = String(formData.get("discountMode") || "rate").trim();
   const discountMode = discountModeRaw === "amount" ? "amount" : "rate";
@@ -52,30 +69,79 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
     mode: discountMode,
   });
 
-  const updated = await db.updateRequestStatus({
+  const nextRate = isGallery ? 0 : normalized.discountRatePct;
+  const nextAmount = isGallery ? 0 : normalized.discountAmountKRW;
+  const nextReason = isGallery ? "" : discountReason;
+  if (nextAmount > 0 && !nextReason) redirect(`${backUrl}&formError=discountReason`);
+
+  const prevAmount = Number(current.discountAmountKRW ?? 0);
+  const prevReason = String(current.discountReason ?? "");
+  const discountChanged = prevAmount !== nextAmount || prevReason !== nextReason;
+
+  await db.updateRequestStatus({
     requestId: current.requestId,
     status,
     adminMemo,
     rejectReason: status === "반려" ? rejectReason : "",
     decidedBy: getDefaultDecidedBy(),
-    discountRatePct: isGallery ? 0 : normalized.discountRatePct,
-    discountAmountKRW: isGallery ? 0 : normalized.discountAmountKRW,
-    discountReason: isGallery ? "" : discountReason,
+    discountRatePct: nextRate,
+    discountAmountKRW: nextAmount,
+    discountReason: nextReason,
   });
 
-  if (status === "승인" || status === "반려" || status === "취소") {
-    const actionMap: Record<string, "REQUEST_APPROVE" | "REQUEST_REJECT" | "REQUEST_CANCEL"> = {
+  const ip = getIpFromHeaders();
+  const actor = getDefaultDecidedBy();
+  const room = current.roomName || current.roomId;
+  const who = current.orgName || current.applicantName;
+  const fee = computeBaseTotalKRW(current).totalFeeKRW;
+
+  if (status !== current.status) {
+    const actionMap: Record<string, "REQUEST_APPROVE" | "REQUEST_REJECT" | "REQUEST_CANCEL" | "REQUEST_STATUS_UPDATE"> = {
       "승인": "REQUEST_APPROVE",
       "반려": "REQUEST_REJECT",
       "취소": "REQUEST_CANCEL",
+      "접수": "REQUEST_STATUS_UPDATE",
     };
-    auditLog({
+    await recordAudit({
       action: actionMap[status],
-      ip: getIpFromHeaders(),
+      ip,
+      actor,
       target: current.requestId,
+      summary: [
+        `${current.status} → ${status}`,
+        room,
+        describeWhen(current),
+        who,
+        `정가 ${fee.toLocaleString()}원`,
+        `할인 ${fmtDiscount(nextRate, nextAmount)}`,
+        status === "반려" ? `사유: ${rejectReason}` : "",
+      ].filter(Boolean).join(" · "),
       details: {
         decidedAt: nowIsoSeoul(),
+        prevStatus: current.status,
+        status,
+        finalFeeKRW: Math.max(0, fee - nextAmount),
+        ...(nextAmount > 0 ? { discountReason: nextReason } : {}),
         ...(status === "반려" ? { rejectReason } : {}),
+      },
+    });
+  }
+
+  if (discountChanged) {
+    await recordAudit({
+      action: "DISCOUNT_UPDATE",
+      ip,
+      actor,
+      target: current.requestId,
+      summary: [
+        `할인 ${fmtDiscount(current.discountRatePct, prevAmount)} → ${fmtDiscount(nextRate, nextAmount)}`,
+        nextReason ? `근거: ${nextReason}` : "",
+        room,
+        who,
+      ].filter(Boolean).join(" · "),
+      details: {
+        before: { rate: current.discountRatePct ?? 0, amount: prevAmount, reason: prevReason },
+        after: { rate: nextRate, amount: nextAmount, reason: nextReason },
       },
     });
   }
@@ -107,6 +173,17 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
     mode: discountMode,
   });
 
+  const backUrlB = `/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(categoryOf(current))}`;
+  const nextAmountB = isGallery ? 0 : normalized.discountAmountKRW;
+  const nextReasonB = isGallery ? "" : discountReason;
+  if (nextAmountB > 0 && !nextReasonB) redirect(`${backUrlB}&formError=discountReason`);
+
+  const src =
+    latest.find((r) => (r.discountAmountKRW ?? 0) > 0 || String(r.discountReason ?? "").trim() !== "") ?? latest[0];
+  const prevAmountB = Number(src?.discountAmountKRW ?? 0);
+  const prevReasonB = String(src?.discountReason ?? "");
+  const prevMemoB = String(latest[0]?.adminMemo ?? "");
+
   await Promise.all(
     latest.map((s, i) =>
       db.updateRequestStatus({
@@ -125,6 +202,33 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
       })
     )
   );
+
+  const discountChangedB = prevAmountB !== nextAmountB || prevReasonB !== nextReasonB;
+  const memoChangedB = !!bundleMemo && bundleMemo !== prevMemoB;
+  if (discountChangedB || memoChangedB) {
+    await recordAudit({
+      action: discountChangedB ? "DISCOUNT_UPDATE" : "BUNDLE_META_UPDATE",
+      ip: getIpFromHeaders(),
+      actor: getDefaultDecidedBy(),
+      target: current.batchId ?? current.requestId,
+      summary: [
+        `묶음 ${latest.length}회`,
+        current.roomName || current.roomId,
+        current.orgName || current.applicantName,
+        `정가 합계 ${baseTotalFeeKRW.toLocaleString()}원`,
+        discountChangedB
+          ? `할인 ${fmtDiscount(src?.discountRatePct, prevAmountB)} → ${fmtDiscount(normalized.discountRatePct, nextAmountB)}`
+          : "",
+        discountChangedB && nextReasonB ? `근거: ${nextReasonB}` : "",
+        memoChangedB ? "메모 변경" : "",
+      ].filter(Boolean).join(" · "),
+      details: {
+        batchId: current.batchId,
+        before: { amount: prevAmountB, reason: prevReasonB, memo: prevMemoB },
+        after: { rate: normalized.discountRatePct, amount: nextAmountB, reason: nextReasonB, memo: bundleMemo },
+      },
+    });
+  }
 
   const catB = categoryOf(current);
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catB)}&saved=1`);
@@ -152,6 +256,9 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
   const latest = sortSessions(await db.getRequestsByBatchId(current.batchId));
 
   const catS = categoryOf(current);
+  if (actionStatus === "반려" && !rejectReason) {
+    redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&formError=rejectReason`);
+  }
   const effectiveSelected = selectAll ? latest.map((s) => s.requestId) : selectedIds;
   if (effectiveSelected.length === 0) redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
 
@@ -172,10 +279,19 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     })
   );
 
-  auditLog({
+  const selectedDates = latest.filter((s) => effectiveSelected.includes(s.requestId)).map((s) => s.date);
+  await recordAudit({
     action: actionStatus === "승인" ? "REQUEST_APPROVE" : "REQUEST_REJECT",
     ip: getIpFromHeaders(),
+    actor: getDefaultDecidedBy(),
     target: current.batchId ?? current.requestId,
+    summary: [
+      `묶음 ${effectiveSelected.length}/${latest.length}회 ${actionStatus}`,
+      current.roomName || current.roomId,
+      current.orgName || current.applicantName,
+      selectedDates.join(", "),
+      actionStatus === "반려" ? `사유: ${rejectReason}` : "",
+    ].filter(Boolean).join(" · "),
     details: {
       decidedAt: nowIsoSeoul(),
       batchId: current.batchId,
@@ -199,8 +315,9 @@ export async function sendConfirmedEmailAction(requestId: string, formData: Form
 
   await sendCustomDecisionEmail(to, subject, body);
 
-  auditLog({
+  await recordAudit({
     action: "EMAIL_SEND",
+    actor: getDefaultDecidedBy(),
     ip: getIpFromHeaders(),
     target: requestId,
     details: { to, subject },
