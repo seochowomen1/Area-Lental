@@ -45,7 +45,7 @@ export default async function AdminHomePage() {
       )}
 
       <div className="rounded-xl bg-white p-5 shadow">
-        <h1 className="text-lg font-semibold text-gray-900">공간별 대관신청 관리</h1>
+        <h1 className="text-lg font-semibold text-gray-900">공간별 대관 · 전시 신청 관리</h1>
         <p className="mt-1 text-sm text-gray-600">
           공간을 선택하여 신청 현황을 목록 또는 캘린더로 확인하세요.
         </p>
@@ -57,6 +57,7 @@ export default async function AdminHomePage() {
           description={`강의실 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회`}
           icon={<IconLecture />}
           href="/admin/requests?category=lecture"
+          badgeLabel="대관"
           ctaLabel="조회하기"
           pendingCount={lecturePending}
           accentColor="blue"
@@ -67,6 +68,7 @@ export default async function AdminHomePage() {
           description={`E-스튜디오 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회`}
           icon={<IconStudio />}
           href="/admin/requests?category=studio"
+          badgeLabel="대관"
           ctaLabel="조회하기"
           pendingCount={studioPending}
           accentColor="violet"
@@ -77,6 +79,7 @@ export default async function AdminHomePage() {
           description={`갤러리 전시신청 현황(접수/승인/취소)\n목록 및 캘린더 조회`}
           icon={<IconGallery />}
           href="/admin/requests?category=gallery"
+          badgeLabel="전시"
           ctaLabel="조회하기"
           pendingCount={galleryPending}
           accentColor="emerald"
