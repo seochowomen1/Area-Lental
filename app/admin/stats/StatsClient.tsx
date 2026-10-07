@@ -41,6 +41,8 @@ function formatCount(v: number): string {
 export default function StatsClient() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
+  const [revFrom, setRevFrom] = useState("");
+  const [revTo, setRevTo] = useState("");
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -87,6 +89,50 @@ export default function StatsClient() {
               <option key={y} value={y}>{y}년</option>
             ))}
           </select>
+        </div>
+      </div>
+
+      {/* 수입 내역 엑셀 (행정사무감사 자료 양식) */}
+      <div className="mb-6 rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <p className="text-sm font-bold text-slate-900">수입 내역 엑셀 (감사 자료 양식)</p>
+            <p className="mt-0.5 text-xs text-slate-500">
+              승인 건 기준 · 연도·대관일자·대관처·장소·금액 · 대관과 전시(갤러리) 시트 분리 · 월별 합계 포함
+            </p>
+          </div>
+          <div className="ml-auto flex flex-wrap items-end gap-2">
+            <label className="text-xs text-slate-600">
+              시작
+              <input
+                type="date"
+                value={revFrom || `${year}-01-01`}
+                onChange={(e) => setRevFrom(e.target.value)}
+                className="ml-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <label className="text-xs text-slate-600">
+              종료
+              <input
+                type="date"
+                value={revTo || `${year}-12-31`}
+                onChange={(e) => setRevTo(e.target.value)}
+                className="ml-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
+              />
+            </label>
+            <a
+              href={`/api/admin/export/revenue?from=${revFrom || `${year}-01-01`}&to=${revTo || `${year}-12-31`}`}
+              className="rounded-lg bg-[rgb(var(--brand-primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-95"
+            >
+              엑셀 받기
+            </a>
+            <a
+              href={`/api/admin/export/revenue?from=${revFrom || `${year}-01-01`}&to=${revTo || `${year}-12-31`}&mask=true`}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            >
+              대관처 가림본
+            </a>
+          </div>
         </div>
       </div>
 
