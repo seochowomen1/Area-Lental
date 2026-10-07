@@ -1054,6 +1054,7 @@ export default function ApplyGalleryClient() {
         </form>
 
         <PrivacyModal
+          variant="gallery"
           open={privacyOpen}
           onClose={() => setPrivacyOpen(false)}
           onAgree={() => {

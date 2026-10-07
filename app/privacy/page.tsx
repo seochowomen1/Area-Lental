@@ -24,9 +24,9 @@ export default function PrivacyPolicyPage() {
           <Section number={1} title="개인정보의 처리 목적">
             <p>센터는 다음 목적을 위해 개인정보를 처리합니다. 처리한 개인정보는 해당 목적 이외의 용도로 이용하지 않으며, 목적이 변경되는 경우 별도의 동의를 받는 등 필요한 조치를 이행합니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
-              <li>시설 대관 신청접수 및 처리</li>
+              <li>시설 대관·갤러리 전시 신청접수 및 처리</li>
               <li>신청자 본인 확인 및 의사소통 경로 확보</li>
-              <li>대관료 안내 및 결제 관련 연락</li>
+              <li>대관료·이용료 안내 및 결제 관련 연락</li>
               <li>시설 이용 관련 통계 작성(개인을 식별할 수 없는 형태)</li>
             </ul>
           </Section>
@@ -62,7 +62,7 @@ export default function PrivacyPolicyPage() {
             <p>센터는 개인정보 수집·이용 목적이 달성된 후에는 해당 정보를 지체 없이 파기합니다. 단, 다음 기준에 따라 보유합니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li><strong>보유 기간:</strong> 수집일로부터 <strong>3년</strong></li>
-              <li><strong>근거:</strong> 시설 대관 신청업무 처리 및 의사소통 경로 확보</li>
+              <li><strong>근거:</strong> 시설 대관·갤러리 전시 신청업무 처리 및 의사소통 경로 확보</li>
               <li>보유 기간 경과 또는 처리 목적 달성 시 지체 없이 파기</li>
             </ul>
           </Section>
@@ -94,7 +94,7 @@ export default function PrivacyPolicyPage() {
               <li>처리정지 요구</li>
             </ul>
             <p className="mt-2">위 권리 행사는 서면, 전화(070-7163-2953), 이메일(seochowomen1@naver.com)을 통해 하실 수 있으며, 센터는 이에 대해 지체 없이 조치하겠습니다.</p>
-            <p className="mt-1">진행 중인 대관 신청(접수·승인 상태)의 개인정보 삭제를 요청하시는 경우, 해당 신청이 취소 처리된 후 삭제됩니다.</p>
+            <p className="mt-1">진행 중인 대관·전시 신청(접수·승인 상태)의 개인정보 삭제를 요청하시는 경우, 해당 신청이 취소 처리된 후 삭제됩니다.</p>
           </Section>
 
           {/* 제7조 */}

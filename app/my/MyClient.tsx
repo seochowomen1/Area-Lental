@@ -268,7 +268,7 @@ export default function MyClient({ token: urlToken, initialEmail = "", initialBi
                       <thead>
                         <tr className="border-b border-slate-200 bg-slate-50 text-left text-xs font-semibold text-slate-600">
                           <th className="px-4 py-3">공간</th>
-                          <th className="px-4 py-3">{allRows.every((r) => r.roomId === "gallery") ? "전시 기간" : "대관 일시"}</th>
+                          <th className="px-4 py-3">{allRows.every((r) => r.roomId === "gallery") ? "전시 기간" : allRows.some((r) => r.roomId === "gallery") ? "이용 일시" : "대관 일시"}</th>
                           <th className="px-4 py-3">신청 일시</th>
                           <th className="px-4 py-3 text-center">상태</th>
                           <th className="px-4 py-3 text-right">금액</th>

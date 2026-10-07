@@ -522,7 +522,7 @@ function badgeVariant(text: string): "success" | "warning" | "danger" | "neutral
   const t = (text || "").trim();
   if (t.includes("반려")) return "danger";
   if (t.includes("취소") || t.includes("부분")) return "warning";
-  if (t.includes("미결제")) return "success";
+  if (t.includes("결제")) return "neutral";
   if (t.includes("승인") || t.includes("신청")) return "success";
   return "neutral";
 }

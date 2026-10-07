@@ -671,7 +671,7 @@ export default function CalendarClient({
                     } else {
                       // block
                       if (it.roomId === "gallery") {
-                        label = `내부대관`;
+                        label = "내부 전시";
                       } else {
                         label = `${it.startTime} ${it.title}`;
                       }
@@ -761,7 +761,7 @@ export default function CalendarClient({
                 detailMain = `${it.startTime}-${it.endTime} ${it.title}`;
               } else {
                 if (it.roomId === "gallery") {
-                  detailMain = `내부대관`;
+                  detailMain = "내부 전시";
                   detailSub = it.reason ?? "";
                 } else {
                   detailMain = `${it.startTime}-${it.endTime} ${it.title}`;

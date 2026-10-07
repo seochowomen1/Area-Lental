@@ -161,10 +161,10 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">신청 및 승인 절차</h4>
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>전시 신청서 양식을 통해 전시 목적, 장르, 내용 등을 작성하여 이메일 또는 센터 방문 접수</li>
-            <li>센터는 3일 이내에 검토 후 승인/반려 결과를 안내합니다.</li>
-            <li>이용료 결제 시 신청 접수 완료 (동일 날짜 신청자 중복 발생 시 결제 완료 우선)</li>
-            <li>센터 방문하여 현장답사 및 미팅 후 전시 신청서 제출 가능 (필요시 신청 당일 이용료 결제까지 가능)</li>
+            <li>이 화면에서 전시 기간을 선택하고 전시 신청서(전시 목적, 장르, 내용 등)를 온라인으로 작성합니다.</li>
+            <li>같은 기간은 먼저 신청한 분이 우선이며, 이미 신청된 날짜는 달력에서 선택할 수 없습니다.</li>
+            <li>센터는 3일 이내에 검토 후 승인/반려 결과를 이메일로 안내합니다.</li>
+            <li>승인 후 센터 방문(현장 결제)으로 이용료를 결제하면 전시가 확정됩니다. 현장답사·상담도 함께 가능합니다.</li>
           </ol>
         </div>
 

@@ -36,7 +36,8 @@ function approvalLabel(status: string, decidedBy?: string) {
 }
 
 function paymentLabel(status: string) {
-  return status === "승인" ? "결제대기" : "미결제";
+  // 결제는 센터 현장 또는 내부 프로그램으로 처리(앱에서 결제 여부를 기록하지 않음)
+  return status === "승인" ? "센터 방문 결제" : "-";
 }
 
 function reservationLabel(status: string, decidedBy?: string) {

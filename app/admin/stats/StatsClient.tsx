@@ -230,8 +230,8 @@ export default function StatsClient() {
 
           <div className="rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500 space-y-1">
             <p><span className="font-semibold text-slate-700">실인원</span>: 해당 월 승인 완료된 개별 신청자 수 (이메일 기준 중복 제거)</p>
-            <p><span className="font-semibold text-slate-700">연인원</span>: 해당 월 총 대관 일수 (회차 수)</p>
-            <p><span className="font-semibold text-slate-700">수입</span>: 해당 월 총 대관료 (승인 건 기준, 할인 적용 후)</p>
+            <p><span className="font-semibold text-slate-700">연인원</span>: 해당 월 총 대관(전시) 일수 (회차 수)</p>
+            <p><span className="font-semibold text-slate-700">수입</span>: 해당 월 총 대관료(갤러리는 이용료) (승인 건 기준, 할인 적용 후)</p>
             <p><span className="font-semibold text-indigo-700">강의실+E-스튜디오</span>: 강의실과 E-스튜디오의 합산 실적 (실인원은 이메일 기준 중복 제거)</p>
           </div>
         </div>

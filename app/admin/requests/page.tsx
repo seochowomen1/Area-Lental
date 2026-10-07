@@ -289,10 +289,10 @@ export default async function AdminRequestsPage({
       <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 shadow-sm`}>
         <div className="flex items-center gap-3">
           <span className={`inline-flex h-3 w-3 rounded-full ${accent.dot}`} />
-          <h1 className={`text-lg font-bold ${accent.text}`}>{roomLabel} 대관 신청 목록</h1>
+          <h1 className={`text-lg font-bold ${accent.text}`}>{roomLabel} {isGalleryCategory ? "전시 신청" : "대관 신청"} 목록</h1>
         </div>
         <p className="mt-1 ml-6 text-sm text-gray-600">
-          {roomLabel} 대관 신청 현황을 조회하고 관리합니다.
+          {roomLabel} {isGalleryCategory ? "전시 신청" : "대관 신청"} 현황을 조회하고 관리합니다.
         </p>
       </div>
 

@@ -6,9 +6,16 @@ import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-export const metadata = {
-  title: "대관신청",
-};
+export function generateMetadata({
+  searchParams,
+}: {
+  searchParams?: { category?: string };
+}) {
+  const category = normalizeRoomCategory(searchParams?.category);
+  return {
+    title: category === "gallery" ? "전시 신청" : "대관신청",
+  };
+}
 
 export default function SpaceListPage({
   searchParams,
@@ -26,7 +33,7 @@ export default function SpaceListPage({
 
   return (
     <div>
-      <SiteHeader title={`${getCategoryLabel(category)} 대관신청`} />
+      <SiteHeader title={`${getCategoryLabel(category)} ${isGallery ? "전시 신청" : "대관신청"}`} />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
 

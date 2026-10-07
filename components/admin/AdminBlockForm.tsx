@@ -138,7 +138,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
           endDate,
           startTime: "09:00",
           endTime: "18:00",
-          reason: reason || "내부 대관"
+          reason: reason || "내부 전시"
         });
 
         if (resetAfterSuccess) {
@@ -229,12 +229,12 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
         <div className={rooms.length > 1 ? "md:col-span-3" : "md:col-span-4"}>
           <FieldLabel>사유</FieldLabel>
           <Input name="reason" placeholder="예: 내부 강좌 / 전시 준비" />
-          <FieldHelp>내부(강사·수강생) 대관 일정 등</FieldHelp>
+          <FieldHelp>{isGallery ? "내부(강사·수강생) 전시 일정 등" : "내부(강사·수강생) 사용 일정 등"}</FieldHelp>
         </div>
 
         <div className="md:col-span-12">
           <Button type="submit" disabled={!canSubmit || isSubmitting} className="w-full">
-            {isSubmitting ? "등록 중..." : "내부 대관 일정 추가"}
+            {isSubmitting ? "등록 중..." : isGallery ? "내부 전시 일정 추가" : "내부 사용 일정 추가"}
           </Button>
         </div>
       </form>

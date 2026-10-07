@@ -14,9 +14,16 @@ export default function SpaceDetailPage({
   const room = ROOMS_BY_ID[params.roomId];
   if (!room) return notFound();
 
+  const category = normalizeRoomCategory(room.category);
+  const isGallery = category === "gallery";
+
   return (
     <div>
-      <SiteHeader title={`${getCategoryLabel(normalizeRoomCategory(room.category))} 대관신청`} backHref="/space" backLabel="목록" />
+      <SiteHeader
+        title={`${getCategoryLabel(category)} ${isGallery ? "전시 신청" : "대관신청"}`}
+        backHref={isGallery ? "/space?category=gallery" : "/space"}
+        backLabel="목록"
+      />
 
       <SpaceDetailShell room={room} />
     </div>

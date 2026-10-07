@@ -9,10 +9,13 @@ type PrivacyModalProps = {
   onClose: () => void;
   onAgree: () => void;
   onDisagree: () => void;
+  /** rental: 강의실·E-스튜디오 대관(기본) / gallery: 우리동네 갤러리 전시 신청 */
+  variant?: "rental" | "gallery";
 };
 
-export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: PrivacyModalProps) {
+export default function PrivacyModal({ open, onClose, onAgree, onDisagree, variant = "rental" }: PrivacyModalProps) {
   const focusTrapRef = useFocusTrap(open);
+  const isGallery = variant === "gallery";
 
   useEffect(() => {
     if (!open) return;
@@ -76,24 +79,29 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree }: Pri
             <tbody>
               <tr>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  시설 대관 신청업무 처리 및<br />의사소통 경로 확보
+                  {isGallery ? "갤러리 전시 신청업무 처리 및" : "시설 대관 신청업무 처리 및"}<br />의사소통 경로 확보
                 </td>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  성명(대표자 성명), 생년월일, 연락처,<br />E-mail, 주소, 단체명, 인원 수,<br />사용 목적, 서약자 성명
+                  성명(대표자 성명), 생년월일, 연락처,<br />E-mail, 주소, 단체명, 인원 수,<br />
+                  {isGallery ? (
+                    <>사용 목적, 전시명, 전시 목적,<br />장르·내용, 서약자 성명</>
+                  ) : (
+                    <>사용 목적, 서약자 성명</>
+                  )}
                 </td>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  수집일로부터 3년 및 대관목적<br />달성 시 지체없이 해당정보 파기
+                  수집일로부터 3년 및 {isGallery ? "전시 목적" : "대관목적"}<br />달성 시 지체없이 해당정보 파기
                 </td>
               </tr>
             </tbody>
           </table>
 
           <p className="mt-3 text-xs text-slate-600 leading-relaxed">
-            ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 대관 신청·진행에 일부 제한이 있습니다.
+            ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 {isGallery ? "전시 신청·진행" : "대관 신청·진행"}에 일부 제한이 있습니다.
           </p>
 
           <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            본 동의는 시설물 대관신청을 위한 필수 사항입니다.
+            {isGallery ? "본 동의는 전시 신청을 위한 필수 사항입니다." : "본 동의는 시설물 대관신청을 위한 필수 사항입니다."}
           </div>
         </div>
 

@@ -9,6 +9,7 @@ import Notice from "@/components/ui/Notice";
 import { BUTTON_BASE, BUTTON_VARIANT } from "@/components/ui/presets";
 
 function RoomCard({ room }: { room: SpaceRoom }) {
+  const isGallery = room.category === "gallery";
   return (
     <Link
       href={`/space/${room.id}`}
@@ -34,7 +35,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
         )}
 
         <span className="absolute left-3 top-3 rounded-full bg-[rgb(var(--brand-primary))] px-3 py-1 text-xs font-semibold text-white shadow">
-          대관신청 필수
+          {isGallery ? "전시 신청 필수" : "대관신청 필수"}
         </span>
       </div>
 
@@ -47,16 +48,16 @@ function RoomCard({ room }: { room: SpaceRoom }) {
           </div>
           <div className="flex items-center justify-between">
             <span>이용시간</span>
-            {room.category === "gallery" ? (
+            {isGallery ? (
               <span className="font-medium text-slate-900">최소 1일</span>
             ) : (
               <span className="font-medium text-slate-900">최소 1시간</span>
             )}
           </div>
           <div className="flex items-center justify-between">
-            <span>대관료</span>
+            <span>{isGallery ? "이용료" : "대관료"}</span>
             <span className="font-medium text-slate-900">
-              {room.category === "gallery" ? "평일 20,000원/일 · 토 10,000원/일" : room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}
+              {isGallery ? "평일 20,000원/일 · 토 10,000원/일" : room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}
             </span>
           </div>
           <div className="flex items-center justify-between">

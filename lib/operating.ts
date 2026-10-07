@@ -209,7 +209,7 @@ export function operatingNoticeLines(roomId?: string): Array<{ label: string; te
     return [
       { label: "평일", text: "9:00 ~ 18:00" },
       { label: "화요일", text: "9:00 ~ 20:00" },
-      { label: "주말", text: "토 9:00 ~ 13:00 (일요일 휴관)" }
+      { label: "주말", text: "토 9:00 ~ 13:00 (일요일·공휴일 휴관)" }
     ];
   }
 

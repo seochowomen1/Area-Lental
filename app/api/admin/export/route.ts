@@ -145,7 +145,7 @@ export async function GET(req: Request) {
     status: 200,
     headers: {
       "content-type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "content-disposition": 'attachment; filename="rental_requests.xlsx"'
+      "content-disposition": `attachment; filename="rental_requests.xlsx"; filename*=UTF-8''${encodeURIComponent("신청목록.xlsx")}`
     }
   });
   } catch (e: unknown) {

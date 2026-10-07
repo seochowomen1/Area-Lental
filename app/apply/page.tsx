@@ -13,7 +13,7 @@ import ApplyClient from "./ApplyClient";
 import ApplyGalleryClient from "./ApplyGalleryClient";
 
 export const metadata: Metadata = {
-  title: "대관 신청서 작성",
+  title: "신청서 작성",
 };
 
 export const dynamic = "force-dynamic";

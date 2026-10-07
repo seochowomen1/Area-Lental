@@ -45,7 +45,7 @@ export default async function AdminSettingsPage({
         </div>
         <p className="mt-1 ml-6 text-sm text-gray-600">
           {category === "gallery"
-            ? "내부 대관 일정을 관리합니다. 등록된 기간에는 외부 대관 신청이 불가능합니다."
+            ? "내부 전시 일정을 관리합니다. 등록된 기간에는 외부 전시 신청이 불가능합니다."
             : "정규 수업시간 및 내부 대관 일정을 관리합니다. 등록된 시간/기간에는 대관 신청이 불가능합니다."}
         </p>
       </div>
@@ -54,7 +54,7 @@ export default async function AdminSettingsPage({
         <ul className="list-disc pl-5 space-y-1">
           {category === "gallery" ? (
             <>
-              <li><b>내부 대관 일정</b>: 내부(강사·수강생) 대관 일정을 등록하면 해당 기간 동안 외부 대관 신청이 차단됩니다.</li>
+              <li><b>내부 전시 일정</b>: 내부(강사·수강생) 전시 일정을 등록하면 해당 기간 동안 외부 전시 신청이 차단됩니다.</li>
               <li><b>차단 방식</b>: 일 단위(시작일~종료일)로 등록되며, 등록된 기간의 전체 운영시간이 차단됩니다.</li>
               <li><b>겹침 방지</b>: 등록 기간이 기존 일정과 겹치는 경우 저장되지 않으며, 화면에 안내가 표시됩니다.</li>
               <li><b>메일 템플릿</b>: 하단에서 접수/승인/반려/취소 시 발송되는 메일 내용을 수정할 수 있습니다 (모든 공간 공통).</li>

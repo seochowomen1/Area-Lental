@@ -4,8 +4,8 @@ import type { ReactNode } from "react";
 
 export const metadata: Metadata = {
   title: {
-    default: "서초여성가족플라자 대관 신청",
-    template: "%s | 서초여성가족플라자 대관",
+    default: "서초여성가족플라자 대관·전시 신청",
+    template: "%s | 서초여성가족플라자 대관·전시",
   },
   description: "서초여성가족플라자 서초센터 강의실·E-스튜디오 대관 및 우리동네 갤러리 전시 신청",
 };

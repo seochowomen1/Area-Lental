@@ -314,7 +314,7 @@ export async function GET(req: Request) {
           date: dt,
           startTime: b.startTime,
           endTime: b.endTime,
-          title: b.endDate ? "내부 대관" : "차단시간",
+          title: b.endDate ? (b.roomId === "gallery" ? "내부 전시" : "내부 사용") : "차단시간",
           reason: b.reason
         });
       }

@@ -354,7 +354,7 @@ export default async function AdminRequestDetail({
         </div>
       </div>
 
-      {/* ═══ 3. 신청자 + 대관 정보 (2열) ═══ */}
+      {/* ═══ 3. 신청자 + 대관(전시) 정보 (2열) ═══ */}
       <div className="grid gap-5 lg:grid-cols-2">
         {/* 신청자 정보 */}
         <Section title="신청자 정보">
@@ -367,8 +367,8 @@ export default async function AdminRequestDetail({
           </dl>
         </Section>
 
-        {/* 대관 정보 */}
-        <Section title="대관 정보">
+        {/* 대관(전시) 정보 */}
+        <Section title={isGallery ? "전시 정보" : "대관 정보"}>
           <dl>
             <InfoRow label="공간">{req.roomName}</InfoRow>
 
@@ -523,7 +523,7 @@ export default async function AdminRequestDetail({
           {isBatch ? (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">대관료 합계(전체 {sessions.length}회)</span>
+                <span className="text-gray-600">{isGallery ? "이용료" : "대관료"} 합계(전체 {sessions.length}회)</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeAll!.rentalFeeKRW)}</span>
               </div>
               {feeAll!.equipmentFeeKRW > 0 && (
@@ -548,7 +548,7 @@ export default async function AdminRequestDetail({
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">대관료</span>
+                <span className="text-gray-600">{isGallery ? "이용료" : "대관료"}</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeBasis.rentalFeeKRW)}</span>
               </div>
               {feeBasis.equipmentFeeKRW > 0 && (
