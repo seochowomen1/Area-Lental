@@ -12,6 +12,7 @@ import { maskName, maskPhone, maskAddress } from "@/lib/mask";
 import { auditLog } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 import { normalizeEmail } from "@/lib/apiResponse";
+import { todayYmdSeoul } from "@/lib/datetime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -128,7 +129,12 @@ export async function POST(req: Request) {
   // 사용자 취소 가능 여부
   // - 이미 취소된 건이 포함되면 불가
   // - 묶음이면 전체 기준으로 판단
-  const cancelable = !["취소", "반려"].includes(overallStatus) && sessions.every((s) => s.status !== "취소" && s.status !== "반려");
+  // 승인된 예약·지난 예약은 온라인 취소 불가(센터 문의) — cancel API와 동일 기준
+  const lastSessionDate = sessions.map((s) => s.endDate || s.date).sort().pop() ?? "";
+  const cancelable =
+    !["취소", "반려"].includes(overallStatus) &&
+    sessions.every((s) => s.status !== "취소" && s.status !== "반려" && s.status !== "승인") &&
+    !(lastSessionDate && lastSessionDate < todayYmdSeoul());
 
   auditLog({
     action: "PI_ACCESS",

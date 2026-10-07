@@ -515,22 +515,24 @@ export async function appendRequestsBatch(
 
   const { sheets } = getGoogleClient();
 
-  // prefix 기준으로 한 번만 조회하여 연속 ID를 생성합니다.
+  // ★ 묶음 회차 ID도 단건과 같은 랜덤 접미사 방식 (진단 렌즈4-1 — 동시 접수 시 '최댓값+1' 중복 방지)
+  const { randomBytes } = await import("crypto");
   const prefix = `REQ-${todayYmdSeoul().replaceAll("-", "")}-`;
   const all = await getAllRequests();
-  const nums = all
-    .map(r => r.requestId)
-    .filter(v => v.startsWith(prefix))
-    .map(v => parseInt(v.slice(prefix.length), 10))
-    .filter(n => Number.isFinite(n));
-  let next = (nums.length ? Math.max(...nums) : 0) + 1;
+  const usedIds = new Set(all.map(r => r.requestId));
+  const newId = () => {
+    let c: string;
+    do { c = `${prefix}${randomBytes(4).toString("hex").toUpperCase()}`; } while (usedIds.has(c));
+    usedIds.add(c);
+    return c;
+  };
 
   const createdAt = nowIsoSeoul();
   const saved: RentalRequest[] = [];
   const values: string[][] = [];
 
   for (const input of inputs) {
-    const requestId = `${prefix}${String(next++).padStart(4, "0")}`;
+    const requestId = newId();
 
     const record: RentalRequest = {
       requestId,
@@ -610,6 +612,31 @@ export async function appendRequestsBatch(
   return saved;
 }
 
+/**
+ * requests 시트 원본을 읽어 requestId → 실제 행 번호(1-based)와 헤더명 → 열 인덱스(0-based)를 만든다.
+ * 빈 행·정렬 변경이 있어도 정확한 행에 쓰기 위한 매핑.
+ */
+async function locateRequestRows(): Promise<{ rowOf: Map<string, number>; col: Map<string, number> }> {
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_REQUESTS}!A:ZZ`
+  });
+  const rows = (res.data.values ?? []) as string[][];
+  const header = (rows[0] ?? []).map((v) => String(v ?? "").trim());
+  const col = new Map<string, number>();
+  header.forEach((h, i) => { if (h && !col.has(h)) col.set(h, i); });
+  const idCol = col.get("requestId");
+  if (idCol === undefined) throw new Error("requests 시트에 'requestId' 헤더가 없습니다.");
+  const rowOf = new Map<string, number>();
+  for (let i = 1; i < rows.length; i++) {
+    const id = String(rows[i]?.[idCol] ?? "").trim();
+    if (id && !rowOf.has(id)) rowOf.set(id, i + 1);
+  }
+  return { rowOf, col };
+}
+
 export async function updateRequestStatus(args: {
   requestId: string;
   status: RequestStatus;
@@ -629,27 +656,38 @@ export async function updateRequestStatus(args: {
 
   const { sheets } = getGoogleClient();
   const all = await getAllRequests();
-  const idx0 = all.findIndex(r => r.requestId === args.requestId);
-  if (idx0 < 0) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  const current = all.find(r => r.requestId === args.requestId);
+  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
 
-  const rowNumber = idx0 + 2; // header + 1
+  // ★ 행 번호는 '필터링된 배열 인덱스'가 아니라 시트 원본에서 실측한다 (2026-10-07 진단 #1)
+  //   빈 행이 끼어 있으면 인덱스+2 방식은 다른 신청자 행에 덮어쓴다.
+  const loc = await locateRequestRows();
+  const rowNumber = loc.rowOf.get(args.requestId);
+  if (!rowNumber) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
 
   const status = args.status;
-
-  const current = all[idx0];
   const statusChanged = current.status !== status;
   const decidedAt = statusChanged ? nowIsoSeoul() : (current.decidedAt || "");
   const decidedBy = statusChanged ? args.decidedBy : (current.decidedBy || "");
 
-  // X..AB (status, adminMemo, rejectReason, decidedAt, decidedBy)
-  const range = `${SHEET_REQUESTS}!X${rowNumber}:AB${rowNumber}`;
-  const values = [[status, args.adminMemo ?? "", args.rejectReason ?? "", decidedAt, decidedBy]];
+  // 상태·메모·사유·처리일·처리자: 헤더 이름으로 열을 찾아 갱신 (고정 X..AB 금지)
+  const statusCells: Array<[string, string]> = [
+    ["status", status],
+    ["adminMemo", args.adminMemo ?? ""],
+    ["rejectReason", args.rejectReason ?? ""],
+    ["decidedAt", decidedAt],
+    ["decidedBy", decidedBy],
+  ];
+  const statusData = statusCells.map(([name, value]) => {
+    const ci = loc.col.get(name);
+    if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
+    const letter = colToLetter(ci + 1);
+    return { range: `${SHEET_REQUESTS}!${letter}${rowNumber}:${letter}${rowNumber}`, values: [[value]] };
+  });
 
-  await sheets.spreadsheets.values.update({
+  await sheets.spreadsheets.values.batchUpdate({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range,
-    valueInputOption: "RAW",
-    requestBody: { values }
+    requestBody: { valueInputOption: "RAW", data: statusData }
   });
 
   // discount columns (있을 경우에만 업데이트)
@@ -660,14 +698,7 @@ export async function updateRequestStatus(args: {
     typeof args.discountReason === "string";
 
   if (shouldUpdateDiscount) {
-    // 헤더를 다시 읽어 컬럼 위치를 찾습니다.
-    const headerRes = await sheets.spreadsheets.values.get({
-      spreadsheetId: env.GOOGLE_SHEET_ID,
-      range: `${SHEET_REQUESTS}!1:1`
-    });
-    const header = ((headerRes.data.values?.[0] ?? []) as string[]).map((v) => String(v).trim());
-    const m = new Map<string, number>();
-    header.forEach((h, i) => m.set(h, i));
+    const m = loc.col;
 
     const idxRate0 = m.get("discountRatePct");
     const idxAmt0 = m.get("discountAmountKRW");
@@ -677,10 +708,15 @@ export async function updateRequestStatus(args: {
     const colAmt = idxAmt0 === undefined ? null : colToLetter(idxAmt0 + 1);
     const colReason = idxReason0 === undefined ? null : colToLetter(idxReason0 + 1);
 
-    // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정
-    const target = all[idx0];
+    // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정 (행 번호는 실측 매핑 사용)
+    const target = current;
     const batchId = (target.batchId ?? "").trim();
-    const rowNumbers = batchId ? all.map((r, i) => ((r.batchId ?? "").trim() === batchId ? i + 2 : 0)).filter(Boolean) : [rowNumber];
+    const rowNumbers = batchId
+      ? all
+          .filter((r) => (r.batchId ?? "").trim() === batchId)
+          .map((r) => loc.rowOf.get(r.requestId) ?? 0)
+          .filter((n) => n > 0)
+      : [rowNumber];
 
     const rateVal = typeof args.discountRatePct === "number" ? args.discountRatePct : (target.discountRatePct ?? 0);
     const amtVal = typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (target.discountAmountKRW ?? 0);

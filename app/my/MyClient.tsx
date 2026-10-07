@@ -37,8 +37,10 @@ type MyListGroup = {
 function fmtCreatedAt(iso: string): string {
   if (!iso) return "-";
   try {
-    const dt = new Date(iso);
-    const kst = new Date(dt.getTime() + 9 * 60 * 60 * 1000);
+    // createdAt은 nowIsoSeoul()이 이미 KST 시각으로 저장한다 → 시차를 다시 더하지 않는다 (진단 #4)
+    const m0 = String(iso).match(/^(d{4})-(d{2})-(d{2})[T ](d{2}):(d{2})/);
+    if (m0) return `${m0[1]}.${m0[2]}.${m0[3]} ${m0[4]}:${m0[5]}`;
+    const kst = new Date(iso);
     const y = kst.getUTCFullYear();
     const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
     const d = String(kst.getUTCDate()).padStart(2, "0");

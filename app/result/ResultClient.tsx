@@ -416,6 +416,11 @@ export default function ResultClient() {
                                 {cancelLoading ? "처리 중" : "예약취소"}
                               </Button>
                             </div>
+                            {!data.cancelable && data.status === "승인" && (
+                              <p className="mt-2 text-xs text-slate-500">
+                                승인된 예약은 환불 규정에 따라 처리되므로 온라인으로 취소할 수 없습니다. 센터(070-7163-2953)로 연락해 주세요.
+                              </p>
+                            )}
                           </td>
                         </tr>
                       )}

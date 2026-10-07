@@ -175,6 +175,18 @@ export async function GET(req: Request) {
     );
   }
 
+  // ★ 갤러리 운영창(공휴일 제외) 계산보다 먼저 공휴일을 로딩 (진단 #5)
+  {
+    const fy = parseInt(from.slice(0, 4), 10), fm = parseInt(from.slice(5, 7), 10);
+    const ty = parseInt(to.slice(0, 4), 10), tm = parseInt(to.slice(5, 7), 10);
+    const loads: Promise<unknown>[] = [];
+    for (let y = fy, mo = fm; y < ty || (y === ty && mo <= tm); mo++) {
+      if (mo > 12) { mo = 1; y++; if (y > ty || (y === ty && mo > tm)) break; }
+      loads.push(ensureHolidaysLoaded(y, mo));
+    }
+    await Promise.all(loads);
+  }
+
   const db = getDatabase();
   const [requests, blocks, schedules] = await Promise.all([
     db.getAllRequests(),

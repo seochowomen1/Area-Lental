@@ -4,6 +4,7 @@ import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { normalizeEmail, handleApiError } from "@/lib/apiResponse";
 import { recordAudit } from "@/lib/auditLog";
+import { todayYmdSeoul } from "@/lib/datetime";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,6 +69,22 @@ export async function POST(req: Request) {
   // 이미 전부 취소인 경우는 멱등 처리
   if (group.every((r) => r.status === "취소")) {
     return NextResponse.json({ ok: true, message: "이미 취소된 신청입니다." });
+  }
+
+  // ★ 승인(결제 안내)된 예약·이미 지난 예약은 온라인 취소 불가 → 환불 규정 적용을 위해 센터로 안내 (진단 렌즈4-3)
+  if (group.some((r) => r.status === "승인")) {
+    return NextResponse.json(
+      {
+        ok: false,
+        message: "승인된 예약은 온라인으로 취소할 수 없습니다. 환불 규정에 따라 처리해야 하므로 센터(070-7163-2953)로 연락해 주세요.",
+      },
+      { status: 409 },
+    );
+  }
+  const today = todayYmdSeoul();
+  const lastDate = group.map((r) => r.endDate || r.date).sort().pop() ?? "";
+  if (lastDate && lastDate < today) {
+    return NextResponse.json({ ok: false, message: "이미 지난 예약은 취소할 수 없습니다." }, { status: 409 });
   }
 
   for (const r of group) {

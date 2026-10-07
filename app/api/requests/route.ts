@@ -202,6 +202,23 @@ export async function POST(req: Request) {
       // 사용자가 선택한 준비일 사용 (빈 문자열이면 준비일 없음, 미전송 시 자동 계산)
       const customPrepDate = galleryInput?.galleryPrepDate;
       const prepDateParam = customPrepDate !== undefined ? (customPrepDate || null) : undefined;
+      // ★ 회차 생성(공휴일 제외 판정)보다 먼저 공휴일을 로딩한다 (2026-10-07 진단 #3 — 콜드 인스턴스 409)
+      //   준비일이 시작일 이전 달일 수 있으므로 시작 전월부터 종료월까지 로딩
+      {
+        const months = new Set<string>();
+        const cur = new Date(`${startDate.slice(0, 7)}-01T00:00:00Z`);
+        cur.setUTCMonth(cur.getUTCMonth() - 1);
+        const endYm = endDate.slice(0, 7);
+        while (true) {
+          const ym = cur.toISOString().slice(0, 7);
+          months.add(ym);
+          if (ym >= endYm) break;
+          cur.setUTCMonth(cur.getUTCMonth() + 1);
+        }
+        await Promise.all(
+          Array.from(months).map((ym) => ensureHolidaysLoaded(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10)))
+        );
+      }
       sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam);
     } else {
       const rawSessions = String(form.get("sessions") ?? "").trim();
@@ -261,6 +278,17 @@ export async function POST(req: Request) {
         { ok: false, code: "VALIDATION_ERROR", message: "이용일자 형식이 올바르지 않습니다." },
         { status: 400 }
       );
+    }
+    // 강의실·E-스튜디오: 오늘 이전 날짜 신청 차단 (갤러리는 위에서 익일 이후로 별도 검증) — 진단 #2
+    if (input.roomId !== "gallery") {
+      const today = todayYmdSeoul();
+      const past = sessions.find((s) => s.date < today);
+      if (past) {
+        return NextResponse.json(
+          { ok: false, code: "VALIDATION_ERROR", message: `지난 날짜(${past.date})는 신청할 수 없습니다.` },
+          { status: 400 }
+        );
+      }
     }
     const sunday = sessions.find((s) => dayOfWeek(s.date) === 0);
     if (sunday) {
