@@ -74,7 +74,7 @@ export default async function AdminHomePage() {
 
         <HomeCategoryCard
           title="우리동네 갤러리"
-          description={`갤러리 대관신청 현황(접수/승인/취소)\n목록 및 캘린더 조회`}
+          description={`갤러리 전시신청 현황(접수/승인/취소)\n목록 및 캘린더 조회`}
           icon={<IconGallery />}
           href="/admin/requests?category=gallery"
           ctaLabel="조회하기"

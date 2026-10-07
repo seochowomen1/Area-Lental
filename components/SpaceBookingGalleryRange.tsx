@@ -119,7 +119,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     return "";
   }, [startDate, bookedDates, holidayMap]);
 
-  // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  // 이용료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) {
       return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
@@ -469,12 +469,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         ) : null}
       </div>
 
-      {/* 대관료 자동 계산 */}
+      {/* 이용료 자동 계산 */}
       {!error && days > 0 && (feeBreakdown.weekdays > 0 || feeBreakdown.saturdays > 0) && (
         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
           <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
             <span className="text-base">💰</span>
-            <span className="text-sm font-bold text-slate-800">예상 대관료</span>
+            <span className="text-sm font-bold text-slate-800">예상 이용료</span>
           </div>
           <div className="px-4 py-3">
             <div className="space-y-2">
@@ -508,7 +508,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
       <div className="mt-5">
         <Button type="button" className="w-full" disabled={!canSubmit} onClick={goApply}>
-          대관 신청서 작성하기
+          전시 신청서 작성하기
         </Button>
       </div>
     </div>

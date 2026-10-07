@@ -10,7 +10,7 @@ export const revalidate = 0;
 export default function Home() {
   return (
     <div className="flex min-h-screen flex-col bg-gray-50">
-      <SiteHeader title="대관신청" />
+      <SiteHeader title="대관 · 전시 신청" />
 
       <main id="main-content" className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
         <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
@@ -30,10 +30,18 @@ export default function Home() {
 
           <HomeCategoryCard
             title="우리동네 갤러리"
-            description={"작품 전시를 위한 갤러리 공간을\n일 단위로 대관할 수 있습니다"}
+            description={"작품 전시를 위한 갤러리 공간을\n일 단위로 신청할 수 있습니다"}
             icon={<IconGallery />}
             href="/space?category=gallery"
           />
+        </div>
+
+        <div className="mt-6 text-center text-sm text-slate-600">
+          요금, 운영시간, 신청 방법, 환불 규정은{" "}
+          <Link href="/guide" className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+            대관 · 전시 이용 안내
+          </Link>
+          에서 확인할 수 있습니다.
         </div>
 
         {/* 신청 내역 조회 - 컴팩트 인라인 */}

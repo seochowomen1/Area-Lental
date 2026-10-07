@@ -27,6 +27,9 @@ import {
   PLEDGE_INTRO,
   PLEDGE_SECTIONS,
   PLEDGE_FOOTER,
+  GALLERY_PLEDGE_TITLE,
+  GALLERY_PLEDGE_INTRO,
+  GALLERY_PLEDGE_SECTIONS,
 } from "@/lib/pledge";
 import type { RentalRequest } from "@/lib/types";
 import { sortSessions } from "@/lib/requestUtils";
@@ -165,7 +168,9 @@ export default async function AdminRequestFormPage({
     : printDate;
 
   /* ── pledge data ── */
-  const pledgeSections = PLEDGE_SECTIONS;
+  const pledgeSections = isGallery ? GALLERY_PLEDGE_SECTIONS : PLEDGE_SECTIONS;
+  const pledgeTitle = isGallery ? GALLERY_PLEDGE_TITLE : PLEDGE_TITLE;
+  const pledgeIntro = isGallery ? GALLERY_PLEDGE_INTRO : PLEDGE_INTRO;
   const opLines = operatingNoticeLines(req.roomId);
 
   return (
@@ -829,7 +834,7 @@ export default async function AdminRequestFormPage({
         )}
 
         {/* ════════════════════════════════════════════════════════ */}
-        {/* ═══ PAGE 1-C: 우리동네 갤러리 대관 신청서 (갤러리 전용) ═══ */}
+        {/* ═══ PAGE 1-C: 우리동네 갤러리 전시 신청서 (갤러리 전용) ═══ */}
         {/* ════════════════════════════════════════════════════════ */}
         {isGallery && (
           <div className="page-section">
@@ -839,7 +844,7 @@ export default async function AdminRequestFormPage({
                 서초여성가족플라자 서초센터
               </h1>
               <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
-                우리동네 갤러리 대관 신청서
+                우리동네 갤러리 전시 신청서
               </h2>
             </div>
 
@@ -944,7 +949,7 @@ export default async function AdminRequestFormPage({
               </tbody>
             </table>
 
-            {/* ── 3. 대관 일정 상세 (배치 회차) ── */}
+            {/* ── 3. 전시 일정 상세 (배치 회차) ── */}
             {isBatch && (
               <table className="mt-2 w-full border-collapse print:mt-1.5">
                 <thead>
@@ -992,7 +997,7 @@ export default async function AdminRequestFormPage({
                 <tbody>
                   <tr>
                     <th className={TH} style={{ width: "18%" }}>
-                      대관비용
+                      이용료
                       <br />
                       <span className="font-normal text-gray-500 print:text-[7px]">
                         (※담당자 기재)
@@ -1018,16 +1023,16 @@ export default async function AdminRequestFormPage({
               </table>
             )}
 
-            {/* ── 4. 대관료 안내 ── */}
+            {/* ── 4. 이용료 안내 ── */}
             <div className="mt-2 rounded border border-gray-400 px-3 py-1.5 print:mt-1.5 print:px-2 print:py-1">
               <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
-                대관료 안내
+                이용료 안내
               </h4>
               <table className="mt-1 w-full border-collapse text-[10px] print:text-[8px]">
                 <thead>
                   <tr>
                     <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">구분</th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">1일 대관료</th>
+                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">1일 이용료</th>
                     <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">비고</th>
                   </tr>
                 </thead>
@@ -1073,7 +1078,7 @@ export default async function AdminRequestFormPage({
                 <tbody>
                   <tr>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      갤러리 대관 신청업무 처리 및
+                      갤러리 전시 신청업무 처리 및
                       <br />
                       의사소통 경로 확보
                     </td>
@@ -1083,7 +1088,7 @@ export default async function AdminRequestFormPage({
                       연락처, E-mail, 주소, 생년월일
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      수집일로부터 3년 및 대관목적
+                      수집일로부터 3년 및 전시 목적
                       <br />
                       달성 시 지체없이 해당정보 파기
                     </td>
@@ -1092,7 +1097,7 @@ export default async function AdminRequestFormPage({
               </table>
               <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
                 ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
-                대관 신청·진행에 일부 제한이 있습니다.
+                전시 신청·진행에 일부 제한이 있습니다.
               </p>
               <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
                 <span className="font-bold text-gray-900">[필수]</span>
@@ -1118,7 +1123,7 @@ export default async function AdminRequestFormPage({
                 </span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
-                본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
+                본 신청서는 온라인 전시 신청 시 전자적 방식으로 동의한 내용이며,
                 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
               </p>
             </div>
@@ -1126,7 +1131,7 @@ export default async function AdminRequestFormPage({
             {/* ── 서명란 ── */}
             <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
               <p>
-                위와 같이 서초여성가족플라자 서초센터 우리동네 갤러리 대관을
+                위와 같이 서초여성가족플라자 서초센터 우리동네 갤러리 전시를
                 신청합니다.
               </p>
               <p className="mt-2">{applyDate}</p>
@@ -1147,7 +1152,7 @@ export default async function AdminRequestFormPage({
         )}
 
         {/* ════════════════════════════════════════════ */}
-        {/* ═══ PAGE 2: 대관규정 서약서 ═══ */}
+        {/* ═══ PAGE 2: 규정 서약서 (갤러리=전시 운영규정 / 그 외=대관규정) ═══ */}
         {/* ════════════════════════════════════════════ */}
         <div className="page-section mt-10 print:mt-0">
           {/* 화면에서 신청서와 서약서 사이 구분선 (인쇄 시 숨김) */}
@@ -1161,13 +1166,13 @@ export default async function AdminRequestFormPage({
               서초여성가족플라자 서초센터
             </h1>
             <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
-              {PLEDGE_TITLE}
+              {pledgeTitle}
             </h2>
           </div>
 
           {/* ── 서약 서문 ── */}
           <p className="mt-3 text-xs leading-relaxed text-gray-900 print:mt-2 print:text-[9px] print:leading-snug">
-            {PLEDGE_INTRO}
+            {pledgeIntro}
           </p>
 
           {/* ── 서약 조항 (가~사) ── */}
@@ -1248,7 +1253,7 @@ export default async function AdminRequestFormPage({
                     <b>{req.applicantName}</b>
                     {req.orgName ? ` (${req.orgName})` : ""}
                   </td>
-                  <th className={TH}>대관 시설</th>
+                  <th className={TH}>{isGallery ? "전시 시설" : "대관 시설"}</th>
                   <td className={TD}>
                     {room?.name ?? req.roomId} ({categoryLabel})
                   </td>
@@ -1256,7 +1261,7 @@ export default async function AdminRequestFormPage({
               </tbody>
             </table>
             <p className="mt-1 text-[9px] text-gray-500 print:text-[7px]">
-              본 서약은 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
+              본 서약은 온라인 {isGallery ? "전시" : "대관"} 신청 시 전자적 방식으로 동의한 내용이며,
               신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
             </p>
           </div>

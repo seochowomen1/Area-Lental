@@ -132,7 +132,7 @@ export default function SettingsClient(props: {
 
       setBlocks((prev) => [data.created, ...prev]);
       highlight(data.created.id);
-      setToast({ type: "success", message: isGallery ? "내부 대관 일정이 등록되었습니다." : "차단시간이 등록되었습니다." });
+      setToast({ type: "success", message: isGallery ? "내부 전시 일정이 등록되었습니다." : "차단시간이 등록되었습니다." });
       setBlockFormOpen(false);
       router.refresh();
       return data.created.id;
@@ -356,17 +356,17 @@ export default function SettingsClient(props: {
         </section>
       )}
 
-      {/* 내부 대관 일정 / 수동 차단 시간 섹션 */}
+      {/* 내부 전시(갤러리)/대관 일정 / 수동 차단 시간 섹션 */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-base font-bold text-slate-900">
-                {isGallery ? "내부 대관 일정" : "내부 대관 일정 / 수동 차단"}
+                {isGallery ? "내부 전시 일정" : "내부 대관 일정 / 수동 차단"}
               </h2>
               <p className="mt-0.5 text-xs text-slate-500">
                 {isGallery
-                  ? "내부(강사·수강생) 대관 일정을 등록하면 외부 대관 신청이 차단됩니다"
+                  ? "내부(강사·수강생) 전시 일정을 등록하면 외부 전시 신청이 차단됩니다"
                   : "시간 단위 또는 일 단위로 특정 날짜/기간의 대관 신청을 차단합니다"}
               </p>
             </div>
@@ -375,7 +375,7 @@ export default function SettingsClient(props: {
               onClick={() => setBlockFormOpen((v) => !v)}
               className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
             >
-              {blockFormOpen ? "닫기" : isGallery ? "+ 내부 대관 일정 추가" : "+ 새 차단시간"}
+              {blockFormOpen ? "닫기" : isGallery ? "+ 내부 전시 일정 추가" : "+ 새 차단시간"}
             </button>
           </div>
         </div>
@@ -454,7 +454,7 @@ export default function SettingsClient(props: {
               ) : (
                 <tr>
                   <td className="px-5 py-8 text-center text-slate-400" colSpan={isGallery ? 4 : 5}>
-                    {isGallery ? "등록된 내부 대관 일정이 없습니다." : "등록된 차단시간이 없습니다."}
+                    {isGallery ? "등록된 내부 전시 일정이 없습니다." : "등록된 차단시간이 없습니다."}
                   </td>
                 </tr>
               )}

@@ -160,11 +160,11 @@ export const GalleryRequestInputSchema = z
   })
   .superRefine((v, ctx) => {
     if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
-    if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "대관 규정 서약 동의는 필수입니다." });
+    if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "전시 운영 규정 서약 동의는 필수입니다." });
 
     const today = todayYmdSeoul();
     if (v.startDate <= today) {
-      ctx.addIssue({ code: "custom", path: ["startDate"], message: "갤러리 대관은 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" });
+      ctx.addIssue({ code: "custom", path: ["startDate"], message: "갤러리 전시는 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" });
     }
 
     if (v.endDate < v.startDate) {

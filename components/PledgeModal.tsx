@@ -2,7 +2,15 @@
 
 import { useEffect } from "react";
 import Button from "@/components/ui/Button";
-import { PLEDGE_FOOTER, PLEDGE_INTRO, PLEDGE_SECTIONS, GALLERY_PLEDGE_SECTIONS, PLEDGE_TITLE } from "@/lib/pledge";
+import {
+  PLEDGE_FOOTER,
+  PLEDGE_INTRO,
+  PLEDGE_SECTIONS,
+  PLEDGE_TITLE,
+  GALLERY_PLEDGE_SECTIONS,
+  GALLERY_PLEDGE_TITLE,
+  GALLERY_PLEDGE_INTRO,
+} from "@/lib/pledge";
 import { operatingNoticeText } from "@/lib/operating";
 import { useFocusTrap } from "@/lib/useFocusTrap";
 
@@ -17,6 +25,8 @@ type Props = {
 export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree }: Props) {
   const isGallery = roomId === "gallery";
   const sections = isGallery ? GALLERY_PLEDGE_SECTIONS : PLEDGE_SECTIONS;
+  const pledgeTitle = isGallery ? GALLERY_PLEDGE_TITLE : PLEDGE_TITLE;
+  const pledgeIntro = isGallery ? GALLERY_PLEDGE_INTRO : PLEDGE_INTRO;
   const focusTrapRef = useFocusTrap(open);
 
   useEffect(() => {
@@ -49,7 +59,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
 
       <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 id="pledge-modal-title" className="text-base font-semibold">{PLEDGE_TITLE}</h3>
+          <h3 id="pledge-modal-title" className="text-base font-semibold">{pledgeTitle}</h3>
           <button
             type="button"
             onClick={onClose}
@@ -62,7 +72,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
 
         <div id="pledge-modal-desc" className="max-h-[60vh] overflow-auto px-5 py-4">
           <p className="text-sm text-gray-700">
-            {PLEDGE_INTRO}
+            {pledgeIntro}
           </p>
 
           <p className="mt-2 text-sm text-gray-700">

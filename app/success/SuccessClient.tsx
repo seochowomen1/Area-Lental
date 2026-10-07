@@ -13,6 +13,8 @@ export default function SuccessClient() {
   const batchId = sp.get("batchId");
   const count = Number(sp.get("count") ?? "1");
   const token = sp.get("token") ?? "";
+  // 갤러리 신청에서 넘어온 경우(category=gallery)에만 "전시" 용어 사용
+  const isGallery = sp.get("category") === "gallery";
 
   // 결과 확인 링크 생성 (토큰이 있으면 토큰으로, 없으면 수동 입력 페이지)
   const resultHref = token && requestId
@@ -23,7 +25,7 @@ export default function SuccessClient() {
 
   return (
     <div>
-      <SiteHeader title="대관신청" backHref="/space" backLabel="목록" />
+      <SiteHeader title={isGallery ? "전시신청" : "대관신청"} backHref={isGallery ? "/space?category=gallery" : "/space"} backLabel="목록" />
 
       <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
         {/* 성공 아이콘 + 제목 */}
@@ -33,7 +35,7 @@ export default function SuccessClient() {
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
             </svg>
           </div>
-          <h2 className="mt-4 text-2xl font-bold text-slate-900">대관 신청이 완료되었습니다</h2>
+          <h2 className="mt-4 text-2xl font-bold text-slate-900">{isGallery ? "전시 신청이 완료되었습니다" : "대관 신청이 완료되었습니다"}</h2>
           <p className="mt-2 text-sm text-slate-600">
             담당자 검토 후 승인/반려 결과를 이메일로 안내드립니다.
           </p>
@@ -67,7 +69,7 @@ export default function SuccessClient() {
           <Notice variant="info" title="신청 후 절차 안내" pad="md">
             <ul className="list-disc space-y-1.5 pl-5 text-sm">
               <li>담당자가 신청 내용을 확인한 후 <b>승인 또는 반려</b> 결과를 이메일로 알려드립니다.</li>
-              <li>승인 후 <b>대관료를 납부</b>하시면 예약이 최종 확정됩니다.</li>
+              <li>승인 후 <b>{isGallery ? "이용료를 납부" : "대관료를 납부"}</b>하시면 예약이 최종 확정됩니다.</li>
               <li>아래 버튼으로 바로 신청 결과를 확인할 수 있습니다.</li>
             </ul>
           </Notice>

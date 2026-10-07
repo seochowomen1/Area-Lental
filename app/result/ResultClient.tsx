@@ -451,7 +451,7 @@ export default function ResultClient() {
                 <div className="text-base font-semibold text-slate-900">금액 상세</div>
                 <div className="grid grid-cols-1 gap-2 rounded-xl border border-slate-200 bg-white p-4 text-sm md:grid-cols-2">
                   <div>
-                    <span className="text-slate-600">대관료</span>: <b>{formatKRW(data.rentalFeeKRW ?? 0)}</b>
+                    <span className="text-slate-600">{isGallery ? "이용료" : "대관료"}</span>: <b>{formatKRW(data.rentalFeeKRW ?? 0)}</b>
                     {data.feeBasis === "approved" && <div className="mt-1 text-xs text-slate-500">* 승인된 회차 기준 금액</div>}
                   </div>
                   <div>

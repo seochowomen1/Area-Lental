@@ -184,9 +184,23 @@ export async function saveTemplates(
  * 특정 상태의 이메일 템플릿을 반환합니다.
  * category 인자는 하위 호환을 위해 남겨두었으나 무시됩니다.
  */
-export async function getTemplate(_category: TemplateCategory | string, status: TemplateStatus): Promise<EmailTemplate> {
+export async function getTemplate(category: TemplateCategory | string, status: TemplateStatus): Promise<EmailTemplate> {
   const all = await loadUnifiedTemplates();
-  return all[status] ?? defaultTemplateFor(status);
+  const tpl = all[status] ?? defaultTemplateFor(status);
+  // 우리동네 갤러리는 "대관"이 아닌 "전시 신청"으로 안내한다 (2026-10 방침)
+  if (category === "gallery") {
+    return { subject: applyGalleryWording(tpl.subject), body: applyGalleryWording(tpl.body) };
+  }
+  return tpl;
+}
+
+/** 통합 템플릿 문구를 갤러리용 표현으로 변환 (대관 → 전시) */
+export function applyGalleryWording(text: string): string {
+  return text
+    .replace(/대관\s*신청/g, "전시 신청")
+    .replace(/대관료/g, "이용료")
+    .replace(/대관비/g, "이용료")
+    .replace(/대관/g, "전시");
 }
 
 /** 변수 값 내의 {{...}} 패턴을 무력화하여 재귀 치환 방지 */

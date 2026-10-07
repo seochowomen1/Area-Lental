@@ -94,7 +94,7 @@ export async function GET(req: Request) {
 
   // Title
   aoa.push([
-    isGallery ? "센터 우리동네 갤러리 대관신청서(시스템 출력)" : "센터 강의실 대관신청서(시스템 출력)",
+    isGallery ? "센터 우리동네 갤러리 전시신청서(시스템 출력)" : "센터 강의실 대관신청서(시스템 출력)",
     "",
     "",
     "",
@@ -148,7 +148,7 @@ export async function GET(req: Request) {
   if (hasMultiple) {
     pushSection("[회차(묶음) 정보]");
     if (isGallery) {
-      aoa.push(["회차", "신청번호", "전시일", "구분", "상태", "대관료(일)", "총액(일)", "비고"]);
+      aoa.push(["회차", "신청번호", "전시일", "구분", "상태", "이용료(일)", "총액(일)", "비고"]);
       for (let i = 0; i < sessions.length; i++) {
         const s = sessions[i];
         const f = computeFeesForRequest(s); // 갤러리: 일 단위 요금(할인/장비 0)
@@ -245,7 +245,7 @@ export async function GET(req: Request) {
   // Fee
   pushSection(`[이용 요금${usingApprovedBasis ? " (승인 회차 기준)" : ""}]`);
   aoa.push([
-    "대관료",
+    isGallery ? "이용료" : "대관료",
     formatKRW(fee.rentalFeeKRW),
     "",
     "",

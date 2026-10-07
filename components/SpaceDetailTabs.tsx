@@ -121,15 +121,15 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
           </div>
         </div>
 
-        {/* 대관료 */}
+        {/* 이용료 */}
         <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">대관료 기준 (1일 기준)</h4>
+          <h4 className="mb-2 text-sm font-semibold">전시 공간 이용료 기준 (1일 기준)</h4>
           <div className="overflow-hidden rounded-md border">
             <table className="w-full text-sm">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
-                  <th className="px-3 py-2 text-left font-medium text-slate-700">대관료</th>
+                  <th className="px-3 py-2 text-left font-medium text-slate-700">이용료</th>
                 </tr>
               </thead>
               <tbody className="divide-y">
@@ -161,10 +161,10 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">신청 및 승인 절차</h4>
           <ol className="list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
-            <li>대관 신청서 양식을 통해 전시 목적, 장르, 내용 등을 작성하여 이메일 또는 센터 방문 접수</li>
+            <li>전시 신청서 양식을 통해 전시 목적, 장르, 내용 등을 작성하여 이메일 또는 센터 방문 접수</li>
             <li>센터는 3일 이내에 검토 후 승인/반려 결과를 안내합니다.</li>
-            <li>대관료 결제 시 신청 접수 완료 (동일 날짜 신청자 중복 발생 시 결제 완료 우선)</li>
-            <li>센터 방문하여 현장답사 및 미팅 후 대관서 제출 가능 (필요시 신청 당일 대관료 결제까지 가능)</li>
+            <li>이용료 결제 시 신청 접수 완료 (동일 날짜 신청자 중복 발생 시 결제 완료 우선)</li>
+            <li>센터 방문하여 현장답사 및 미팅 후 전시 신청서 제출 가능 (필요시 신청 당일 이용료 결제까지 가능)</li>
           </ol>
         </div>
 
@@ -345,11 +345,11 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
         </div>
 
         <div className="rounded-lg border p-4">
-          <h4 className="mb-2 text-sm font-semibold">대관 취소(센터 사정) 및 이용 제한</h4>
+          <h4 className="mb-2 text-sm font-semibold">전시 취소(센터 사정) 및 이용 제한</h4>
           <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
             <li>천재지변, 시설 점검, 안전상 필요 등 불가피한 사유로 일정이 조정될 수 있습니다.</li>
             <li>시설물 훼손, 안전수칙 위반, 허위 신청 등 운영상 문제가 확인될 경우 이용이 제한될 수 있습니다.</li>
-            <li>대관 진행 중 발견 시 바로 취소되며 대관료는 환불 불가합니다.</li>
+            <li>전시 진행 중 발견 시 바로 취소되며 이용료는 환불 불가합니다.</li>
           </ul>
         </div>
 

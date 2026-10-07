@@ -124,10 +124,10 @@ export async function sendAdminNewRequestEmail(req: RentalRequest) {
   const atts = Array.isArray(req.attachments) ? req.attachments : [];
 
   const subject = isGallery(req)
-    ? `[대관신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.requestId}`
+    ? `[전시신청] ${req.roomName} / ${formatWhenSingle(req)} / ${req.requestId}`
     : `[대관신청] ${req.roomName} / ${req.date} ${req.startTime}-${req.endTime} / ${req.requestId}`;
   const text =
-`새 대관 신청이 등록되었습니다.
+`새 ${isGallery(req) ? "전시" : "대관"} 신청이 등록되었습니다.
 
 - 신청번호: ${req.requestId}
 - 공간(${cat}): ${req.roomName}
@@ -156,14 +156,14 @@ export async function sendAdminNewRequestEmailBatch(reqs: RentalRequest[]) {
   const url = `${base.APP_BASE_URL}/admin/requests/${encodeURIComponent(first.requestId)}`;
 
   const subject = isGallery(first)
-    ? `[대관신청] ${first.roomName} / 전시 ${list.length}일 / ${first.requestId}`
+    ? `[전시신청] ${first.roomName} / 전시 ${list.length}일 / ${first.requestId}`
     : `[대관신청] ${first.roomName} / ${list.length}회차 / ${first.requestId}`;
   const sessions = list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n");
 
   const eqLabel = isGallery(first) ? "장비" : getRoomCategory(first) === "studio" ? "촬영장비(회차별 동일)" : "기자재(회차별 동일)";
 
   const text =
-`새 대관 신청(묶음)이 등록되었습니다.
+`새 ${isGallery(first) ? "전시" : "대관"} 신청(묶음)이 등록되었습니다.
 
 - 대표 신청번호: ${first.requestId}
 - ${isGallery(first) ? "전시일 수" : "회차 수"}: ${list.length}${isGallery(first) ? "일" : "회"}
@@ -244,7 +244,7 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
   const fee = computeFeesForRequest(req);
   const feeBlock =
 `[이용 요금]
-- 대관료: ${formatKRW(fee.rentalFeeKRW)}
+- ${isGallery(req) ? "이용료" : "대관료"}: ${formatKRW(fee.rentalFeeKRW)}
 - 장비사용료: ${formatKRW(fee.equipmentFeeKRW)}
 - 총 금액: ${formatKRW(fee.totalFeeKRW)}
 - 할인: ${fee.discountAmountKRW > 0 ? `${fee.discountRatePct.toFixed(2)}% (${formatKRW(fee.discountAmountKRW)})` : "-"}
@@ -272,7 +272,7 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
   }
 
   // Fallback (접수 등)
-  const subject = `[${req.status}] ${cat} 대관 신청 결과 (${req.requestId})`;
+  const subject = `[${req.status}] ${cat} ${isGallery(req) ? "전시" : "대관"} 신청 결과 (${req.requestId})`;
   const body =
 `안녕하세요. 서초여성가족플라자 서초센터입니다.
 
@@ -314,7 +314,7 @@ export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): { to: 
   else if (pendingCount > 0) displayStatus = "접수";
   else displayStatus = "부분처리";
 
-  const subject = `[${displayStatus}] ${cat} 대관 신청 결과 (${first.requestId})`;
+  const subject = `[${displayStatus}] ${cat} ${isGallery(first) ? "전시" : "대관"} 신청 결과 (${first.requestId})`;
 
   const base = getBaseEnv();
   const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(first.requestId)}`;
@@ -334,7 +334,7 @@ export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): { to: 
   const feeBlock = bundleFee
     ?
 `[이용 요금${feeTitleNote}]
-- 대관료 합계: ${formatKRW(bundleFee.rentalFeeKRW)}
+- ${isGallery(first) ? "이용료" : "대관료"} 합계: ${formatKRW(bundleFee.rentalFeeKRW)}
 - 장비사용료 합계: ${formatKRW(bundleFee.equipmentFeeKRW)}
 - 총 금액: ${formatKRW(bundleFee.totalFeeKRW)}
 - 할인: ${bundleFee.discountAmountKRW > 0 ? `${bundleFee.discountRatePct.toFixed(2)}% (${formatKRW(bundleFee.discountAmountKRW)})` : "-"}

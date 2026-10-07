@@ -7,7 +7,7 @@ export const metadata: Metadata = {
     default: "서초여성가족플라자 대관 신청",
     template: "%s | 서초여성가족플라자 대관",
   },
-  description: "서초여성가족플라자 서초센터 강의실·E-스튜디오·갤러리 대관 신청",
+  description: "서초여성가족플라자 서초센터 강의실·E-스튜디오 대관 및 우리동네 갤러리 전시 신청",
 };
 
 export default function RootLayout({ children }: { children: ReactNode }) {

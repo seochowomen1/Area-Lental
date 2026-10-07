@@ -445,6 +445,7 @@ export default function ApplyGalleryClient() {
       if (batchId) qp.set("batchId", batchId);
       if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
       if (token) qp.set("token", token);
+      qp.set("category", "gallery");
       router.push(qp.toString() ? `/success?${qp.toString()}` : "/success");
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
@@ -455,7 +456,7 @@ export default function ApplyGalleryClient() {
 
   const sessionCount = sessionsBundle.sessions.length;
 
-  // 대관료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
+  // 이용료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
     if (!sessionsBundle.sessions.length) return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
     let weekdays = 0;
@@ -562,7 +563,7 @@ export default function ApplyGalleryClient() {
                 ))}
               </div>
               <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                이메일은 대관 승인 여부 및 신청 조회 등에 활용되므로 반드시 정확히 입력해 주세요.
+                이메일은 전시 승인 여부 및 신청 조회 등에 활용되므로 반드시 정확히 입력해 주세요.
               </p>
             </Card>
 
@@ -601,9 +602,9 @@ export default function ApplyGalleryClient() {
               </div>
             </Card>
 
-            {/* 예상 대관료 */}
+            {/* 예상 이용료 */}
             <Card pad="lg">
-              <h3 className={SECTION_TITLE}>예상 대관료</h3>
+              <h3 className={SECTION_TITLE}>예상 이용료</h3>
               <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="px-4 py-3 space-y-2">
                   {feeBreakdown.weekdays > 0 && (
@@ -649,10 +650,10 @@ export default function ApplyGalleryClient() {
 
   return (
     <div>
-      <SiteHeader title="우리동네 갤러리 대관 신청" backHref="/space?category=gallery" backLabel="목록" />
+      <SiteHeader title="우리동네 갤러리 전시 신청" backHref="/space?category=gallery" backLabel="목록" />
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <h2 className="text-2xl font-bold">우리동네 갤러리 대관 신청서 작성</h2>
+        <h2 className="text-2xl font-bold">우리동네 갤러리 전시 신청서 작성</h2>
         <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 담당자 검토/승인 절차를 거쳐 확정됩니다.</p>
 
         <div className="mt-4">
@@ -749,12 +750,12 @@ export default function ApplyGalleryClient() {
               ) : null}
             </div>
 
-            {/* 대관료 자동 계산 */}
+            {/* 이용료 자동 계산 */}
             {sessionCount > 0 && (
               <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
                 <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
                   <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 대관료</span>
+                  <span className="text-sm font-bold text-slate-800">예상 이용료</span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="space-y-2">
@@ -793,7 +794,7 @@ export default function ApplyGalleryClient() {
             {/* 철수시간 설정 */}
             {isYmd(endDate) && (
               <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
-                <h4 className="text-sm font-bold text-orange-900">대관 철수 안내</h4>
+                <h4 className="text-sm font-bold text-orange-900">전시 철수 안내</h4>
                 <p className="mt-1 text-xs text-orange-800">
                   전시 마지막 날({endDate}) <b>17시까지</b> 철수를 완료해야 합니다. 철수 예정 시간을 설정해 주세요.
                 </p>
@@ -1143,15 +1144,15 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
             </div>
           </div>
 
-          {/* 대관료 */}
+          {/* 이용료 */}
           <div>
-            <h4 className="font-semibold mb-2">대관료 기준 (1일 기준)</h4>
+            <h4 className="font-semibold mb-2">전시 공간 이용료 기준 (1일 기준)</h4>
             <div className="overflow-hidden rounded-md border">
               <table className="w-full text-sm">
                 <thead className="bg-slate-50">
                   <tr>
                     <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">대관료</th>
+                    <th className="px-3 py-2 text-left font-medium text-slate-700">이용료</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y">
@@ -1204,7 +1205,7 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
             <ul className="list-disc space-y-1.5 pl-5 text-gray-700">
               <li>부적절한 목적, 시설 훼손 우려, 종교 포교, 정치적 목적, 영리적 목적</li>
               <li>작품 판매, 세미나, 퍼포먼스, 기타 판촉행사 등 부대행사 진행</li>
-              <li>대관 규정 미진 시 대관 중 발견 시 즉시 취소 및 환불 불가</li>
+              <li>전시 운영 규정 미진 시 전시 중 발견 시 즉시 취소 및 환불 불가</li>
             </ul>
           </div>
         </div>

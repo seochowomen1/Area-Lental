@@ -174,11 +174,11 @@ export async function POST(req: Request) {
           { status: 400 }
         );
       }
-      // 갤러리 당일 대관 차단: 준비일이 과거가 되므로 최소 익일부터 신청 가능
+      // 갤러리 당일 전시 신청 차단: 준비일이 과거가 되므로 최소 익일부터 신청 가능
       const todayStr = todayYmdSeoul();
       if (startDate <= todayStr) {
         return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", message: "갤러리 대관은 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" },
+          { ok: false, code: "VALIDATION_ERROR", message: "갤러리 전시는 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" },
           { status: 400 }
         );
       }
