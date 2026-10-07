@@ -19,6 +19,8 @@ export default function Home() {
             description={"다양한 규모의 강의실을 시간 단위로\n대관할 수 있습니다"}
             icon={<IconLecture />}
             href="/space"
+            badgeLabel="대관"
+            ctaLabel="대관 신청하기"
           />
 
           <HomeCategoryCard
@@ -26,6 +28,8 @@ export default function Home() {
             description={"영상 촬영·편집에 필요한 장비와\n공간을 대관할 수 있습니다"}
             icon={<IconStudio />}
             href="/space?category=studio"
+            badgeLabel="대관"
+            ctaLabel="대관 신청하기"
           />
 
           <HomeCategoryCard
@@ -33,6 +37,8 @@ export default function Home() {
             description={"작품 전시를 위한 갤러리 공간을\n일 단위로 신청할 수 있습니다"}
             icon={<IconGallery />}
             href="/space?category=gallery"
+            badgeLabel="전시"
+            ctaLabel="전시 신청하기"
           />
         </div>
 

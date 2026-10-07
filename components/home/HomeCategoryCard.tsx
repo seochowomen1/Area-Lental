@@ -28,6 +28,8 @@ type Props = {
   href?: string;
   disabledNote?: string;
   ctaLabel?: string;
+  /** 상단 배지 문구 (기본 "공간안내") — 대관 시설은 "대관", 갤러리는 "전시" */
+  badgeLabel?: string;
   className?: string;
   /** 대기 건수 (admin 전용) */
   pendingCount?: number;
@@ -42,12 +44,14 @@ export default function HomeCategoryCard({
   href,
   disabledNote,
   ctaLabel,
+  badgeLabel,
   className,
   pendingCount,
   accentColor,
 }: Props) {
   const isDisabled = !href || Boolean(disabledNote);
   const label = (ctaLabel ?? "예약하기").trim() || "예약하기";
+  const badge = (badgeLabel ?? "공간안내").trim() || "공간안내";
   const note = disabledNote ? (disabledNote.trim().startsWith("※") ? disabledNote.trim() : `※ ${disabledNote.trim()}`) : null;
   const accent = accentColor ? ACCENT_STYLES[accentColor] : null;
 
@@ -76,10 +80,10 @@ export default function HomeCategoryCard({
       {accent ? (
         <div className={cn("mt-6 inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[12px] font-semibold", accent.badge, accent.badgeText)}>
           <span className={cn("inline-block h-2 w-2 rounded-full", accent.dot)} />
-          공간안내
+          {badge}
         </div>
       ) : (
-        <div className={cn(HOME_BADGE, "mt-6")}>공간안내</div>
+        <div className={cn(HOME_BADGE, "mt-6")}>{badge}</div>
       )}
 
       {/* 제목 */}
