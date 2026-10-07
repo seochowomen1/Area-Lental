@@ -239,3 +239,55 @@ function makeGalleryReq(date: string, isPrepDay: boolean): RentalRequest {
     isPrepDay,
   } as unknown as RentalRequest;
 }
+
+// ─── 묶음 부분 승인 할인 (2026-10-07 진단 #4 회귀) ───
+
+function makeLectureReq(seq: number, discount: { discountRatePct: number; discountAmountKRW: number }): RentalRequest {
+  return {
+    requestId: `L-${seq}`,
+    roomId: "sangsang1",
+    roomName: "상상교실 1",
+    date: `2026-10-${String(12 + seq).padStart(2, "0")}`,
+    startTime: "10:00",
+    endTime: "11:00",
+    applicantName: "테스트",
+    birth: "2000-01-01",
+    address: "서울",
+    phone: "010-1234-5678",
+    email: "test@test.com",
+    orgName: "기관",
+    headcount: 5,
+    purpose: "교육",
+    equipment: { laptop: false, projector: false, audio: false },
+    status: "접수",
+    createdAt: "2026-10-01T09:00:00Z",
+    pledgeDate: "2026-10-01",
+    pledgeName: "테스트",
+    batchId: "B-TEST",
+    batchSeq: seq,
+    batchSize: 10,
+    ...discount,
+  } as unknown as RentalRequest;
+}
+
+describe("묶음 할인 — 부분 승인 시 비례 적용", () => {
+  test("10회 × 70,000원에 50% 할인 → 4회만 승인하면 140,000원 (0원이 아님)", () => {
+    const perSession = 70000;
+    const full = normalizeDiscount(perSession * 10, { ratePct: 50, amountKRW: 0, mode: "rate" });
+    const all = Array.from({ length: 10 }, (_, i) => makeLectureReq(i, full));
+    const feeAll = computeFeesForBundle(all);
+    const feePart = computeFeesForBundle(all.slice(0, 4));
+    expect(feeAll.finalFeeKRW).toBe(350000);
+    expect(feePart.totalFeeKRW).toBe(280000);
+    expect(feePart.discountAmountKRW).toBe(140000);
+    expect(feePart.finalFeeKRW).toBe(140000);
+  });
+
+  test("금액으로 입력한 할인(350,000원)도 저장된 율로 비례 적용", () => {
+    const perSession = 70000;
+    const full = normalizeDiscount(perSession * 10, { ratePct: 0, amountKRW: 350000, mode: "amount" });
+    const all = Array.from({ length: 10 }, (_, i) => makeLectureReq(i, full));
+    expect(computeFeesForBundle(all).finalFeeKRW).toBe(350000);
+    expect(computeFeesForBundle(all.slice(0, 4)).finalFeeKRW).toBe(140000);
+  });
+});
