@@ -207,10 +207,14 @@ export function computeFeesForBundle(reqs: RentalRequest[]): FeeBreakdown {
     list.find((r) => (r.discountAmountKRW ?? 0) > 0 || (r.discountRatePct ?? 0) > 0 || String(r.discountReason ?? "").trim() !== "") ??
     first;
 
+  // 묶음 할인은 항상 "율" 기준으로 재계산한다.
+  // normalizeDiscount가 율·금액을 함께 저장하므로 금액 모드를 그대로 쓰면,
+  // 부분 승인(승인된 회차만 넘어온 경우)에 묶음 전체 기준 할인액이 통째로 빠져 과다 할인이 된다(2026-10-07 진단 #4).
+  // 저장된 율은 입력 당시 총액 대비 비율이라 회차 일부만 계산해도 비례 적용된다.
   const { discountRatePct, discountAmountKRW } = normalizeDiscount(totalFeeKRW, {
     ratePct: isGallery ? 0 : (discountSource.discountRatePct ?? 0),
-    amountKRW: isGallery ? 0 : (discountSource.discountAmountKRW ?? 0),
-    mode: isGallery ? "rate" : (discountSource.discountAmountKRW ?? 0) > 0 ? "amount" : "rate"
+    amountKRW: 0,
+    mode: "rate"
   });
 
   const finalFeeKRW = Math.max(0, Math.round(totalFeeKRW) - discountAmountKRW);

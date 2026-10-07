@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getGoogleClient } from "@/lib/google";
 import { requireGoogleEnv } from "@/lib/env";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -29,14 +30,8 @@ const SHEETS_CONFIG = [
       "purpose", "attachments",
       "privacyAgree", "pledgeAgree", "pledgeDate", "pledgeName",
       "status", "adminMemo", "rejectReason", "decidedAt", "decidedBy",
-      // optional columns
-      "discountRatePct", "discountAmountKRW", "discountReason",
-      "batchId", "batchSeq", "batchSize",
-      "isPrepDay", "startDate", "endDate",
-      "exhibitionTitle", "exhibitionPurpose", "genreContent", "awarenessPath", "specialNotes",
-      "galleryGeneratedAt", "galleryGenerationVersion",
-      "galleryWeekdayCount", "gallerySaturdayCount", "galleryExhibitionDayCount",
-      "galleryPrepDate", "galleryAuditJson",
+      // optional columns — lib/sheets.ts의 REQUEST_OPTIONAL_HEADERS와 동일 목록(단일 출처)
+      ...REQUEST_OPTIONAL_HEADERS,
     ],
   },
   {

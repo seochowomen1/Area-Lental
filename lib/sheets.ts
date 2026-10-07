@@ -23,7 +23,7 @@ const SHEET_BLOCKS = "blocks";
 // 관리자 입력(할인) 필드 - 시트에 컬럼이 없더라도 로컬/Mock 모드가 깨지지 않도록 "옵션"으로 취급
 // 기존 운영 시트와의 호환을 위해 '없으면 자동으로 헤더에 추가'하는 optional 컬럼들
 // (추가해도 기존 데이터 파싱/업데이트가 깨지지 않도록 끝에 append)
-const REQUEST_OPTIONAL_HEADERS = [
+export const REQUEST_OPTIONAL_HEADERS = [
   "discountRatePct",
   "discountAmountKRW",
   "discountReason",
@@ -230,7 +230,7 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   // optional 컬럼이 추가될 수 있으므로 충분히 넓게 읽습니다.
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_REQUESTS}!A:AZ`
+    range: `${SHEET_REQUESTS}!A:ZZ`
   });
 
   const rows = (res.data.values ?? []) as string[][];
@@ -492,7 +492,7 @@ export async function appendRequest(
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_REQUESTS}!A:AZ`,
+    range: `${SHEET_REQUESTS}!A:ZZ`,
     valueInputOption: "RAW",
     requestBody: { values }
   });
@@ -602,7 +602,7 @@ export async function appendRequestsBatch(
 
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_REQUESTS}!A:AZ`,
+    range: `${SHEET_REQUESTS}!A:ZZ`,
     valueInputOption: "RAW",
     requestBody: { values }
   });
