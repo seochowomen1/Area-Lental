@@ -22,3 +22,7 @@ npm-debug.log*
 # mock data
 .mockdb.json
 .vercel
+
+# 내부 진단 메모(저장소에 올리지 않음)
+기능점검_*.md
+고도화_진단_*.md
