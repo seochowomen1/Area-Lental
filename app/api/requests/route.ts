@@ -490,15 +490,24 @@ export async function POST(req: Request) {
         const safeName = f.name.replace(/[^a-zA-Z0-9가-힣._-]/g, "_").slice(0, 100);
         const fileName = `${first.date}_${first.startTime.replace(":", "")}-${first.endTime.replace(":", "")}_${input.roomId}_${safeName}`;
 
-        const createRes = await drive.files.create({
-          requestBody: { name: fileName, parents: [fullEnv.GOOGLE_DRIVE_FOLDER_ID] },
-          media: { mimeType: f.type, body: BufferToStream(buf) },
-          fields: "id"
-        });
+        // ★ 2026-10-19: 서비스 계정은 My Drive 저장 용량이 없어 files.create가 403(storageQuotaExceeded)으로 실패한다.
+        //   첨부 실패가 신청 자체를 잃게 하지 않도록 비치명 처리 — 신청은 저장하고 첨부 칸에 실패 표식을 남긴다.
+        //   (근본 해결: Drive 업로드를 소유자 OAuth 토큰으로 전환 — drive-check 진단 참조)
+        try {
+          const createRes = await drive.files.create({
+            requestBody: { name: fileName, parents: [fullEnv.GOOGLE_DRIVE_FOLDER_ID] },
+            media: { mimeType: f.type, body: BufferToStream(buf) },
+            fields: "id"
+          });
 
-        const id = createRes.data.id!;
-        const getRes = await drive.files.get({ fileId: id, fields: "webViewLink" });
-        uploadedUrls.push(getRes.data.webViewLink ?? `https://drive.google.com/file/d/${id}/view`);
+          const id = createRes.data.id!;
+          const getRes = await drive.files.get({ fileId: id, fields: "webViewLink" });
+          uploadedUrls.push(getRes.data.webViewLink ?? `https://drive.google.com/file/d/${id}/view`);
+        } catch (uploadErr) {
+          const ue = uploadErr as { code?: unknown; message?: string };
+          logger.error("첨부 업로드 실패 — 신청은 계속 저장", { fileName, code: ue?.code, error: ue?.message ?? String(uploadErr) });
+          uploadedUrls.push(`[업로드 실패] ${safeName} — 신청자에게 메일로 재요청 필요`);
+        }
       }
     }
 
