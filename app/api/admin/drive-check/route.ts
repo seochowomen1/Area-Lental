@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { getGoogleClient } from "@/lib/google";
+import { getGoogleClient, getDriveUploadClient, ensureUploadFolderId } from "@/lib/google";
 import { isMockMode } from "@/lib/env";
 
 export const runtime = "nodejs";
@@ -32,8 +32,15 @@ export async function GET(req: Request) {
   const steps: Step[] = [];
   let createdId: string | null = null;
   try {
-    const { drive, env } = getGoogleClient();
-    const folderId = env.GOOGLE_DRIVE_FOLDER_ID;
+    const { drive, mode } = getDriveUploadClient();
+    steps.push({ step: "mode", ok: true, detail: { mode, serviceFolderId: getGoogleClient().env.GOOGLE_DRIVE_FOLDER_ID } });
+    let folderId = "";
+    try {
+      folderId = await ensureUploadFolderId(drive, mode);
+      steps.push({ step: "uploadFolder", ok: true, detail: { folderId } });
+    } catch (e) {
+      steps.push({ step: "uploadFolder", ok: false, error: describeError(e) });
+    }
 
     try {
       const about = await drive.about.get({ fields: "user(emailAddress),storageQuota(limit,usage)" });

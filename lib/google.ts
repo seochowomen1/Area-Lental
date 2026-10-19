@@ -1,5 +1,5 @@
 import { google } from "googleapis";
-import { isMockMode, requireGoogleEnv } from "@/lib/env";
+import { getGoogleOAuthEnvOptional, isMockMode, requireGoogleEnv } from "@/lib/env";
 
 /**
  * @deprecated
@@ -69,4 +69,49 @@ export function getGoogleClient() {
     drive: google.drive({ version: "v3", auth }),
     env
   };
+}
+
+/* ───────── 첨부 업로드 클라이언트 (2026-10-19) ─────────
+ * - OAuth env가 있으면 드라이브 소유자 토큰(drive.file)으로 업로드 → 앱이 만든 전용 폴더에 저장
+ * - 없으면 종전 서비스 계정 경로(⚠️ My Drive에서는 403 storageQuotaExceeded) */
+export type DriveUploadMode = "oauth" | "service";
+
+export function getDriveUploadClient(): { drive: ReturnType<typeof google.drive>; mode: DriveUploadMode } {
+  if (isMockMode()) {
+    throw new Error("MOCK_MODE=true에서는 Google Client를 사용할 수 없습니다.");
+  }
+  const oauth = getGoogleOAuthEnvOptional();
+  if (oauth) {
+    const client = new google.auth.OAuth2(oauth.GOOGLE_OAUTH_CLIENT_ID, oauth.GOOGLE_OAUTH_CLIENT_SECRET);
+    client.setCredentials({ refresh_token: oauth.GOOGLE_OAUTH_REFRESH_TOKEN });
+    return { drive: google.drive({ version: "v3", auth: client }), mode: "oauth" };
+  }
+  return { drive: getGoogleClient().drive, mode: "service" };
+}
+
+let _uploadFolderCache: { name: string; id: string } | null = null;
+
+/**
+ * 업로드 대상 폴더 ID
+ * - service 모드: GOOGLE_DRIVE_FOLDER_ID 그대로
+ * - oauth 모드(drive.file): 앱이 만든 폴더만 접근 가능 → 루트에 "{GOOGLE_DRIVE_UPLOAD_FOLDER_NAME|대관앱 첨부}" 폴더를 찾거나 만든다
+ */
+export async function ensureUploadFolderId(drive: ReturnType<typeof google.drive>, mode: DriveUploadMode): Promise<string> {
+  if (mode === "service") return requireGoogleEnv().GOOGLE_DRIVE_FOLDER_ID;
+  const name = (getGoogleOAuthEnvOptional()?.GOOGLE_DRIVE_UPLOAD_FOLDER_NAME ?? "대관앱 첨부").trim() || "대관앱 첨부";
+  if (_uploadFolderCache?.name === name) return _uploadFolderCache.id;
+
+  const q = `name = '${name.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+  const found = await drive.files.list({ q, fields: "files(id,name)", pageSize: 5, spaces: "drive" });
+  let id = found.data.files?.[0]?.id ?? null;
+  if (!id) {
+    const created = await drive.files.create({
+      requestBody: { name, mimeType: "application/vnd.google-apps.folder" },
+      fields: "id"
+    });
+    id = created.data.id ?? null;
+  }
+  if (!id) throw new Error("업로드 폴더를 만들 수 없습니다.");
+  _uploadFolderCache = { name, id };
+  return id;
 }

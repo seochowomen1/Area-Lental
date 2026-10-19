@@ -99,3 +99,29 @@ export function getSmtpEnvOptional(): (z.infer<typeof SmtpSchema> & { ADMIN_NOTI
   }
   return parsed.data;
 }
+
+/**
+ * Google Drive 업로드용 OAuth(선택 · 2026-10-19)
+ * - 서비스 계정은 My Drive 저장 용량이 없어 파일 생성이 403(storageQuotaExceeded)으로 실패한다.
+ * - 세 값이 모두 있으면 첨부 업로드만 드라이브 소유자 OAuth 토큰으로 수행(범위 drive.file · 앱 전용 폴더).
+ * - 발급: scripts/google-oauth-token.mjs
+ */
+const GoogleOAuthSchema = z.object({
+  GOOGLE_OAUTH_CLIENT_ID: z.string().min(1, "Required"),
+  GOOGLE_OAUTH_CLIENT_SECRET: z.string().min(1, "Required"),
+  GOOGLE_OAUTH_REFRESH_TOKEN: z.string().min(1, "Required"),
+  /** 앱이 만들 업로드 폴더 이름(기본 "대관앱 첨부") */
+  GOOGLE_DRIVE_UPLOAD_FOLDER_NAME: z.string().optional()
+}).passthrough();
+
+export function getGoogleOAuthEnvOptional(): z.infer<typeof GoogleOAuthSchema> | null {
+  const any = process.env.GOOGLE_OAUTH_CLIENT_ID || process.env.GOOGLE_OAUTH_CLIENT_SECRET || process.env.GOOGLE_OAUTH_REFRESH_TOKEN;
+  if (!any) return null;
+  const parsed = GoogleOAuthSchema.safeParse(process.env);
+  if (!parsed.success) {
+    throw new Error(
+      `환경변수 설정 오류(Google OAuth 업로드):\n${parsed.error.issues.map(i => `${i.path.join(".")}: ${i.message}`).join("\n")}`
+    );
+  }
+  return parsed.data;
+}

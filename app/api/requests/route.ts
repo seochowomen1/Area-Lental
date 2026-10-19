@@ -7,7 +7,7 @@ import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/l
 import { ensureHolidaysLoaded } from "@/lib/holidays";
 import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
 import { buildGallerySessionsFromPeriod, buildGalleryOccupancy, galleryDateConflicts, isPrepAfterExhibition, validateGalleryOperatingHours } from "@/lib/gallery";
-import { getGoogleClient } from "@/lib/google";
+import { getDriveUploadClient, ensureUploadFolderId } from "@/lib/google";
 import { isMockMode } from "@/lib/env";
 import {
   sendAdminNewRequestEmail,
@@ -480,7 +480,14 @@ export async function POST(req: Request) {
         uploadedUrls.push(`mock://${encodeURIComponent(f.name)}`);
       }
     } else {
-      const { drive, env: fullEnv } = getGoogleClient();
+      // ★ 2026-10-19: OAuth env가 있으면 소유자 토큰으로 업로드(앱 전용 폴더), 없으면 서비스 계정(My Drive에선 403)
+      const { drive, mode: uploadMode } = getDriveUploadClient();
+      let uploadFolderId: string | null = null;
+      try {
+        uploadFolderId = await ensureUploadFolderId(drive, uploadMode);
+      } catch (folderErr) {
+        logger.error("업로드 폴더 확인 실패", { error: folderErr instanceof Error ? folderErr.message : String(folderErr) });
+      }
 
       for (const f of files) {
         const ab = await f.arrayBuffer();
@@ -494,8 +501,9 @@ export async function POST(req: Request) {
         //   첨부 실패가 신청 자체를 잃게 하지 않도록 비치명 처리 — 신청은 저장하고 첨부 칸에 실패 표식을 남긴다.
         //   (근본 해결: Drive 업로드를 소유자 OAuth 토큰으로 전환 — drive-check 진단 참조)
         try {
+          if (!uploadFolderId) throw new Error("업로드 폴더 없음");
           const createRes = await drive.files.create({
-            requestBody: { name: fileName, parents: [fullEnv.GOOGLE_DRIVE_FOLDER_ID] },
+            requestBody: { name: fileName, parents: [uploadFolderId] },
             media: { mimeType: f.type, body: BufferToStream(buf) },
             fields: "id"
           });
@@ -505,7 +513,7 @@ export async function POST(req: Request) {
           uploadedUrls.push(getRes.data.webViewLink ?? `https://drive.google.com/file/d/${id}/view`);
         } catch (uploadErr) {
           const ue = uploadErr as { code?: unknown; message?: string };
-          logger.error("첨부 업로드 실패 — 신청은 계속 저장", { fileName, code: ue?.code, error: ue?.message ?? String(uploadErr) });
+          logger.error("첨부 업로드 실패 — 신청은 계속 저장", { fileName, mode: uploadMode, code: ue?.code, error: ue?.message ?? String(uploadErr) });
           uploadedUrls.push(`[업로드 실패] ${safeName} — 신청자에게 메일로 재요청 필요`);
         }
       }

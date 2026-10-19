@@ -26,3 +26,7 @@ npm-debug.log*
 # 내부 진단 메모(저장소에 올리지 않음)
 기능점검_*.md
 고도화_진단_*.md
+
+# Google OAuth 토큰(로컬 발급 결과 · 절대 커밋 금지)
+.google-oauth.local.json
+client_secret*.json
