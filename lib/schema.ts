@@ -108,6 +108,8 @@ export type RequestInput = z.infer<typeof RequestInputSchema>;
 export const GalleryRequestInputSchema = z
   .object({
     roomId: z.string().min(1),
+    /** 접수 방식 — offline은 관리자 서면 접수 등록(/api/requests에서 관리자 인증 필수) */
+    intake: z.enum(["online", "offline"]).optional().default("online"),
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     startTime: z.string().regex(/^\d{2}:\d{2}$/),
     endTime: z.string().regex(/^\d{2}:\d{2}$/),
@@ -163,7 +165,8 @@ export const GalleryRequestInputSchema = z
     if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "전시 운영 규정 서약 동의는 필수입니다." });
 
     const today = todayYmdSeoul();
-    if (v.startDate <= today) {
+    // 서면 접수 등록(관리자)은 이미 접수된 건을 소급 등록하므로 당일·과거 시작일을 허용
+    if (v.intake !== "offline" && v.startDate <= today) {
       ctx.addIssue({ code: "custom", path: ["startDate"], message: "갤러리 전시는 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" });
     }
 

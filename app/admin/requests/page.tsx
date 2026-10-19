@@ -361,6 +361,15 @@ export default async function AdminRequestsPage({
                 href={exportUrl}
                 className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
               />
+              {isGalleryCategory && (
+                <Link
+                  href={`/admin/requests/new?category=${encodeURIComponent(category)}`}
+                  className="rounded-full border border-emerald-300 bg-emerald-50 px-5 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
+                  title="방문·이메일·팩스로 받은 종이 신청서를 대신 등록합니다"
+                >
+                  + 서면 신청 등록
+                </Link>
+              )}
             </div>
 
             <div className="flex items-center gap-3">

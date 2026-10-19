@@ -124,6 +124,9 @@ export async function mock_appendRequest(input: Omit<RentalRequest, "requestId" 
     galleryPrepDate: input.galleryPrepDate,
     galleryAuditJson: input.galleryAuditJson,
     galleryRemovalTime: input.galleryRemovalTime,
+    intakeChannel: input.intakeChannel,
+    appliedAt: input.appliedAt,
+    intakeNote: input.intakeNote,
 
     applicantName: input.applicantName,
     birth: input.birth,
@@ -202,6 +205,9 @@ export async function mock_appendRequestsBatch(
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
       galleryRemovalTime: input.galleryRemovalTime,
+      intakeChannel: input.intakeChannel,
+      appliedAt: input.appliedAt,
+      intakeNote: input.intakeNote,
 
       applicantName: input.applicantName,
       birth: input.birth,

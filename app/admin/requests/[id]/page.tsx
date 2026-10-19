@@ -10,7 +10,7 @@ import StatusBadge from "@/components/admin/StatusBadge";
 import { assertAdminAuth } from "@/lib/adminAuth";
 import { analyzeBundle, pickFeeBasisSessions } from "@/lib/bundle";
 import { getDatabase } from "@/lib/database";
-import { REQUEST_ID_LABEL } from "@/lib/labels";
+import { REQUEST_ID_LABEL, intakeChannelLabel, isOfflineIntake } from "@/lib/labels";
 import { computeBaseTotalKRW, computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 
 import { getCategoryLabel, getRoom, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
@@ -200,6 +200,9 @@ export default async function AdminRequestDetail({
     requestId: req.requestId,
     status: displayStatus,
     createdAt: req.createdAt,
+    /** 서면 접수 건은 appliedAt(실제 신청일)을 신청일자로 쓸 것 (2026-10-19) */
+    appliedAt: req.appliedAt ?? "",
+    intakeChannel: req.intakeChannel ?? "online",
     applicant: {
       name: req.applicantName,
       birth: req.birth,
@@ -362,6 +365,14 @@ export default async function AdminRequestDetail({
             <InfoRow label="성명">{req.applicantName}</InfoRow>
             <InfoRow label="연락처">{req.phone}</InfoRow>
             <InfoRow label="이메일">{req.email}</InfoRow>
+            {isOfflineIntake(req.intakeChannel) && (
+              <InfoRow label="접수 경로">
+                <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">서면</span>
+                <span className="ml-2">{intakeChannelLabel(req.intakeChannel)}</span>
+                {req.appliedAt ? <span className="ml-2 text-gray-600">신청일 {req.appliedAt}</span> : null}
+                {req.intakeNote ? <span className="ml-2 text-gray-500">· {req.intakeNote}</span> : null}
+              </InfoRow>
+            )}
             {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}
             {!isStudio && req.headcount && <InfoRow label="인원">{req.headcount}명</InfoRow>}
           </dl>

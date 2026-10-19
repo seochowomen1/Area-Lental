@@ -18,6 +18,8 @@ import {
 import { logger } from "@/lib/logger";
 import { createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
+import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import type { IntakeChannel } from "@/lib/types";
 import type { RequestStatus } from "@/lib/types";
 import { REQUEST_LIMITS } from "@/lib/constants";
 
@@ -97,6 +99,8 @@ export async function POST(req: Request) {
 
     const raw = {
       roomId: String(form.get("roomId") ?? ""),
+      // 관리자 서면 접수 등록(2026-10-19): intake=offline + 관리자 쿠키 필수
+      intake: String(form.get("intake") ?? "online") === "offline" ? "offline" : "online",
       date: String(form.get("date") ?? ""),
       startTime: String(form.get("startTime") ?? ""),
       endTime: String(form.get("endTime") ?? ""),
@@ -140,6 +144,36 @@ export async function POST(req: Request) {
       pledgeName: String(form.get("pledgeName") ?? "")
     };
 
+    // ★ 서면 접수 등록(관리자) — 방문·이메일·팩스로 받은 종이 신청서를 관리자가 대신 등록
+    //   - 관리자 인증을 입력 검증보다 먼저 수행 · 접수 경로/신청일/메모 기록 · 신청자 메일·토큰 발급 없음 · 당일/과거 시작일 허용
+    const isOffline = raw.intake === "offline";
+    let offlineMeta: { intakeChannel: IntakeChannel; appliedAt: string; intakeNote?: string } | null = null;
+    if (isOffline) {
+      const auth = assertAdminApiAuth(req);
+      if (!auth.ok) {
+        return NextResponse.json(
+          { ok: false, code: "UNAUTHORIZED", message: "서면 접수 등록은 관리자만 할 수 있습니다." },
+          { status: auth.status ?? 401 }
+        );
+      }
+      if (raw.roomId !== "gallery") {
+        return NextResponse.json(
+          { ok: false, code: "VALIDATION_ERROR", message: "서면 접수 등록은 현재 우리동네 갤러리만 지원합니다." },
+          { status: 400 }
+        );
+      }
+      const ch = String(form.get("intakeChannel") ?? "").trim();
+      const appliedAt = String(form.get("appliedAt") ?? "").trim();
+      const intakeNote = String(form.get("intakeNote") ?? "").trim().slice(0, 500);
+      if (!["visit", "email", "fax"].includes(ch)) {
+        return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: "접수 경로를 선택해 주세요." }, { status: 400 });
+      }
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(appliedAt) || appliedAt > todayYmdSeoul()) {
+        return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: "신청(접수)일은 오늘 이전 날짜로 입력해 주세요." }, { status: 400 });
+      }
+      offlineMeta = { intakeChannel: ch as IntakeChannel, appliedAt, intakeNote: intakeNote || undefined };
+    }
+
     const schema = raw.roomId === "gallery" ? GalleryRequestInputSchema : RequestInputSchema;
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
@@ -154,6 +188,7 @@ export async function POST(req: Request) {
       );
     }
     const input = parsed.data;
+
 
     // ✅ 여러 회차(날짜별로 시간 다르게) 묶음 신청 지원
     const isYmd = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
@@ -176,7 +211,7 @@ export async function POST(req: Request) {
       }
       // 갤러리 당일 전시 신청 차단: 준비일이 과거가 되므로 최소 익일부터 신청 가능
       const todayStr = todayYmdSeoul();
-      if (startDate <= todayStr) {
+      if (!isOffline && startDate <= todayStr) {
         return NextResponse.json(
           { ok: false, code: "VALIDATION_ERROR", message: "갤러리 전시는 최소 1일 전에 신청해야 합니다. (당일 신청 불가)" },
           { status: 400 }
@@ -532,6 +567,11 @@ export async function POST(req: Request) {
         galleryAuditJson,
         galleryRemovalTime: isGallery ? (galleryInput?.galleryRemovalTime || undefined) : undefined,
 
+        // 서면 접수 등록 메타(온라인 신청은 undefined)
+        intakeChannel: offlineMeta?.intakeChannel,
+        appliedAt: offlineMeta?.appliedAt,
+        intakeNote: offlineMeta?.intakeNote,
+
         applicantName: input.applicantName,
         birth: input.birth,
         address: input.address,
@@ -579,7 +619,9 @@ export async function POST(req: Request) {
     }
 
     try {
-      if (savedList.length > 1) {
+      if (isOffline) {
+        // 서면 접수 등록: 신청자 접수 메일·관리자 알림 메일 모두 발송하지 않음(관리자가 직접 등록한 건)
+      } else if (savedList.length > 1) {
         await sendAdminNewRequestEmailBatch(savedList);
         await sendApplicantReceivedEmailBatch(savedList);
       } else {
@@ -594,8 +636,9 @@ export async function POST(req: Request) {
       });
     }
 
-    logger.info('대관 신청 생성 완료', {
+    logger.info(isOffline ? '서면 접수 등록 완료(관리자)' : '대관 신청 생성 완료', {
       requestId: savedList[0]?.requestId,
+      intakeChannel: offlineMeta?.intakeChannel,
       batchId,
       count: savedList.length,
       roomId: input.roomId,
@@ -604,7 +647,7 @@ export async function POST(req: Request) {
 
     let applicantToken = "";
     try {
-      applicantToken = createApplicantLinkToken({
+      if (!isOffline) applicantToken = createApplicantLinkToken({
         email: input.email,
         ttlSeconds: 7 * 24 * 60 * 60,
       });

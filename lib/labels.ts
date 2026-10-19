@@ -12,3 +12,19 @@ export function statusLabel(status: RequestStatus): string {
 export const REQUEST_ID_LABEL = "신청번호";
 export const APPLY_NOUN = "신청";
 export const APPLY_VERB = "신청";
+
+/** 접수 경로 표시 (서면 접수 등록 · 2026-10-19) */
+export const INTAKE_CHANNEL_OPTIONS: { value: "visit" | "email" | "fax"; label: string }[] = [
+  { value: "visit", label: "방문 제출(서면)" },
+  { value: "email", label: "이메일 제출(서면)" },
+  { value: "fax", label: "팩스·우편 제출(서면)" },
+];
+
+export function intakeChannelLabel(ch?: string): string {
+  if (!ch || ch === "online") return "온라인 신청";
+  return INTAKE_CHANNEL_OPTIONS.find((o) => o.value === ch)?.label ?? ch;
+}
+
+export function isOfflineIntake(ch?: string): boolean {
+  return Boolean(ch && ch !== "online");
+}

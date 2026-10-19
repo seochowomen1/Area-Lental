@@ -1,5 +1,8 @@
 export type RequestStatus = "접수" | "승인" | "반려" | "취소";
 
+/** 접수 경로 (서면 접수 등록 기능 · 2026-10-19) */
+export type IntakeChannel = "online" | "visit" | "email" | "fax";
+
 export type RentalRequest = {
   requestId: string;
   createdAt: string;
@@ -52,6 +55,13 @@ export type RentalRequest = {
   galleryAuditJson?: string;
   /** 우리동네 갤러리: 철수시간(HH:MM, 종료일 기준) */
   galleryRemovalTime?: string;
+
+  /** 접수 경로 — online(앱 신청) · visit(방문 서면) · email(이메일 서면) · fax(팩스·우편 서면). 없으면 online (2026-10-19) */
+  intakeChannel?: IntakeChannel;
+  /** 서면 접수 시 실제 신청(접수)일 YYYY-MM-DD — 없으면 createdAt 기준 */
+  appliedAt?: string;
+  /** 서면 접수 등록 메모(원본 보관 위치 등) */
+  intakeNote?: string;
 
   applicantName: string;
   birth: string;

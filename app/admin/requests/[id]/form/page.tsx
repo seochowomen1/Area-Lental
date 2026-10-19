@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { intakeChannelLabel, isOfflineIntake } from "@/lib/labels";
 
 import PrintActions from "./PrintActions";
 
@@ -159,7 +160,12 @@ export default async function AdminRequestFormPage({
      - printDate(출력일)는 푸터 표기 전용 — KST 기준으로 산출 */
   const ymdToDots = (s?: string) => (s ? s.slice(0, 10).replace(/-/g, ".") : "");
   const printDate = ymdToDots(todayYmdSeoul());
-  const applyDate = ymdToDots(req.createdAt) || printDate;
+  // 서면 접수 등록 건(2026-10-19): 신청일 = 실제 접수일(appliedAt) · 전자 동의 문구 대신 서면 접수 표기
+  const isOffline = isOfflineIntake(req.intakeChannel);
+  const applyDate = (isOffline && req.appliedAt ? ymdToDots(req.appliedAt) : ymdToDots(req.createdAt)) || printDate;
+  const intakeLine = isOffline
+    ? `접수일: ${req.appliedAt ? ymdToDots(req.appliedAt) : applyDate} · 접수 경로: ${intakeChannelLabel(req.intakeChannel)}`
+    : "";
   const pledgeSignDate = ymdToDots(req.pledgeDate) || applyDate;
 
   // 전자 동의 일시 (신청 일시 — 날짜+시각)
@@ -519,17 +525,18 @@ export default async function AdminRequestFormPage({
             {/* ── 6. 전자 동의 확인 ── */}
             <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
               <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
-                [전자 동의 확인]
+                {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
               <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
-                <span>신청 일시: {consentDate}</span>
+                <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
-                본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
-                신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+                {isOffline
+                  ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
+                  : "본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
               </p>
             </div>
 
@@ -541,7 +548,7 @@ export default async function AdminRequestFormPage({
               </p>
               <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
-                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; {isOffline ? "(서면 서명 · 원본 보관)" : "(전자 동의 완료)"}
               </p>
             </div>
 
@@ -799,15 +806,16 @@ export default async function AdminRequestFormPage({
             {/* ── 6. 전자 동의 확인 ── */}
             <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
               <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
-                [전자 동의 확인]
+                {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
               <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
-                <span>신청 일시: {consentDate}</span>
+                <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
-                본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며,
-                신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+                {isOffline
+                  ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
+                  : "본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
               </p>
             </div>
 
@@ -818,7 +826,7 @@ export default async function AdminRequestFormPage({
               </p>
               <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
-                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; {isOffline ? "(서면 서명 · 원본 보관)" : "(전자 동의 완료)"}
               </p>
             </div>
 
@@ -1114,17 +1122,18 @@ export default async function AdminRequestFormPage({
             {/* ── 6. 전자 동의 확인 ── */}
             <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
               <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
-                [전자 동의 확인]
+                {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
               <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
-                <span>신청 일시: {consentDate}</span>
+                <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
               </div>
               <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
-                본 신청서는 온라인 전시 신청 시 전자적 방식으로 동의한 내용이며,
-                신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+                {isOffline
+                  ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
+                  : "본 신청서는 온라인 전시 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
               </p>
             </div>
 
@@ -1136,7 +1145,7 @@ export default async function AdminRequestFormPage({
               </p>
               <p className="mt-2">{applyDate}</p>
               <p className="mt-2">
-                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+                신청자: <b>{req.applicantName}</b> &nbsp;&nbsp; {isOffline ? "(서면 서명 · 원본 보관)" : "(전자 동의 완료)"}
               </p>
             </div>
 
@@ -1233,15 +1242,15 @@ export default async function AdminRequestFormPage({
           {/* ── 전자 서약 확인란 ── */}
           <div className="mt-3 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-2 print:px-2 print:py-1.5">
             <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
-              [전자 서약 확인]
+              {isOffline ? "[서면 서약 확인]" : "[전자 서약 확인]"}
             </h4>
             <table className="mt-1 w-full border-collapse text-[11px] print:text-[9px]">
               <tbody>
                 <tr>
                   <th className={TH} style={{ width: "18%" }}>
-                    서약 일시
+                    {isOffline ? "서약일" : "서약 일시"}
                   </th>
-                  <td className={TD}>{consentDate}</td>
+                  <td className={TD}>{isOffline ? `${ymdToDots(req.pledgeDate) || applyDate} (${intakeChannelLabel(req.intakeChannel)})` : consentDate}</td>
                   <th className={TH} style={{ width: "14%" }}>
                     연락처
                   </th>
@@ -1261,8 +1270,9 @@ export default async function AdminRequestFormPage({
               </tbody>
             </table>
             <p className="mt-1 text-[9px] text-gray-500 print:text-[7px]">
-              본 서약은 온라인 {isGallery ? "전시" : "대관"} 신청 시 전자적 방식으로 동의한 내용이며,
-              신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.
+              {isOffline
+                ? "본 서약은 신청자가 서면 서약서에 서명하여 제출한 내용이며, 서명 원본을 센터에서 보관합니다."
+                : `본 서약은 온라인 ${isGallery ? "전시" : "대관"} 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.`}
             </p>
           </div>
 
@@ -1270,7 +1280,7 @@ export default async function AdminRequestFormPage({
           <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
             <p>{pledgeSignDate}</p>
             <p className="mt-2">
-              서약자: <b>{req.applicantName}</b> &nbsp;&nbsp; (전자 동의 완료)
+              서약자: <b>{req.applicantName}</b> &nbsp;&nbsp; {isOffline ? "(서면 서명 · 원본 보관)" : "(전자 동의 완료)"}
             </p>
           </div>
 

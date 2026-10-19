@@ -58,6 +58,11 @@ export const REQUEST_OPTIONAL_HEADERS = [
   "galleryPrepDate",
   "galleryAuditJson",
   "galleryRemovalTime",
+
+  // 서면 접수 등록 (2026-10-19)
+  "intakeChannel",
+  "appliedAt",
+  "intakeNote",
 ] as const;
 
 function colToLetter(col1: number): string {
@@ -162,6 +167,9 @@ function buildRecordValueMap(record: RentalRequest): Record<string, string> {
     galleryPrepDate: record.galleryPrepDate ?? "",
     galleryAuditJson: record.galleryAuditJson ?? "",
     galleryRemovalTime: record.galleryRemovalTime ?? "",
+    intakeChannel: record.intakeChannel ?? "",
+    appliedAt: record.appliedAt ?? "",
+    intakeNote: record.intakeNote ?? "",
   };
 }
 
@@ -305,6 +313,9 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
   const iGalleryPrepDate = opt("galleryPrepDate");
   const iGalleryAuditJson = opt("galleryAuditJson");
   const iGalleryRemovalTime = opt("galleryRemovalTime");
+  const iIntakeChannel = opt("intakeChannel");
+  const iAppliedAt = opt("appliedAt");
+  const iIntakeNote = opt("intakeNote");
 
   return rows
     .slice(1)
@@ -342,6 +353,9 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       galleryPrepDate: iGalleryPrepDate >= 0 ? (String(r[iGalleryPrepDate] ?? "").trim() || undefined) : undefined,
       galleryAuditJson: iGalleryAuditJson >= 0 ? (String(r[iGalleryAuditJson] ?? "").trim() || undefined) : undefined,
       galleryRemovalTime: iGalleryRemovalTime >= 0 ? (String(r[iGalleryRemovalTime] ?? "").trim() || undefined) : undefined,
+      intakeChannel: iIntakeChannel >= 0 ? ((String(r[iIntakeChannel] ?? "").trim() || undefined) as RentalRequest["intakeChannel"]) : undefined,
+      appliedAt: iAppliedAt >= 0 ? (String(r[iAppliedAt] ?? "").trim() || undefined) : undefined,
+      intakeNote: iIntakeNote >= 0 ? (String(r[iIntakeNote] ?? "").trim() || undefined) : undefined,
 
       applicantName: r[idx("applicantName")],
       birth: r[idx("birth")],
@@ -456,6 +470,9 @@ export async function appendRequest(
     galleryPrepDate: input.galleryPrepDate,
     galleryAuditJson: input.galleryAuditJson,
     galleryRemovalTime: input.galleryRemovalTime,
+    intakeChannel: input.intakeChannel,
+    appliedAt: input.appliedAt,
+    intakeNote: input.intakeNote,
 
     applicantName: input.applicantName,
     birth: input.birth,
@@ -566,6 +583,9 @@ export async function appendRequestsBatch(
       galleryPrepDate: input.galleryPrepDate,
       galleryAuditJson: input.galleryAuditJson,
       galleryRemovalTime: input.galleryRemovalTime,
+      intakeChannel: input.intakeChannel,
+      appliedAt: input.appliedAt,
+      intakeNote: input.intakeNote,
 
       applicantName: input.applicantName,
       birth: input.birth,
