@@ -5,6 +5,7 @@ import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { buildHourSlotsForDate } from "@/lib/operating";
 import { handleApiError } from "@/lib/apiResponse";
 import type { RequestStatus } from "@/lib/types";
+import { buildGalleryOccupancy } from "@/lib/gallery";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -15,7 +16,7 @@ export const revalidate = 0;
  * 사용자 캘린더에서 선택 불가 표시에 사용됩니다.
  *
  * GET /api/booked-dates?roomId=xxx&month=YYYY-MM
- * → { ok, bookedDates: string[] }  // ["2026-02-23", "2026-02-24", ...]
+ * → { ok, bookedDates: string[], exhibitionEndDates: string[], prepOnlyDates: string[], holidays }
  */
 export async function GET(req: Request) {
   try {
@@ -45,6 +46,11 @@ export async function GET(req: Request) {
 
     const conflictStatuses: RequestStatus[] = ["접수", "승인"];
     const bookedDates: string[] = [];
+    // ★ 갤러리 준비·철거 규정(2026-10-19): 준비일은 날짜를 "마감"시키지 않는다
+    //   (앞 전시의 마지막 날에 17:00 이후 준비 가능 · 준비일만 잡힌 날은 앞 신청의 마지막 전시일로 선택 가능)
+    const galleryOcc = roomId === "gallery" ? buildGalleryOccupancy(requests) : null;
+    const exhibitionEndDates: string[] = [];
+    const prepOnlyDates: string[] = [];
 
     for (let d = 1; d <= lastDay; d++) {
       const date = `${yearStr}-${monthStr}-${String(d).padStart(2, "0")}`;
@@ -57,17 +63,14 @@ export async function GET(req: Request) {
       if (baseSlots.length === 0) continue;
 
       // 해당 날짜에 대한 기존 예약 필터
-      const sameRoomRequests = requests.filter((r) => {
-        if (r.roomId !== roomId) return false;
-        if (!conflictStatuses.includes(r.status)) return false;
-        // 갤러리 1행 형식
-        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
-          if (date >= r.startDate && date <= r.endDate && dayOfWeek(date) !== 0) return true;
-          if (r.galleryPrepDate && date === r.galleryPrepDate) return true;
-          return false;
-        }
-        return r.date === date;
-      });
+      const sameRoomRequests = galleryOcc
+        ? []
+        : requests.filter((r) => {
+            if (r.roomId !== roomId) return false;
+            if (!conflictStatuses.includes(r.status)) return false;
+            return r.date === date;
+          });
+      const galleryExhibitionDay = galleryOcc ? galleryOcc.exhibitionDates.has(date) : false;
 
       const sameRoomBlocks = blocks.filter((b) => {
         if (b.roomId !== roomId && b.roomId !== "all") return false;
@@ -81,10 +84,7 @@ export async function GET(req: Request) {
 
       // 모든 슬롯이 차단되었는지 확인
       const allSlotsTaken = baseSlots.every((slot) => {
-        const byReq = sameRoomRequests.some((r) => {
-          if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
-          return overlaps(r.startTime, r.endTime, slot.start, slot.end);
-        });
+        const byReq = galleryExhibitionDay || sameRoomRequests.some((r) => overlaps(r.startTime, r.endTime, slot.start, slot.end));
         // 갤러리 블록(내부 대관 등 날짜 범위)은 전일 차단으로 처리
         const byBlock = sameRoomBlocks.some((b) => {
           if (roomId === "gallery" && b.endDate) return true;
@@ -97,11 +97,19 @@ export async function GET(req: Request) {
       if (allSlotsTaken) {
         bookedDates.push(date);
       }
+      if (galleryOcc) {
+        if (galleryOcc.endDates.has(date) && galleryExhibitionDay) exhibitionEndDates.push(date);
+        if (galleryOcc.prepDates.has(date) && !allSlotsTaken) prepOnlyDates.push(date);
+      }
     }
 
     return NextResponse.json({
       ok: true,
       bookedDates,
+      /** 갤러리: 기존 전시의 마지막 날(철거일) — 다음 전시 준비일로 허용(평일 17:00·토 11:00 이후) */
+      exhibitionEndDates,
+      /** 갤러리: 다른 신청의 준비일만 잡힌 날 — 앞 전시의 마지막 날(종료일)로만 선택 가능 */
+      prepOnlyDates,
       holidays: holidays.map((h) => ({ date: h.date, name: h.name })),
     });
   } catch (e: unknown) {

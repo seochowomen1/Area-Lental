@@ -5,7 +5,13 @@ import {
   getDefaultPrepDate,
   getAvailablePrepDates,
   computeGalleryStats,
+  galleryTeardownDeadline,
+  galleryPrepWindow,
+  buildGalleryOccupancy,
+  galleryDateConflicts,
+  isPrepAfterExhibition,
 } from "@/lib/gallery";
+import type { RentalRequest } from "@/lib/types";
 import { _clearHolidayCache } from "@/lib/holidays";
 
 beforeEach(() => {
@@ -173,5 +179,69 @@ describe("computeGalleryStats", () => {
     const stats = computeGalleryStats("2026-03-16", "2026-03-18");
     expect(stats.prepDate).toBeDefined();
     expect(stats.prepDate).not.toBeNull();
+  });
+});
+
+// ─── 준비·철거 규정 (2026-10-19) ───
+
+function req(partial: Partial<RentalRequest>): RentalRequest {
+  return { requestId: "r", roomId: "gallery", status: "승인", date: "", startTime: "09:00", endTime: "18:00", ...partial } as unknown as RentalRequest;
+}
+
+describe("갤러리 준비·철거 규정", () => {
+  test("철거 기한: 평일 16:00 · 토요일 11:00 · 일요일 null", () => {
+    expect(galleryTeardownDeadline("2026-10-28")).toBe("16:00"); // 수
+    expect(galleryTeardownDeadline("2026-10-31")).toBe("11:00"); // 토
+    expect(galleryTeardownDeadline("2026-11-01")).toBeNull(); // 일
+  });
+
+  test("준비일 창: 전시 없으면 운영시간 전체, 있으면 17:00~(토 11:00~)", () => {
+    expect(galleryPrepWindow("2026-10-28", false)).toEqual({ startTime: "09:00", endTime: "18:00" });
+    expect(galleryPrepWindow("2026-10-28", true)).toEqual({ startTime: "17:00", endTime: "18:00" });
+    expect(galleryPrepWindow("2026-10-27", true)).toEqual({ startTime: "17:00", endTime: "20:00" }); // 화 야간
+    expect(galleryPrepWindow("2026-10-31", true)).toEqual({ startTime: "11:00", endTime: "13:00" }); // 토
+  });
+
+  test("점유 집합: 1행 형식 + 구형 batch", () => {
+    const occ = buildGalleryOccupancy([
+      req({ requestId: "a", startDate: "2026-10-14", endDate: "2026-10-28", galleryPrepDate: "2026-10-13" }),
+      req({ requestId: "b", batchId: "B", date: "2026-11-02", isPrepDay: true }),
+      req({ requestId: "b2", batchId: "B", date: "2026-11-03" }),
+      req({ requestId: "b3", batchId: "B", date: "2026-11-04" }),
+      req({ requestId: "c", status: "반려", startDate: "2026-12-01", endDate: "2026-12-05" }),
+    ]);
+    expect(occ.exhibitionDates.has("2026-10-20")).toBe(true);
+    expect(occ.exhibitionDates.has("2026-10-18")).toBe(false); // 일요일 제외
+    expect(occ.endDates.has("2026-10-28")).toBe(true);
+    expect(occ.prepDates.has("2026-10-13")).toBe(true);
+    expect(occ.prepDates.has("2026-11-02")).toBe(true);
+    expect(occ.endDates.has("2026-11-04")).toBe(true);
+    expect(occ.exhibitionDates.has("2026-12-01")).toBe(false); // 반려 제외
+  });
+
+  test("충돌: 앞 전시 마지막 날은 준비일로 허용, 중간 날은 불가", () => {
+    const occ = buildGalleryOccupancy([
+      req({ requestId: "a", startDate: "2026-10-14", endDate: "2026-10-28", galleryPrepDate: "2026-10-13" }),
+    ]);
+    expect(galleryDateConflicts(occ, "2026-10-28", "prep")).toBe(false);
+    expect(isPrepAfterExhibition(occ, "2026-10-28")).toBe(true);
+    expect(galleryDateConflicts(occ, "2026-10-27", "prep")).toBe(true);
+    expect(galleryDateConflicts(occ, "2026-10-13", "prep")).toBe(true); // 준비일끼리
+    expect(galleryDateConflicts(occ, "2026-10-28", "exhibition", "2026-10-30")).toBe(true);
+    expect(galleryDateConflicts(occ, "2026-10-29", "exhibition", "2026-10-30")).toBe(false);
+  });
+
+  test("충돌: 다른 신청의 준비일은 우리 마지막 날에서만 허용", () => {
+    const occ = buildGalleryOccupancy([
+      req({ requestId: "n", startDate: "2026-11-05", endDate: "2026-11-10", galleryPrepDate: "2026-11-04" }),
+    ]);
+    expect(galleryDateConflicts(occ, "2026-11-04", "exhibition", "2026-11-04")).toBe(false);
+    expect(galleryDateConflicts(occ, "2026-11-04", "exhibition", "2026-11-06")).toBe(true);
+  });
+
+  test("회차 생성: 준비일이 앞 전시 철거일이면 17:00 시작", () => {
+    const sessions = buildGallerySessionsFromPeriod("2026-10-29", "2026-10-30", "2026-10-28", { prepAfterExhibition: true });
+    expect(sessions[0]).toEqual({ date: "2026-10-28", startTime: "17:00", endTime: "18:00", isPrepDay: true });
+    expect(sessions.length).toBe(3);
   });
 });

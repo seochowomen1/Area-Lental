@@ -7,6 +7,7 @@ import Button from "@/components/ui/Button";
 import { FieldHelp } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
 import { CARD_BASE } from "@/components/ui/presets";
+import { GALLERY_RULES } from "@/lib/constants";
 
 function isYmd(v: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -66,6 +67,10 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
+  /** 기존 전시의 마지막 날(철거일) — 다음 전시 준비일로 허용(평일 17:00·토 11:00 이후) */
+  const [exhibitionEndDates, setExhibitionEndDates] = useState<Set<string>>(new Set());
+  /** 다른 신청의 준비일만 잡힌 날 — 우리 전시의 마지막 날(종료일)로만 선택 가능 */
+  const [prepOnlyDates, setPrepOnlyDates] = useState<Set<string>>(new Set());
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
 
   // 월 변경 시 예약 마감 날짜 + 공휴일 조회
@@ -77,6 +82,8 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         if (data.ok && Array.isArray(data.bookedDates)) {
           setBookedDates(new Set(data.bookedDates));
         }
+        setExhibitionEndDates(new Set(Array.isArray(data.exhibitionEndDates) ? data.exhibitionEndDates : []));
+        setPrepOnlyDates(new Set(Array.isArray(data.prepOnlyDates) ? data.prepOnlyDates : []));
         if (Array.isArray(data.holidays)) {
           const m = new Map<string, string>();
           for (const h of data.holidays) m.set(h.date, h.name);
@@ -104,20 +111,30 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     return count;
   }, [startDate, endDate, holidayMap]);
 
-  // 기본 준비일 계산: 시작일 이전 1일(일요일·예약 마감일이면 직전 영업일)
-  const defaultPrepDate = useMemo(() => {
-    if (!isYmd(startDate)) return "";
-    let prepYmd = dateToYmdLocal(new Date(toDateLocal(startDate).getFullYear(), toDateLocal(startDate).getMonth(), toDateLocal(startDate).getDate() - 1));
+  // 기본 준비일 계산 (준비·철거 규정 2026-10-19)
+  // - 시작일 직전 운영일(일요일·공휴일만 건너뜀). 마감일을 피해 더 이전으로 밀지 않는다.
+  // - 그날이 기존 전시의 마지막 날이면 "철거 후 17:00(토 11:00) 이후" 준비
+  // - 그날이 지났거나(오늘 포함) 전시 중간·내부 차단이면 준비일 없음
+  const prepInfo = useMemo(() => {
+    if (!isYmd(startDate)) return { date: "", afterExhibition: false };
+    let prepYmd = startDate;
     let safety = 0;
-    while (isYmd(prepYmd) && safety++ < 30) {
-      if (dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd) && !holidayMap.has(prepYmd)) break;
+    do {
       const d = toDateLocal(prepYmd);
       d.setDate(d.getDate() - 1);
       prepYmd = dateToYmdLocal(d);
+    } while ((dayOfWeekLocal(prepYmd) === 0 || holidayMap.has(prepYmd)) && safety++ < 14);
+    if (!isYmd(prepYmd) || prepYmd <= dateToYmdLocal(new Date())) return { date: "", afterExhibition: false };
+    if (bookedDates.has(prepYmd)) {
+      if (exhibitionEndDates.has(prepYmd)) return { date: prepYmd, afterExhibition: true };
+      return { date: "", afterExhibition: false };
     }
-    if (isYmd(prepYmd) && prepYmd < startDate && dayOfWeekLocal(prepYmd) !== 0 && !bookedDates.has(prepYmd) && !holidayMap.has(prepYmd)) return prepYmd;
-    return "";
-  }, [startDate, bookedDates, holidayMap]);
+    return { date: prepYmd, afterExhibition: false };
+  }, [startDate, bookedDates, exhibitionEndDates, holidayMap]);
+  const defaultPrepDate = prepInfo.date;
+  const prepAfterLabel = prepInfo.afterExhibition
+    ? `${dayOfWeekLocal(prepInfo.date) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY} 이후`
+    : "";
 
   // 이용료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
   const feeBreakdown = useMemo(() => {
@@ -272,6 +289,16 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     if (isYmd(startDate) && !isYmd(endDate)) {
       if (ymd < startDate) return true;
       if (diffDaysInclusive(startDate, ymd) > 30) return true;
+      // 기간 안에 마감일이 끼면 비활성 · 다른 신청의 준비일은 우리 마지막 날로만 가능(그 뒤로는 비활성)
+      let cur = startDate;
+      let guard = 0;
+      while (cur < ymd && guard++ < 40) {
+        if (prepOnlyDates.has(cur)) return true;
+        const d = toDateLocal(cur);
+        d.setDate(d.getDate() + 1);
+        cur = dateToYmdLocal(d);
+        if (cur <= ymd && bookedDates.has(cur)) return true;
+      }
     }
 
     // 시작/종료 모두 선택된 상태: 범위 밖은 비활성 (단, 시작일은 재클릭으로 초기화 가능)
@@ -290,9 +317,10 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
           <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
           <li>일요일·공휴일은 휴관으로 자동 제외됩니다.</li>
-          <li>준비(세팅)일 1일은 <span className="font-semibold">무료</span>로 포함됩니다. (신청서에서 날짜 선택 가능)</li>
+          <li>준비(세팅)일 1일은 <span className="font-semibold">무료</span>로 포함됩니다. (시작 직전 운영일 · 신청서에서 변경 가능)</li>
           <li>전시 기간은 최대 30일까지 신청할 수 있습니다.</li>
-          <li>전시 마지막 날 <span className="font-semibold">17시까지 철수 완료</span> 필수</li>
+          <li><span className="font-semibold">철거</span>: 전시 마지막 날 <span className="font-semibold">평일 16:00 · 토요일 11:00 이전</span> 완료</li>
+          <li><span className="font-semibold">준비</span>: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <span className="font-semibold">평일 17:00 · 토요일 11:00 이후</span></li>
         </ul>
       </div>
 
@@ -401,7 +429,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                   {c.inMonth && (
                     <div className="mt-1 flex items-center gap-1">
                       {isPrep ? (
-                        <span className="text-[9px] font-bold text-emerald-700">준비</span>
+                        <span className="text-center text-[9px] font-bold leading-none text-emerald-700">
+                          준비{prepAfterLabel ? <><br />{prepAfterLabel}</> : null}
+                        </span>
                       ) : (isSunday || holidayMap.has(c.ymd)) ? (
                         <>
                           <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" title={holidayMap.get(c.ymd) ?? "휴관"} />
@@ -410,7 +440,11 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                           )}
                         </>
                       ) : bookedDates.has(c.ymd) ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
+                        exhibitionEndDates.has(c.ymd) ? (
+                          <span className="text-[9px] leading-none text-gray-500" title="기존 전시 철거일 — 철거 후 준비 가능">철거</span>
+                        ) : (
+                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
+                        )
                       ) : isStart ? (
                         <span className="text-[9px] font-bold text-orange-600">시작</span>
                       ) : isEnd && !isStart ? (
@@ -419,6 +453,8 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
                       ) : c.ymd < dateToYmdLocal(new Date()) ? (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
+                      ) : prepOnlyDates.has(c.ymd) ? (
+                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" title="다음 전시 준비일 — 종료일로만 선택 가능(철거 후 인계)" />
                       ) : (
                         <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
                       )}
@@ -444,7 +480,11 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
             <span>준비일</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-300" aria-hidden />
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" aria-hidden />
+            <span>마감</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" aria-hidden />
             <span>휴관</span>
           </div>
         </div>
@@ -460,10 +500,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         {!error && days > 0 ? (
           <div className="space-y-1">
             <FieldHelp>선택 기간: {days}일 (일요일·공휴일 자동 제외)</FieldHelp>
-            {defaultPrepDate && (
+            {defaultPrepDate ? (
               <FieldHelp>
-                준비일: {defaultPrepDate} ({dowLabel(defaultPrepDate)}) — 신청서에서 변경 가능
+                준비일: {defaultPrepDate} ({dowLabel(defaultPrepDate)}){prepAfterLabel ? ` — 앞 전시 철거 후 ${prepAfterLabel} 입장` : ""} — 신청서에서 변경 가능
               </FieldHelp>
+            ) : (
+              <FieldHelp>준비일: 없음 (직전 운영일이 지났거나 사용 중) — 시작일 당일 운영시간 내 준비</FieldHelp>
             )}
           </div>
         ) : null}
@@ -492,7 +534,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
               )}
               {feeBreakdown.prepDays > 0 && defaultPrepDate && (
                 <div className="flex items-center justify-between text-sm text-emerald-600">
-                  <span>준비일 {feeBreakdown.prepDays}일 ({defaultPrepDate} {dowLabel(defaultPrepDate)})</span>
+                  <span>준비일 {feeBreakdown.prepDays}일 ({defaultPrepDate} {dowLabel(defaultPrepDate)}{prepAfterLabel ? ` · ${prepAfterLabel}` : ""})</span>
                   <span className="font-medium">무료</span>
                 </div>
               )}

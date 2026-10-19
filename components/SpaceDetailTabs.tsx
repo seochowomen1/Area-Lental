@@ -140,7 +140,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
           </div>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-xs text-slate-600">
             <li>할인 및 바우처 적용 불가</li>
-            <li>준비(세팅)일 1일 무료 지원</li>
+            <li>준비(세팅)일 1일 무료 지원 (전시 시작 직전 운영일)</li>
           </ul>
         </div>
 
@@ -152,7 +152,8 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
             <li>와이어 걸이(고리)를 활용한 형식의 작품만 전시 가능 (고리를 걸 수 있는 장치 필요)</li>
             <li>액자 형태 작품: 가로/세로 최대 60cm, 최대 15점까지 전시 가능</li>
             <li>작품 크기·무게에 따라 전시 불가 시 사전 담당자 상담 필요</li>
-            <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수</li>
+            <li>철거: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수</li>
+            <li>준비: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 가능</li>
             <li>홍보 콘텐츠 제작을 위해 준비일 이전에 전시 고리 사진 파일을 서초센터 메일로 공유 필요</li>
           </ul>
         </div>

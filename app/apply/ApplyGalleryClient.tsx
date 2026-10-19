@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { GALLERY_RULES } from "@/lib/constants";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -121,18 +122,47 @@ function getAvailablePrepDates(startDate: string, count = 7): string[] {
  * 예: 후보=[2/11, 2/10, 2/9, 2/8, 2/7, 2/6, 2/5], 2/6 충돌
  *   → 결과=[2/11, 2/10, 2/9, 2/8, 2/7] (2/6 이후 전부 잘림)
  */
-function filterPrepDatesByConflict(candidates: string[], bookedDates: Set<string>): string[] {
+function filterPrepDatesByConflict(candidates: string[], bookedDates: Set<string>, exhibitionEndDates: Set<string>): string[] {
+  // 준비·철거 규정(2026-10-19): 기존 전시의 마지막 날(철거일)은 철거 후 17:00(토 11:00) 이후 준비 가능
+  //   → 후보에 포함. 그 전시의 중간 날짜(마감)를 만나면 그 이전은 전부 제외
   const result: string[] = [];
   for (const d of candidates) {
-    if (bookedDates.has(d)) break;
+    if (bookedDates.has(d)) {
+      if (exhibitionEndDates.has(d)) {
+        result.push(d);
+        continue;
+      }
+      break;
+    }
     result.push(d);
   }
   return result;
 }
 
+/** 직전 운영일에 전시가 있을 때 준비 가능 시작 시각 (평일 17:00 · 토요일 11:00) */
+function prepAfterStartTime(ymd: string): string {
+  return dayOfWeekLocal(ymd) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY;
+}
+
+/** 전시 마지막 날 철거 완료 기한 (평일 16:00 · 토요일 11:00) */
+function teardownDeadline(ymd: string): string {
+  return dayOfWeekLocal(ymd) === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
+}
+
+/** 09:00부터 기한까지 30분 간격 철수 시간 옵션 */
+function teardownTimeOptions(deadline: string): string[] {
+  const out: string[] = [];
+  const [dh, dm] = deadline.split(":").map((v) => parseInt(v, 10));
+  const limit = dh * 60 + dm;
+  for (let t = 9 * 60; t <= limit; t += 30) {
+    out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
+  }
+  return out;
+}
+
 type SessionInput = { date: string; startTime: string; endTime: string };
 
-function buildGallerySessions(startDate: string, endDate: string, selectedPrepDate?: string): {
+function buildGallerySessions(startDate: string, endDate: string, selectedPrepDate?: string, prepAfterExhibition = false): {
   prepDate: string | null;
   sessions: SessionInput[];
 } {
@@ -165,9 +195,11 @@ function buildGallerySessions(startDate: string, endDate: string, selectedPrepDa
   if (prepDate && prepDate < startDate) {
     const dow = dayOfWeekLocal(prepDate);
     if (dow !== 0) {
-      if (dow === 6) sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "13:00" });
-      else if (dow === 2) sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "20:00" });
-      else sessions.unshift({ date: prepDate, startTime: "09:00", endTime: "18:00" });
+      // 앞 전시의 마지막 날이면 철거 후(평일 17:00 · 토 11:00) 이후부터
+      const startTime = prepAfterExhibition ? prepAfterStartTime(prepDate) : "09:00";
+      if (dow === 6) sessions.unshift({ date: prepDate, startTime, endTime: "13:00" });
+      else if (dow === 2) sessions.unshift({ date: prepDate, startTime, endTime: "20:00" });
+      else sessions.unshift({ date: prepDate, startTime, endTime: "18:00" });
     }
   }
 
@@ -298,10 +330,13 @@ export default function ApplyGalleryClient() {
 
   // 준비일 후보에 대한 예약 충돌 조회
   const [prepBookedDates, setPrepBookedDates] = useState<Set<string>>(new Set());
+  /** 기존 전시의 마지막 날(철거일) — 철거 후 준비 가능 */
+  const [prepEndDates, setPrepEndDates] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     if (!isYmd(startDate)) {
       setPrepBookedDates(new Set());
+      setPrepEndDates(new Set());
       return;
     }
     const candidates = getAvailablePrepDates(startDate);
@@ -314,21 +349,32 @@ export default function ApplyGalleryClient() {
     const fetches = Array.from(months).map((m) =>
       fetch(`/api/booked-dates?roomId=gallery&month=${m}`)
         .then((r) => r.json())
-        .then((data) => (data.ok && Array.isArray(data.bookedDates) ? (data.bookedDates as string[]) : []))
-        .catch(() => [] as string[])
+        .then((data) => ({
+          booked: data.ok && Array.isArray(data.bookedDates) ? (data.bookedDates as string[]) : [],
+          ends: data.ok && Array.isArray(data.exhibitionEndDates) ? (data.exhibitionEndDates as string[]) : [],
+        }))
+        .catch(() => ({ booked: [] as string[], ends: [] as string[] }))
     );
     Promise.all(fetches).then((results) => {
       const all = new Set<string>();
-      for (const dates of results) for (const d of dates) all.add(d);
+      const ends = new Set<string>();
+      for (const r of results) {
+        for (const d of r.booked) all.add(d);
+        for (const d of r.ends) ends.add(d);
+      }
       setPrepBookedDates(all);
+      setPrepEndDates(ends);
     });
   }, [startDate]);
 
   // 충돌 필터링: 충돌 날짜를 만나면 거기서 잘림 (그 날짜 이전은 선택 불가)
   const filteredPrepDates = useMemo(
-    () => filterPrepDatesByConflict(getAvailablePrepDates(startDate), prepBookedDates),
-    [startDate, prepBookedDates]
+    () => filterPrepDatesByConflict(getAvailablePrepDates(startDate), prepBookedDates, prepEndDates),
+    [startDate, prepBookedDates, prepEndDates]
   );
+  /** 선택한 준비일이 앞 전시의 마지막 날이면 철거 후(17:00/토 11:00) 이후 준비 */
+  const prepAfterExhibition = Boolean(galleryPrepDate && prepBookedDates.has(galleryPrepDate) && prepEndDates.has(galleryPrepDate));
+  const prepAfterLabel = prepAfterExhibition && galleryPrepDate ? `${prepAfterStartTime(galleryPrepDate)} 이후` : "";
 
   // filteredPrepDates가 바뀌면 기본 준비일을 자동 선택 (현재 선택이 유효하면 유지)
   useEffect(() => {
@@ -357,7 +403,7 @@ export default function ApplyGalleryClient() {
     setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
   }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate, setValue]);
 
-  const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate, galleryPrepDate), [startDate, endDate, galleryPrepDate]);
+  const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate, galleryPrepDate, prepAfterExhibition), [startDate, endDate, galleryPrepDate, prepAfterExhibition]);
 
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
   useEffect(() => {
@@ -529,7 +575,7 @@ export default function ApplyGalleryClient() {
                   <span className="text-sm text-slate-500">전시 준비일</span>
                   <span className="text-sm font-semibold text-slate-900">
                     {sessionsBundle.prepDate
-                      ? `${sessionsBundle.prepDate} (${dowLabel(sessionsBundle.prepDate)}) — 무료`
+                      ? `${sessionsBundle.prepDate} (${dowLabel(sessionsBundle.prepDate)}) — 무료${prepAfterLabel ? ` · 앞 전시 철거 후 ${prepAfterLabel}` : ""}`
                       : "없음"}
                   </span>
                 </div>
@@ -666,7 +712,8 @@ export default function ApplyGalleryClient() {
               <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
               <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. (날짜 선택 가능)</li>
               <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
-              <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수입니다.</li>
+              <li><b>철거</b>: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수입니다.</li>
+              <li><b>준비</b>: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 가능합니다.</li>
               <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
             </ul>
           </Notice>
@@ -728,6 +775,7 @@ export default function ApplyGalleryClient() {
                   </div>
                   <p className="mt-1 text-xs text-emerald-800">
                     전시 시작 전 준비(세팅)를 위한 1일을 무료로 사용할 수 있습니다. 필요 없으면 &lsquo;준비일 없음&rsquo;을 선택하세요.
+                    그날 전시가 없으면 운영시간 내 언제든, 앞 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 준비 가능합니다.
                   </p>
                   <div className="mt-2">
                     <Select
@@ -736,12 +784,15 @@ export default function ApplyGalleryClient() {
                     >
                       {filteredPrepDates.map((d) => (
                         <option key={d} value={d}>
-                          {d} ({dowLabel(d)})
+                          {d} ({dowLabel(d)}){prepBookedDates.has(d) && prepEndDates.has(d) ? ` · 앞 전시 철거 후 ${prepAfterStartTime(d)} 이후` : ""}
                         </option>
                       ))}
                       <option value="">준비일 없음</option>
                     </Select>
                   </div>
+                  {prepAfterLabel ? (
+                    <FieldHelp className="text-emerald-800">선택한 준비일에는 앞 전시가 있어 철거 후 <b>{prepAfterLabel}</b>부터 입장·세팅할 수 있습니다.</FieldHelp>
+                  ) : null}
                   {errors.galleryPrepDate?.message ? <FieldHelp className="text-red-600">{errors.galleryPrepDate.message}</FieldHelp> : null}
                 </div>
               )}
@@ -796,7 +847,7 @@ export default function ApplyGalleryClient() {
               <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
                 <h4 className="text-sm font-bold text-orange-900">전시 철수 안내</h4>
                 <p className="mt-1 text-xs text-orange-800">
-                  전시 마지막 날({endDate}) <b>17시까지</b> 철수를 완료해야 합니다. 철수 예정 시간을 설정해 주세요.
+                  전시 마지막 날({endDate} {dowLabel(endDate)}) <b>{teardownDeadline(endDate)}까지</b> 철거를 완료해야 합니다. (평일 16:00 · 토요일 11:00 이전) 철수 예정 시간을 설정해 주세요.
                 </p>
                 <div className="mt-3 grid grid-cols-2 gap-4">
                   <div>
@@ -807,23 +858,9 @@ export default function ApplyGalleryClient() {
                     <FieldLabel htmlFor="galleryRemovalTime">철수 시간 *</FieldLabel>
                     <Select id="galleryRemovalTime" {...register("galleryRemovalTime")}>
                       <option value="">선택해 주세요</option>
-                      <option value="09:00">09:00</option>
-                      <option value="09:30">09:30</option>
-                      <option value="10:00">10:00</option>
-                      <option value="10:30">10:30</option>
-                      <option value="11:00">11:00</option>
-                      <option value="11:30">11:30</option>
-                      <option value="12:00">12:00</option>
-                      <option value="12:30">12:30</option>
-                      <option value="13:00">13:00</option>
-                      <option value="13:30">13:30</option>
-                      <option value="14:00">14:00</option>
-                      <option value="14:30">14:30</option>
-                      <option value="15:00">15:00</option>
-                      <option value="15:30">15:30</option>
-                      <option value="16:00">16:00</option>
-                      <option value="16:30">16:30</option>
-                      <option value="17:00">17:00</option>
+                      {teardownTimeOptions(teardownDeadline(endDate)).map((t) => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
                     </Select>
                     {errors.galleryRemovalTime?.message ? <FieldHelp className="text-red-600">{errors.galleryRemovalTime.message}</FieldHelp> : null}
                   </div>
@@ -1173,7 +1210,8 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
               <li>와이어 걸이(고리)를 활용한 형식의 작품만 전시 가능</li>
               <li>액자 형태 작품: 가로/세로 최대 60cm, 최대 15점</li>
               <li>작품 크기·무게에 따라 전시 불가 시 사전 담당자 상담 필요</li>
-              <li>전시 마지막 날 <b>17시까지 철수 완료</b> 필수</li>
+              <li>철거: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수</li>
+              <li>준비: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b></li>
               <li>홍보 콘텐츠 제작을 위해 준비일 이전에 전시 고리 사진 파일을 서초센터 메일로 공유 필요</li>
             </ul>
           </div>

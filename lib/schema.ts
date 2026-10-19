@@ -2,7 +2,7 @@ import { toMinutes, todayYmdSeoul } from "./datetime";
 
 import { z } from "zod";
 import { UPLOAD } from "@/lib/config";
-import { TIME_CONSTANTS } from "@/lib/constants";
+import { GALLERY_RULES, TIME_CONSTANTS } from "@/lib/constants";
 
 /**
  * HTML checkbox(FormData) 값 파싱
@@ -144,7 +144,7 @@ export const GalleryRequestInputSchema = z
     awarenessPath: z.string().max(200).optional(),
     specialNotes: z.string().max(1000).optional(),
 
-    // 철수시간 (종료일 당일, 17:00 이전 필수)
+    // 철수시간 (종료일 당일 · 평일 16:00 / 토요일 11:00 이전 필수 — 준비·철거 규정 2026-10-19)
     galleryRemovalTime: z.string().regex(/^\d{2}:\d{2}$/, "철수 시간을 선택해 주세요."),
 
     // 전시 준비일 (사용자 선택, 빈 문자열이면 준비일 없음)
@@ -186,11 +186,13 @@ export const GalleryRequestInputSchema = z
       ctx.addIssue({ code: "custom", path: ["laptop"], message: "갤러리 신청은 장비 옵션을 선택할 수 없습니다." });
     }
 
-    // 철수시간: 17:00 이전 필수
+    // 철수시간: 종료일이 토요일이면 11:00, 평일이면 16:00 이전 필수 (준비·철거 규정 2026-10-19)
     if (v.galleryRemovalTime) {
       const rmMin = toMinutes(v.galleryRemovalTime);
-      if (Number.isFinite(rmMin) && rmMin > toMinutes("17:00")) {
-        ctx.addIssue({ code: "custom", path: ["galleryRemovalTime"], message: "철수 시간은 17:00 이전으로 설정해 주세요." });
+      const endDow = new Date(`${v.endDate}T00:00:00Z`).getUTCDay();
+      const deadline = endDow === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
+      if (Number.isFinite(rmMin) && rmMin > toMinutes(deadline)) {
+        ctx.addIssue({ code: "custom", path: ["galleryRemovalTime"], message: `철수 시간은 ${endDow === 6 ? "토요일 11:00" : "평일 16:00"} 이전으로 설정해 주세요.` });
       }
     }
 

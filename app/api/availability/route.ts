@@ -89,8 +89,8 @@ export async function GET(req: Request) {
       if (!conflictStatuses.includes(r.status)) return false;
       // 갤러리 1행 형식: 날짜 범위 체크
       if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
+        // ★ 준비·철거 규정(2026-10-19): 준비일은 날짜를 차단하지 않음(앞 전시 마지막 날과 공유)
         if (date >= r.startDate && date <= r.endDate && dayOfWeek(date) !== 0) return true;
-        if (r.galleryPrepDate && date === r.galleryPrepDate) return true;
         return false;
       }
       // 기존 형식: 개별 날짜 매칭

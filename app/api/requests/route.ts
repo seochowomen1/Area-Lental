@@ -6,7 +6,7 @@ import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
 import { ensureHolidaysLoaded } from "@/lib/holidays";
 import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
-import { buildGallerySessionsFromPeriod, validateGalleryOperatingHours } from "@/lib/gallery";
+import { buildGallerySessionsFromPeriod, buildGalleryOccupancy, galleryDateConflicts, isPrepAfterExhibition, validateGalleryOperatingHours } from "@/lib/gallery";
 import { getGoogleClient } from "@/lib/google";
 import { isMockMode } from "@/lib/env";
 import {
@@ -219,7 +219,11 @@ export async function POST(req: Request) {
           Array.from(months).map((ym) => ensureHolidaysLoaded(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10)))
         );
       }
-      sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam);
+      // ★ 준비·철거 규정(2026-10-19): 준비일이 앞 전시의 마지막 날이면 17:00(토 11:00) 이후 회차로 생성
+      const occForPrep = buildGalleryOccupancy(await db.getAllRequests());
+      const prepProbe = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam).find((s) => s.isPrepDay)?.date;
+      const prepAfterExhibition = prepProbe ? isPrepAfterExhibition(occForPrep, prepProbe) : false;
+      sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam, { prepAfterExhibition });
     } else {
       const rawSessions = String(form.get("sessions") ?? "").trim();
       if (rawSessions) {
@@ -331,6 +335,7 @@ export async function POST(req: Request) {
     // 운영시간/충돌 검증은 회차별로 수행
     const all = await db.getAllRequests();
     const conflictStatuses: RequestStatus[] = ["접수", "승인"];
+    const galleryOcc = buildGalleryOccupancy(all);
     const schedules = await db.getClassSchedules();
     const blocks = await db.getBlocks();
 
@@ -342,23 +347,25 @@ export async function POST(req: Request) {
         continue;
       }
 
-      const sameRoomSameDate = all.filter((r) => {
-        if (r.roomId !== input.roomId) return false;
-        if (!conflictStatuses.includes(r.status)) return false;
-        // 갤러리 1행 형식: 날짜 범위로 충돌 판정
-        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) {
-          if (sess.date >= r.startDate && sess.date <= r.endDate && dayOfWeek(sess.date) !== 0) return true;
-          if (r.galleryPrepDate && sess.date === r.galleryPrepDate) return true;
-          return false;
-        }
-        // 기존 형식: 개별 날짜 매칭
-        return r.date === sess.date;
-      });
-      const hasRequestConflict = sameRoomSameDate.some((r) => {
-        // 갤러리 1행 형식은 시간대 겹침이 아니라 날짜 범위 겹침으로 이미 판정됨
-        if (r.roomId === "gallery" && !r.batchId && r.startDate && r.endDate) return true;
-        return overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime);
-      });
+      let hasRequestConflict: boolean;
+      if (input.roomId === "gallery") {
+        // ★ 갤러리는 준비·철거 규정(2026-10-19)에 따라 날짜 단위로 판정
+        //   - 준비일은 앞 전시의 마지막 날(철거일)과 겹쳐도 허용(17:00/토 11:00 이후)
+        //   - 전시일은 다른 신청의 준비일과 우리 마지막 날에서만 겹침 허용
+        hasRequestConflict = galleryDateConflicts(
+          galleryOcc,
+          sess.date,
+          sess.isPrepDay ? "prep" : "exhibition",
+          galleryInput?.endDate
+        );
+      } else {
+        const sameRoomSameDate = all.filter((r) => {
+          if (r.roomId !== input.roomId) return false;
+          if (!conflictStatuses.includes(r.status)) return false;
+          return r.date === sess.date;
+        });
+        hasRequestConflict = sameRoomSameDate.some((r) => overlaps(r.startTime, r.endTime, sess.startTime, sess.endTime));
+      }
       if (hasRequestConflict) {
         issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "CONFLICT", message: conflictMessage(input.roomId, sess.date, sess.startTime, sess.endTime) });
         continue;
