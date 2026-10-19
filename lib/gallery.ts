@@ -1,7 +1,7 @@
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
 import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
 import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
-import type { RentalRequest, RequestStatus } from "@/lib/types";
+import type { BlockTime, RentalRequest, RequestStatus } from "@/lib/types";
 
 export type GalleryOperatingWindow = { startTime: string; endTime: string };
 export type GallerySessionInput = {
@@ -127,10 +127,23 @@ const OCCUPANCY_STATUSES: RequestStatus[] = ["접수", "승인"];
 
 /**
  * 갤러리 신청 목록 → 점유 집합 (1행 형식 startDate~endDate + 구형 batch 개별 행 모두 지원)
+ * - blocks: 관리자 날짜 범위 차단(내부 전시 등)도 전시로 취급 — 마지막 날은 철거일로 준비 허용
  */
-export function buildGalleryOccupancy(requests: RentalRequest[], excludeRequestId?: string): GalleryOccupancy {
+export function buildGalleryOccupancy(requests: RentalRequest[], blocks: BlockTime[] = [], excludeRequestId?: string): GalleryOccupancy {
   const occ: GalleryOccupancy = { exhibitionDates: new Set(), endDates: new Set(), prepDates: new Set() };
   const batchLast = new Map<string, string>();
+
+  for (const b of blocks) {
+    if (b.roomId !== "gallery" && b.roomId !== "all") continue;
+    if (!b.endDate) continue; // 시간 단위 단일 차단은 전시로 보지 않음
+    let cur = b.date;
+    let safety = 0;
+    while (cur <= b.endDate && safety++ < 400) {
+      if (dayOfWeek(cur) !== 0) occ.exhibitionDates.add(cur);
+      cur = addDaysYmd(cur, 1);
+    }
+    occ.endDates.add(b.endDate);
+  }
 
   for (const r of requests) {
     if (r.roomId !== "gallery") continue;

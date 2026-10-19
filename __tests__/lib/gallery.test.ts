@@ -231,6 +231,17 @@ describe("갤러리 준비·철거 규정", () => {
     expect(galleryDateConflicts(occ, "2026-10-29", "exhibition", "2026-10-30")).toBe(false);
   });
 
+  test("관리자 날짜 범위 차단(내부 전시)의 마지막 날도 철거일로 준비 허용", () => {
+    const occ = buildGalleryOccupancy([], [
+      { id: "blk", roomId: "gallery", date: "2026-10-14", endDate: "2026-10-28", startTime: "09:00", endTime: "18:00", reason: "내부 전시" },
+    ]);
+    expect(occ.exhibitionDates.has("2026-10-20")).toBe(true);
+    expect(occ.endDates.has("2026-10-28")).toBe(true);
+    expect(galleryDateConflicts(occ, "2026-10-28", "prep")).toBe(false);
+    expect(galleryDateConflicts(occ, "2026-10-27", "prep")).toBe(true);
+    expect(isPrepAfterExhibition(occ, "2026-10-28")).toBe(true);
+  });
+
   test("충돌: 다른 신청의 준비일은 우리 마지막 날에서만 허용", () => {
     const occ = buildGalleryOccupancy([
       req({ requestId: "n", startDate: "2026-11-05", endDate: "2026-11-10", galleryPrepDate: "2026-11-04" }),

@@ -48,7 +48,7 @@ export async function GET(req: Request) {
     const bookedDates: string[] = [];
     // ★ 갤러리 준비·철거 규정(2026-10-19): 준비일은 날짜를 "마감"시키지 않는다
     //   (앞 전시의 마지막 날에 17:00 이후 준비 가능 · 준비일만 잡힌 날은 앞 신청의 마지막 전시일로 선택 가능)
-    const galleryOcc = roomId === "gallery" ? buildGalleryOccupancy(requests) : null;
+    const galleryOcc = roomId === "gallery" ? buildGalleryOccupancy(requests, blocks) : null;
     const exhibitionEndDates: string[] = [];
     const prepOnlyDates: string[] = [];
 

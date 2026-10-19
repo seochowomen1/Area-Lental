@@ -220,7 +220,7 @@ export async function POST(req: Request) {
         );
       }
       // ★ 준비·철거 규정(2026-10-19): 준비일이 앞 전시의 마지막 날이면 17:00(토 11:00) 이후 회차로 생성
-      const occForPrep = buildGalleryOccupancy(await db.getAllRequests());
+      const occForPrep = buildGalleryOccupancy(await db.getAllRequests(), await db.getBlocks());
       const prepProbe = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam).find((s) => s.isPrepDay)?.date;
       const prepAfterExhibition = prepProbe ? isPrepAfterExhibition(occForPrep, prepProbe) : false;
       sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam, { prepAfterExhibition });
@@ -335,9 +335,9 @@ export async function POST(req: Request) {
     // 운영시간/충돌 검증은 회차별로 수행
     const all = await db.getAllRequests();
     const conflictStatuses: RequestStatus[] = ["접수", "승인"];
-    const galleryOcc = buildGalleryOccupancy(all);
     const schedules = await db.getClassSchedules();
     const blocks = await db.getBlocks();
+    const galleryOcc = buildGalleryOccupancy(all, blocks);
 
     const issues: Array<{ date: string; startTime: string; endTime: string; code: string; message: string }> = [];
     for (const sess of sessions) {
@@ -386,6 +386,8 @@ export async function POST(req: Request) {
           if (b.roomId !== input.roomId && b.roomId !== "all") return false;
           const bStart = b.date;
           const bEnd = b.endDate || b.date;
+          // ★ 갤러리 준비일은 날짜 범위 차단(내부 전시)의 마지막 날(철거일)과 겹쳐도 허용
+          if (input.roomId === "gallery" && sess.isPrepDay && b.endDate && sess.date === b.endDate) return false;
           return sess.date >= bStart && sess.date <= bEnd;
         })
         .some((b) => overlaps(b.startTime, b.endTime, sess.startTime, sess.endTime));
