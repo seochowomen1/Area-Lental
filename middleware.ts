@@ -138,6 +138,16 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/admin/login")) return withSecurityHeaders(NextResponse.next());
   if (pathname === "/api/admin/login") return withSecurityHeaders(NextResponse.next());
 
+  // 업무 시스템 동기화 크론(GET + Authorization: Bearer CRON_SECRET)은 라우트가 직접 검증한다.
+  // 토큰이 틀리면 라우트가 관리자 쿠키 검사로 넘어가 401을 돌려준다.
+  if (
+    pathname === "/api/admin/class-schedules/sync" &&
+    req.method === "GET" &&
+    (req.headers.get("authorization") || "").startsWith("Bearer ")
+  ) {
+    return withSecurityHeaders(NextResponse.next());
+  }
+
   // ADMIN_PASSWORD_HASH (bcrypt) 또는 ADMIN_PASSWORD (레거시) 지원
   const tokenSource = process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD;
   if (!tokenSource) {
