@@ -339,7 +339,7 @@ export default function ScheduleGrid({
         {roomName && slots >= 2 && (
           <div className="truncate text-[8px] font-bold leading-tight opacity-70">{roomName}</div>
         )}
-        <div className="truncate text-[10px] font-bold leading-tight">{sched.title}</div>
+        <div className="truncate text-[10px] font-bold leading-tight">{sched.source === "classroom" ? "⟳ " : ""}{sched.title}</div>
         {slots >= 2 && (
           <div className="truncate text-[9px] opacity-70 leading-tight">
             {sched.startTime}~{sched.endTime}

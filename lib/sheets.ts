@@ -769,6 +769,48 @@ export async function updateRequestStatus(args: {
   return updated;
 }
 
+// class_schedule 시트의 선택 컬럼(없으면 헤더 끝에 자동 추가) — 업무 시스템 동기화 표식
+export const SCHEDULE_OPTIONAL_HEADERS = ["source", "sourceId", "syncedAt"] as const;
+const SCHEDULE_REQUIRED_HEADERS = ["id", "roomId", "dayOfWeek", "startTime", "endTime", "title", "effectiveFrom", "effectiveTo"];
+
+async function ensureScheduleHeaders(): Promise<string[]> {
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!1:1`
+  });
+  const existing = ((res.data.values?.[0] ?? []) as string[]).map((v) => String(v).trim());
+  const header = existing.length ? existing : [...SCHEDULE_REQUIRED_HEADERS];
+  const missing = SCHEDULE_OPTIONAL_HEADERS.filter((h) => !header.includes(h));
+  if (!missing.length && existing.length) return header;
+  const nextHeader = [...header, ...missing];
+  await sheets.spreadsheets.values.update({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A1:${colToLetter(nextHeader.length)}1`,
+    valueInputOption: "RAW",
+    requestBody: { values: [nextHeader] }
+  });
+  return nextHeader;
+}
+
+function scheduleToRow(header: string[], s: ClassSchedule): string[] {
+  const map: Record<string, string> = {
+    id: s.id,
+    roomId: s.roomId,
+    dayOfWeek: String(s.dayOfWeek),
+    startTime: s.startTime,
+    endTime: s.endTime,
+    title: s.title,
+    effectiveFrom: s.effectiveFrom,
+    effectiveTo: s.effectiveTo,
+    source: s.source ?? "",
+    sourceId: s.sourceId ?? "",
+    syncedAt: s.syncedAt ?? "",
+  };
+  return header.map((h) => map[h] ?? "");
+}
+
 export async function getClassSchedules(): Promise<ClassSchedule[]> {
   if (isMockMode()) return mock_getClassSchedules();
 
@@ -777,27 +819,36 @@ export async function getClassSchedules(): Promise<ClassSchedule[]> {
   const { sheets } = getGoogleClient();
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_SCHEDULE}!A:H`
+    range: `${SHEET_SCHEDULE}!A:Z`
   });
   const rows = (res.data.values ?? []) as string[][];
   if (rows.length <= 1) return [];
-  const header = rows[0];
-  const idx = createHeaderIndex(
-    header,
-    ["id", "roomId", "dayOfWeek", "startTime", "endTime", "title", "effectiveFrom", "effectiveTo"],
-    SHEET_SCHEDULE
-  );
+  const header = rows[0].map((v) => String(v).trim());
+  const idx = createHeaderIndex(header, SCHEDULE_REQUIRED_HEADERS, SHEET_SCHEDULE);
+  const opt = (r: string[], name: string) => {
+    const i = header.indexOf(name);
+    return i >= 0 ? (r[i] || "") : "";
+  };
 
-  return rows.slice(1).filter(r => r[idx("id")]).map(r => ({
-    id: r[idx("id")],
-    roomId: r[idx("roomId")],
-    dayOfWeek: parseInt(r[idx("dayOfWeek")] || "0", 10),
-    startTime: r[idx("startTime")],
-    endTime: r[idx("endTime")],
-    title: r[idx("title")] || "",
-    effectiveFrom: r[idx("effectiveFrom")] || "",
-    effectiveTo: r[idx("effectiveTo")] || ""
-  }));
+  return rows.slice(1).filter(r => r[idx("id")]).map(r => {
+    const item: ClassSchedule = {
+      id: r[idx("id")],
+      roomId: r[idx("roomId")],
+      dayOfWeek: parseInt(r[idx("dayOfWeek")] || "0", 10),
+      startTime: r[idx("startTime")],
+      endTime: r[idx("endTime")],
+      title: r[idx("title")] || "",
+      effectiveFrom: r[idx("effectiveFrom")] || "",
+      effectiveTo: r[idx("effectiveTo")] || ""
+    };
+    const source = opt(r, "source");
+    if (source) {
+      item.source = source;
+      item.sourceId = opt(r, "sourceId");
+      item.syncedAt = opt(r, "syncedAt");
+    }
+    return item;
+  });
 }
 
 export async function addClassSchedule(s: Omit<ClassSchedule, "id">): Promise<ClassSchedule> {
@@ -806,17 +857,19 @@ export async function addClassSchedule(s: Omit<ClassSchedule, "id">): Promise<Cl
   const env = requireGoogleEnv();
 
   const { sheets } = getGoogleClient();
+  const header = await ensureScheduleHeaders();
   const id = `CS-${Date.now()}`;
+  const created: ClassSchedule = { id, ...s };
   await sheets.spreadsheets.values.append({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_SCHEDULE}!A:H`,
+    range: `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`,
     valueInputOption: "RAW",
     requestBody: {
-      values: [[id, s.roomId, String(s.dayOfWeek), s.startTime, s.endTime, s.title, s.effectiveFrom, s.effectiveTo]]
+      values: [scheduleToRow(header, created)]
     }
   });
 
-  return { id, ...s };
+  return created;
 }
 
 export async function updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule> {
@@ -834,6 +887,7 @@ export async function updateClassSchedule(id: string, updates: Partial<Omit<Clas
   if (!existing) throw new Error("수정할 수업시간을 찾을 수 없습니다.");
 
   const updated: ClassSchedule = { ...existing, ...updates };
+  const header = await ensureScheduleHeaders();
 
   // 행 위치 찾기
   const res = await sheets.spreadsheets.values.get({
@@ -847,14 +901,69 @@ export async function updateClassSchedule(id: string, updates: Partial<Omit<Clas
   const rowNumber = rowIndex + 1; // 1-based
   await sheets.spreadsheets.values.update({
     spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_SCHEDULE}!A${rowNumber}:H${rowNumber}`,
+    range: `${SHEET_SCHEDULE}!A${rowNumber}:${colToLetter(header.length)}${rowNumber}`,
     valueInputOption: "RAW",
     requestBody: {
-      values: [[updated.id, updated.roomId, String(updated.dayOfWeek), updated.startTime, updated.endTime, updated.title, updated.effectiveFrom, updated.effectiveTo]]
+      values: [scheduleToRow(header, updated)]
     }
   });
 
   return updated;
+}
+
+/**
+ * 출처(source)가 같은 행을 모두 지우고 새 항목을 한 번에 추가한다 — 업무 시스템 동기화용.
+ * 수동 등록 행(source 빈칸)은 건드리지 않는다.
+ */
+export async function replaceClassSchedulesBySource(
+  source: string,
+  items: Omit<ClassSchedule, "id">[]
+): Promise<{ deleted: number; added: number }> {
+  if (isMockMode()) {
+    const { mock_replaceClassSchedulesBySource } = await import("./mockdb");
+    return mock_replaceClassSchedulesBySource(source, items);
+  }
+
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const header = await ensureScheduleHeaders();
+  const sourceCol = header.indexOf("source");
+
+  const res = await sheets.spreadsheets.values.get({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`
+  });
+  const rows = (res.data.values ?? []) as string[][];
+  const targets = rows
+    .map((r, i) => ({ i, src: String(r[sourceCol] ?? "").trim() }))
+    .filter((x) => x.i > 0 && x.src === source)
+    .map((x) => x.i)
+    .sort((a, b) => b - a); // 아래 행부터 지워야 인덱스가 밀리지 않음
+
+  if (targets.length) {
+    const sheetId = await getSheetIdByTitle(SHEET_SCHEDULE);
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      requestBody: {
+        requests: targets.map((rowIndex) => ({
+          deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 } }
+        }))
+      }
+    });
+  }
+
+  if (items.length) {
+    const stamp = Date.now();
+    const values = items.map((s, i) => scheduleToRow(header, { id: `CS-${stamp}-${String(i).padStart(3, "0")}`, ...s, source }));
+    await sheets.spreadsheets.values.append({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`,
+      valueInputOption: "RAW",
+      requestBody: { values }
+    });
+  }
+
+  return { deleted: targets.length, added: items.length };
 }
 
 async function getSheetIdByTitle(title: string): Promise<number> {

@@ -43,7 +43,14 @@ export default function SettingsClient(props: {
   };
   useEffect(() => () => { if (highlightTimer.current) window.clearTimeout(highlightTimer.current); }, []);
 
-  const [submitting, setSubmitting] = useState<null | "schedule" | "block" | "delete">(null);
+  const [submitting, setSubmitting] = useState<null | "schedule" | "block" | "delete" | "sync">(null);
+
+  // 업무 시스템(강의실 일정표) 동기화 표식
+  const syncedCount = useMemo(() => schedules.filter((s) => s.source === "classroom").length, [schedules]);
+  const lastSyncedAt = useMemo(() => {
+    const at = schedules.filter((s) => s.source === "classroom").map((s) => s.syncedAt || "").sort().pop();
+    return at ? at.replace("T", " ").slice(0, 16) : "";
+  }, [schedules]);
 
   // 펼치기/접기 상태
   const [scheduleFormOpen, setScheduleFormOpen] = useState(false);
@@ -99,6 +106,30 @@ export default function SettingsClient(props: {
       throw new Error(msg);
     }
     return data as T;
+  }
+
+  // 업무 시스템에서 강좌 일정을 받아 정규수업(source=classroom)을 통째로 갱신
+  async function onSyncClassroom() {
+    if (!confirm("업무 시스템(강의실 일정표)의 강좌 일정을 가져와 자동 등록분을 전부 갱신할까요?\n직접 등록한 수업시간은 그대로 둡니다.")) return;
+    setSubmitting("sync");
+    try {
+      const data = await apiJson<{ ok: true; result: { quarters: string[]; received: number; produced: number; deleted: number; added: number; stats: { skippedRoom: number; skippedHours: number; merged: number } } }>(
+        "/api/admin/class-schedules/sync",
+        { method: "POST" }
+      );
+      const r = data.result;
+      const refreshed = await apiJson<{ ok: true; schedules: ClassSchedule[] }>("/api/admin/class-schedules");
+      setSchedules(refreshed.schedules);
+      setToast({
+        type: "success",
+        message: `업무 시스템 동기화 완료 — ${r.quarters.join(", ") || "분기 없음"} · 받은 일정 ${r.received}건 → 등록 ${r.added}건 (이전 자동 등록 ${r.deleted}건 교체 · 운영시간 밖 ${r.stats.skippedHours}건 제외)`,
+      });
+      router.refresh();
+    } catch (err: unknown) {
+      setToast({ type: "error", message: err instanceof Error ? err.message : "동기화에 실패했습니다." });
+    } finally {
+      setSubmitting(null);
+    }
   }
 
   async function onCreateSchedule(payload: Omit<ClassSchedule, "id">) {
@@ -231,9 +262,23 @@ export default function SettingsClient(props: {
             <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-base font-bold text-slate-900">정규 수업시간</h2>
-                <p className="mt-0.5 text-xs text-slate-500">등록된 시간에는 대관 신청이 차단됩니다</p>
+                <p className="mt-0.5 text-xs text-slate-500">
+                  등록된 시간에는 대관 신청이 차단됩니다
+                  {syncedCount > 0 && (
+                    <span className="ml-2 text-slate-400">· 업무 시스템 자동 등록 {syncedCount}건{lastSyncedAt ? ` (${lastSyncedAt})` : ""}</span>
+                  )}
+                </p>
               </div>
               <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={onSyncClassroom}
+                  disabled={submitting !== null}
+                  title="서초센터 업무 시스템(강의실 일정표)의 강좌 일정을 가져와 자동 등록분을 갱신합니다. 매일 새벽에도 자동 실행됩니다."
+                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                >
+                  {submitting === "sync" ? "가져오는 중…" : "업무 시스템 가져오기"}
+                </button>
                 {/* 시간표 / 목록 토글 */}
                 <div className="flex rounded-full border border-slate-200 bg-white p-0.5">
                   <button
@@ -323,12 +368,20 @@ export default function SettingsClient(props: {
                             </span>
                           </td>
                           <td className="px-5 py-3 tabular-nums">{s.startTime}~{s.endTime}</td>
-                          <td className="px-5 py-3 text-slate-600">{s.title || <span className="text-slate-400">-</span>}</td>
+                          <td className="px-5 py-3 text-slate-600">
+                            {s.title || <span className="text-slate-400">-</span>}
+                            {s.source === "classroom" && (
+                              <span className="ml-2 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200" title="업무 시스템 강의실 일정표에서 자동 등록 — 수정은 업무 시스템에서">
+                                자동
+                              </span>
+                            )}
+                          </td>
                           <td className="px-5 py-3 text-xs tabular-nums text-slate-600">{(s.effectiveFrom || "-") + " ~ " + (s.effectiveTo || "-")}</td>
                           <td className="px-5 py-3 text-right">
                             <button
                               type="button"
-                              disabled={submitting !== null}
+                              disabled={submitting !== null || s.source === "classroom"}
+                              title={s.source === "classroom" ? "자동 등록 항목은 다음 동기화 때 다시 생깁니다. 업무 시스템에서 강좌를 수정하세요." : undefined}
                               onClick={() => onDeleteSchedule(s.id)}
                               className="rounded-full border border-rose-200 bg-white px-3 py-1.5 text-xs font-medium text-rose-600 shadow-sm transition hover:bg-rose-50 disabled:opacity-50"
                             >

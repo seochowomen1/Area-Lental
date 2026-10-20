@@ -15,6 +15,7 @@ export type AuditAction =
   | "SCHEDULE_CREATE"
   | "SCHEDULE_UPDATE"
   | "SCHEDULE_DELETE"
+  | "SCHEDULE_SYNC"
   | "REQUEST_DELETE"
   | "REQUEST_APPROVE"
   | "REQUEST_REJECT"
@@ -42,6 +43,7 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "SCHEDULE_CREATE",
   "SCHEDULE_UPDATE",
   "SCHEDULE_DELETE",
+  "SCHEDULE_SYNC",
   "REQUEST_DELETE",
   "REQUEST_APPROVE",
   "REQUEST_REJECT",
@@ -63,6 +65,7 @@ const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   SCHEDULE_CREATE: "수업시간 등록",
   SCHEDULE_UPDATE: "수업시간 수정",
   SCHEDULE_DELETE: "수업시간 삭제",
+  SCHEDULE_SYNC: "수업시간 동기화(업무 시스템)",
   REQUEST_DELETE: "신청 삭제",
   REQUEST_APPROVE: "승인",
   REQUEST_REJECT: "반려",

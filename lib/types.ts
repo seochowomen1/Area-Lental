@@ -116,6 +116,12 @@ export type ClassSchedule = {
   title: string;
   effectiveFrom: string;
   effectiveTo: string;
+  /** 외부 시스템에서 동기화된 항목이면 출처(예: "classroom" = 서초센터 업무 시스템 강의실 일정표) */
+  source?: string;
+  /** 출처 쪽 식별자(분기:강좌ID:요일|날짜) */
+  sourceId?: string;
+  /** 마지막 동기화 시각(ISO) */
+  syncedAt?: string;
 };
 
 export type BlockTime = {

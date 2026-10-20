@@ -60,6 +60,8 @@ export interface Database {
   addClassSchedule(schedule: Omit<ClassSchedule, "id">): Promise<ClassSchedule>;
   updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>): Promise<ClassSchedule>;
   deleteClassSchedule(id: string): Promise<void>;
+  /** 출처(source)별 일괄 교체 — 외부 시스템 동기화용 */
+  replaceClassSchedulesBySource(source: string, items: Omit<ClassSchedule, "id">[]): Promise<{ deleted: number; added: number }>;
 
   // 차단 시간대 관련
   getBlocks(): Promise<BlockedSlot[]>;
@@ -130,6 +132,11 @@ class MockDatabase implements Database {
   async deleteClassSchedule(id: string) {
     const { mock_deleteClassSchedule } = await this.mockdb;
     return mock_deleteClassSchedule(id);
+  }
+
+  async replaceClassSchedulesBySource(source: string, items: Omit<ClassSchedule, "id">[]) {
+    const { mock_replaceClassSchedulesBySource } = await this.mockdb;
+    return mock_replaceClassSchedulesBySource(source, items);
   }
 
   async getBlocks() {
@@ -235,6 +242,12 @@ class SheetsDatabase implements Database {
     this.schedulesCache.invalidate();
     const { deleteClassSchedule } = await this.sheets;
     return deleteClassSchedule(id);
+  }
+
+  async replaceClassSchedulesBySource(source: string, items: Omit<ClassSchedule, "id">[]) {
+    this.schedulesCache.invalidate();
+    const { replaceClassSchedulesBySource } = await this.sheets;
+    return replaceClassSchedulesBySource(source, items);
   }
 
   async getBlocks() {

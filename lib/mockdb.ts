@@ -329,6 +329,22 @@ export async function mock_deleteClassSchedule(id: string): Promise<void> {
   saveDb(db);
 }
 
+/** 출처(source)가 같은 항목을 전부 지우고 새 항목으로 갈아끼운다(동기화용) */
+export async function mock_replaceClassSchedulesBySource(
+  source: string,
+  items: Omit<ClassSchedule, "id">[]
+): Promise<{ deleted: number; added: number }> {
+  const db = ensureDb();
+  const before = db.schedules.length;
+  db.schedules = db.schedules.filter((s) => s.source !== source);
+  const deleted = before - db.schedules.length;
+  const stamp = Date.now();
+  const created: ClassSchedule[] = items.map((s, i) => ({ id: `CS-${stamp}-${i}`, ...s, source }));
+  db.schedules.push(...created);
+  saveDb(db);
+  return { deleted, added: created.length };
+}
+
 export async function mock_getBlocks(): Promise<BlockTime[]> {
   return ensureDb().blocks;
 }
