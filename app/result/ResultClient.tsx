@@ -30,6 +30,15 @@ type ResultPayload =
       paymentStatusText: string;
       spaceCategoryText: string;
 
+      // 결제 안내 (03_api §8-3 · 미결제·기한 전일 때만 링크)
+      paymentStatus?: string;
+      paymentLinkUrl?: string;
+      paymentDueDate?: string;
+      paymentDueDateText?: string;
+      paidAt?: string;
+      refundedAt?: string;
+      autoCancelled?: boolean;
+
       requestId: string;
       roomId: string;
       roomName: string;
@@ -160,6 +169,16 @@ export default function ResultClient() {
 
   const [cancelLoading, setCancelLoading] = useState(false);
 
+  // PC(≥900) = 표에 "결제" 열 · 휴대폰 = 표 아래 "결제" 박스 (02_ui §4)
+  const [isPc, setIsPc] = useState(true);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 900px)");
+    const apply = () => setIsPc(mq.matches);
+    apply();
+    mq.addEventListener("change", apply);
+    return () => mq.removeEventListener("change", apply);
+  }, []);
+
   async function onCancel() {
     if (!data || !data.ok) return;
     if (!data.cancelable) return;
@@ -281,6 +300,7 @@ export default function ResultClient() {
                         <th className="px-3 py-4">예약일시</th>
                         <th className="px-3 py-4">승인상태</th>
                         <th className="px-3 py-4">예약상태</th>
+                        {isPc && <th className="px-3 py-4">결제</th>}
                       </tr>
                     </thead>
                     <tbody>
@@ -326,10 +346,25 @@ export default function ResultClient() {
                         <td className="px-3 py-5">
                           <OutlinedBadge variant={badgeVariant(data.reservationStatusText)}>{data.reservationStatusText}</OutlinedBadge>
                         </td>
+                        {isPc && (
+                          <td className="min-w-[220px] px-3 py-5">
+                            <PaymentCell data={data} />
+                          </td>
+                        )}
                       </tr>
                     </tbody>
                   </table>
                 </div>
+
+                {!isPc && (
+                  <div className="mt-4 rounded-xl border border-slate-200 bg-white p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-semibold text-slate-900">결제</span>
+                      <OutlinedBadge variant={paymentBadgeVariant(data.paymentStatusText)}>{data.paymentStatusText || "-"}</OutlinedBadge>
+                    </div>
+                    <PaymentCell data={data} mobile />
+                  </div>
+                )}
 
                 <div className="flex items-center justify-end px-3 py-6">
                   <div className="text-lg font-bold text-slate-900">
@@ -525,6 +560,57 @@ function badgeVariant(text: string): "success" | "warning" | "danger" | "neutral
   if (t.includes("결제")) return "neutral";
   if (t.includes("승인") || t.includes("신청")) return "success";
   return "neutral";
+}
+
+/** 결제 열 배지 색 (01_spec ③-(마)) — 기존 badgeVariant의 "결제→neutral" 분기보다 먼저 판정 */
+function paymentBadgeVariant(text: string): "success" | "warning" | "danger" | "neutral" {
+  const t = (text || "").trim();
+  if (t === "결제 완료") return "success";
+  if (t === "결제 대기") return "warning";
+  if (t.includes("기한 지남") || t.includes("자동 취소")) return "danger";
+  return "neutral";
+}
+
+type PaymentCellData = {
+  paymentStatusText: string;
+  paymentLinkUrl?: string;
+  paymentDueDate?: string;
+  paymentDueDateText?: string;
+  paidAt?: string;
+  refundedAt?: string;
+  autoCancelled?: boolean;
+};
+
+/** 결제 열(PC) / 결제 박스(휴대폰) 내용 — 문구 01_spec ③-(마) 표 원문 */
+function PaymentCell({ data, mobile = false }: { data: PaymentCellData; mobile?: boolean }) {
+  const t = (data.paymentStatusText || "-").trim();
+  const noteCls = cn("text-xs leading-5 text-slate-600", mobile ? "mt-2" : "mt-2 text-left");
+  const btnCls = cn("inline-flex items-center justify-center rounded-xl bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-95", mobile && "mt-3 w-full min-h-[44px]");
+
+  let note: string | null = null;
+  if (t === "결제 안내 예정") note = "승인 메일로 결제 방법을 안내드립니다.";
+  else if (t === "결제 대기") note = `결제 기한 ${data.paymentDueDateText || data.paymentDueDate || ""}까지 · 기한까지 결제가 확인되지 않으면 신청이 자동 취소됩니다.`;
+  else if (t === "결제 기한 지남") note = "결제 기한이 지났습니다. 신청이 곧 자동 취소됩니다. 이용을 원하시면 센터로 문의해 주세요.";
+  else if (t === "기한 경과 자동 취소") note = `결제 기한(${data.paymentDueDate || ""}) 경과로 자동 취소되었습니다. 다시 이용하시려면 새로 신청해 주세요.`;
+  else if (t === "결제 완료") note = data.paidAt ? `${data.paidAt} 결제` : null;
+  else if (t === "환불 완료") note = data.refundedAt ? `${data.refundedAt} 환불` : null;
+
+  const showButton = t === "결제 대기" && !!data.paymentLinkUrl;
+
+  return (
+    <div>
+      {!mobile && <OutlinedBadge variant={paymentBadgeVariant(t)}>{t}</OutlinedBadge>}
+      {showButton && !mobile && (
+        <div className="mt-2.5">
+          <a href={data.paymentLinkUrl} target="_blank" rel="noopener noreferrer" className={btnCls}>홈페이지에서 결제하기</a>
+        </div>
+      )}
+      {note && <p className={noteCls}>{note}</p>}
+      {showButton && mobile && (
+        <a href={data.paymentLinkUrl} target="_blank" rel="noopener noreferrer" className={btnCls}>홈페이지에서 결제하기</a>
+      )}
+    </div>
+  );
 }
 
 function OutlinedBadge({

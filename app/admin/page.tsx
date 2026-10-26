@@ -1,8 +1,10 @@
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
 import { IconGallery, IconLecture, IconStudio } from "@/components/home/Icons";
 import Notice from "@/components/ui/Notice";
+import PaymentStatusChips from "@/components/admin/PaymentStatusChips";
 import { RETENTION_YEARS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
+import { summarizePaymentChips } from "@/lib/payment";
 import { getRoomsByCategory } from "@/lib/space";
 
 export const dynamic = "force-dynamic";
@@ -30,6 +32,16 @@ export default async function AdminHomePage() {
     return !isNaN(d.getTime()) && d < cutoff;
   }).length;
 
+  // 결제 현황 칩 (payment-link-record) — 목록이 카테고리별이므로 칩도 카테고리별로 집계해 해당 목록으로 연다
+  const chipRows = [
+    { label: "결제 현황 · 강의실", category: "lecture", ids: lectureRoomIds },
+    { label: "결제 현황 · E-스튜디오", category: "studio", ids: studioRoomIds },
+    { label: "결제 현황 · 우리동네 갤러리", category: "gallery", ids: galleryRoomIds },
+  ].map((c) => ({
+    ...c,
+    summary: summarizePaymentChips(allRequests.filter((r) => c.ids.has(r.roomId))),
+  }));
+
   return (
     <div className="space-y-4">
       {expiredCount > 0 && (
@@ -50,6 +62,16 @@ export default async function AdminHomePage() {
           공간을 선택하여 신청 현황을 목록 또는 캘린더로 확인하세요.
         </p>
       </div>
+
+      {chipRows.map((c, i) => (
+        <PaymentStatusChips
+          key={c.category}
+          label={c.label}
+          summary={c.summary}
+          listHref={`/admin/requests?category=${c.category}`}
+          showCheck={i === chipRows.findIndex((x) => x.summary.paymentWaiting + x.summary.closeNeeded + x.summary.autoCancelled > 0)}
+        />
+      ))}
 
       <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <HomeCategoryCard

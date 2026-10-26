@@ -8,6 +8,18 @@ import type { RentalRequest, RequestStatus } from "@/lib/types";
 import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 import RequestTable, { type TableRowData } from "./RequestTable";
 import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
+import PaymentStatusChips, { type PaymentFocus } from "@/components/admin/PaymentStatusChips";
+import { derivePaymentView, paymentListChip, summarizePaymentChips, type PaymentView } from "@/lib/payment";
+import { todayYmdSeoul } from "@/lib/datetime";
+
+const PAYMENT_FOCUS_VALUES: readonly PaymentFocus[] = ["payment-waiting", "close-needed", "auto-cancelled"];
+
+/** 결제 현황 칩 클릭 시 목록 조건 (01_spec ②-(라)) */
+function matchesPaymentFocus(view: PaymentView, focus: PaymentFocus): boolean {
+  if (focus === "payment-waiting") return (view.paymentState === "waiting" || view.paymentState === "dueTomorrow") && !!view.paymentLinkUrl;
+  if (focus === "close-needed") return view.closeNeeded;
+  return view.paymentState === "autoCancelled" && !view.homepageClosedAt;
+}
 
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
@@ -24,6 +36,7 @@ type GroupRow = {
   approvedCount: number;
   totalCount: number;
   createdAt: string;
+  paymentView: PaymentView;
 };
 
 function groupKey(r: RentalRequest) {
@@ -81,7 +94,7 @@ function formatPeriod(items: RentalRequest[]) {
 export default async function AdminRequestsPage({
   searchParams,
 }: {
-  searchParams: { category?: string; roomId?: string; status?: string; q?: string; date?: string; view?: string };
+  searchParams: { category?: string; roomId?: string; status?: string; q?: string; date?: string; view?: string; focus?: string };
 }) {
   const category = normalizeRoomCategory(searchParams.category);
   const isGalleryCategory = category === "gallery";
@@ -95,6 +108,8 @@ export default async function AdminRequestsPage({
   const q = (searchParams.q ?? "").trim();
   const date = (searchParams.date ?? "").trim();
   const view = (searchParams.view === "items" ? "items" : "group") as ViewMode;
+  const focus: PaymentFocus | null = PAYMENT_FOCUS_VALUES.includes(searchParams.focus as PaymentFocus) ? (searchParams.focus as PaymentFocus) : null;
+  const todayYmd = todayYmdSeoul();
 
   // 카테고리 외 강의실 값이 들어오면 안전하게 전체로 되돌립니다.
   if (roomId !== "all" && !allowedRoomIds.has(roomId)) {
@@ -135,8 +150,14 @@ export default async function AdminRequestsPage({
       approvedCount: bundle.approvedCount,
       totalCount: bundle.totalCount,
       createdAt,
+      paymentView: derivePaymentView(sorted, todayYmd),
     };
   });
+
+  // 결제 현황 칩 — 이 카테고리 건만 집계 (02_ui §2)
+  const categoryRequests = Array.from(map.values()).flat();
+  const chipSummary = summarizePaymentChips(categoryRequests, todayYmd);
+  const listHref = `/admin/requests?category=${encodeURIComponent(category)}`;
 
   const qLower = q.toLowerCase();
 
@@ -145,6 +166,7 @@ export default async function AdminRequestsPage({
       // 단일 패스: 공간 → 상태 → 날짜 → 검색 필터 결합
       if (roomId !== "all" && g.representative.roomId !== roomId) return false;
       if (status !== "all" && g.groupStatus !== status) return false;
+      if (focus && !matchesPaymentFocus(g.paymentView, focus)) return false;
       if (date) {
         const rep = g.representative;
         if (rep.roomId === "gallery" && !rep.batchId && rep.startDate && rep.endDate) {
@@ -229,6 +251,7 @@ export default async function AdminRequestsPage({
           discountRatePct: fee.discountRatePct,
           discountAmountKRW: fee.discountAmountKRW,
           finalFeeKRW: fee.finalFeeKRW,
+          paymentChip: paymentListChip(g.paymentView),
         };
       })
     : filteredItems.map((r) => {
@@ -263,6 +286,8 @@ export default async function AdminRequestsPage({
           discountRatePct: fee.discountRatePct,
           discountAmountKRW: fee.discountAmountKRW,
           finalFeeKRW: fee.finalFeeKRW,
+          // 회차 보기에서는 묶음 전체를 다시 읽어 결제 칩을 계산
+          paymentChip: paymentListChip(derivePaymentView(r.batchId ? all.filter((x) => x.batchId === r.batchId) : [r], todayYmd)),
         };
       });
 
@@ -273,6 +298,7 @@ export default async function AdminRequestsPage({
     params.set("status", status);
     if (q) params.set("q", q);
     if (date) params.set("date", date);
+    if (focus) params.set("focus", focus);
     params.set("view", nextView);
     return `/admin/requests?${params.toString()}`;
   };
@@ -296,6 +322,9 @@ export default async function AdminRequestsPage({
         </p>
       </div>
 
+      {/* 결제 현황 칩 (payment-link-record) — 전부 0건이면 숨김 */}
+      <PaymentStatusChips summary={chipSummary} listHref={listHref} activeFocus={focus} />
+
       {/* 필터 영역 */}
       <div className="no-print rounded-xl bg-white p-4 shadow">
         <form
@@ -304,6 +333,7 @@ export default async function AdminRequestsPage({
           method="get"
         >
           <input type="hidden" name="category" value={category} />
+          {focus && <input type="hidden" name="focus" value={focus} />}
 
           <div>
             <label className="text-xs font-semibold text-gray-700">

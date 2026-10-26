@@ -3,10 +3,19 @@
 import { useSearchParams, useRouter, usePathname } from "next/navigation";
 import { useEffect, useState, useCallback } from "react";
 
+import { formatShortMd } from "@/lib/payment";
+import { EMAIL_SECTION_ID, OPEN_EMAIL_MODAL_EVENT } from "@/lib/paymentUi";
+
 type EmailContent = {
   to: string;
   subject: string;
   body: string;
+  /** 묶음 표시 상태(email-preview 응답 · 03_api §8-1) */
+  status?: string;
+  /** 승인 ≥1 and 결제 링크 있음 → 본문에 [결제 안내] 블록 포함 */
+  paymentGuideIncluded?: boolean;
+  paymentDueDate?: string;
+  paymentLinkUrl?: string;
 };
 
 interface EmailConfirmModalProps {
@@ -45,7 +54,15 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
       const res = await fetch(`/api/admin/email-preview?requestId=${encodeURIComponent(requestId)}`);
       const data = await res.json();
       if (data.ok) {
-        setContent({ to: data.to, subject: data.subject, body: data.body });
+        setContent({
+          to: data.to,
+          subject: data.subject,
+          body: data.body,
+          status: typeof data.status === "string" ? data.status : undefined,
+          paymentGuideIncluded: !!data.paymentGuideIncluded,
+          paymentDueDate: typeof data.paymentDueDate === "string" ? data.paymentDueDate : "",
+          paymentLinkUrl: typeof data.paymentLinkUrl === "string" ? data.paymentLinkUrl : "",
+        });
         setOpen(true);
       } else {
         setToast("이메일 미리보기를 불러오지 못했습니다.");
@@ -56,6 +73,15 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
       setLoading(false);
     }
   }, [requestId]);
+
+  // 결제 안내 섹션(2단계 "승인 메일 보내기")에서 모달 열기 요청
+  useEffect(() => {
+    const handler = () => {
+      void openEmailModal();
+    };
+    window.addEventListener(OPEN_EMAIL_MODAL_EVENT, handler);
+    return () => window.removeEventListener(OPEN_EMAIL_MODAL_EVENT, handler);
+  }, [openEmailModal]);
 
   const close = useCallback(() => {
     setOpen(false);
@@ -70,6 +96,8 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
     form.set("to", content.to);
     form.set("subject", content.subject);
     form.set("body", content.body);
+    // 감사 target=신청번호 · 본문에 결제 링크가 있으면 paymentNoticeSentAt 기록 (03_api §8-2)
+    form.set("requestId", requestId);
 
     try {
       const res = await fetch(`/api/admin/send-email`, {
@@ -82,6 +110,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
         setOpen(false);
         setContent(null);
         router.replace(pathname, { scroll: false });
+        router.refresh();
       } else {
         setToast(data.message || "발송 실패");
       }
@@ -90,7 +119,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
     } finally {
       setSending(false);
     }
-  }, [content, router, pathname]);
+  }, [content, router, pathname, requestId]);
 
   const showSendButton = currentStatus !== "접수";
 
@@ -110,7 +139,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
 
       {/* 메일 발송 버튼 — 처리 상태(승인/반려/취소)일 때만 표시 */}
       {showSendButton && (
-        <section className="rounded-xl border-2 border-gray-200 bg-white shadow-sm">
+        <section id={EMAIL_SECTION_ID} className="rounded-xl border-2 border-gray-200 bg-white shadow-sm">
           <div className="border-b border-gray-100 px-5 py-3">
             <h2 className="text-sm font-bold text-gray-900">메일 발송</h2>
           </div>
@@ -147,6 +176,18 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
                 아래 내용을 확인하고 필요 시 수정한 뒤 발송해 주세요.
               </p>
             </div>
+
+            {/* 결제 안내 포함 여부 상태 줄 — 승인 상태일 때만 (02_ui §3) */}
+            {isApprovedStatus(content.status ?? currentStatus) &&
+              (content.paymentGuideIncluded ? (
+                <div className="mx-6 mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-800">
+                  결제 안내 포함됨{content.paymentDueDate ? ` · 기한 ${formatShortMd(content.paymentDueDate)}` : ""}
+                </div>
+              ) : (
+                <div role="status" className="mx-6 mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                  결제 링크가 저장되지 않아 이 메일에는 결제 안내가 없습니다. 링크를 먼저 저장하려면 닫기를 누르세요.
+                </div>
+              ))}
 
             <div className="max-h-[60vh] overflow-y-auto px-6 py-4 space-y-4">
               <div>
@@ -185,7 +226,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
                 type="button"
                 onClick={close}
                 disabled={sending}
-                className="rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                className="flex-1 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 md:flex-none"
               >
                 취소
               </button>
@@ -193,7 +234,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
                 type="button"
                 onClick={send}
                 disabled={sending}
-                className="rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60"
+                className="flex-1 rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 md:flex-none"
               >
                 {sending ? "발송 중..." : "메일 발송"}
               </button>
@@ -203,6 +244,11 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
       )}
     </>
   );
+}
+
+/** 승인 회차가 있는 상태인지(단건 "승인" · 묶음 "승인"/"부분처리") — 결제 안내 상태 줄 표시 조건 */
+function isApprovedStatus(status: string): boolean {
+  return status === "승인" || status === "부분처리" || status.includes("승인");
 }
 
 function SavedToast() {

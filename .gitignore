@@ -30,3 +30,6 @@ npm-debug.log*
 # Google OAuth 토큰(로컬 발급 결과 · 절대 커밋 금지)
 .google-oauth.local.json
 client_secret*.json
+
+# 서브에이전트 핸드오프(내부 문서)
+.claude/work/

@@ -9,6 +9,8 @@ import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
 import { handleApiError } from "@/lib/apiResponse";
 import { maskName } from "@/lib/mask";
+import { collectedKRWOf, paymentRep } from "@/lib/payment";
+import { PAYMENT_LABELS } from "@/lib/labels";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -17,14 +19,16 @@ export const revalidate = 0;
 /**
  * 수입 내역 엑셀 (행정사무감사 자료 양식) — 2026-10 행정감사 후속
  *
- * GET /api/admin/export/revenue?from=YYYY-MM-DD&to=YYYY-MM-DD[&mask=true]
+ * GET /api/admin/export/revenue?from=YYYY-MM-DD&to=YYYY-MM-DD[&mask=true][&basis=usage|paid]
  *   (from/to 미지정 시 year=YYYY 또는 올해 1/1~12/31)
  *
  * - 승인된 건만 집계 (묶음은 승인 회차만, 1건 = 1행)
- * - 시트1 "대관(강의실·E-스튜디오)": 연도 · 대관일자 · 대관처 · 장소 · 금액 (+ 정가·할인·근거·유무료·신청번호·처리자)
+ * - 시트1 "대관(강의실·E-스튜디오)": 연도 · 대관일자 · 대관처 · 장소 · 승인 금액 (+ 정가·할인·근거·유무료·결제 기록·신청번호·처리자)
  * - 시트2 "전시(우리동네 갤러리)": 같은 형식 (갤러리는 대관 시설이 아니므로 분리)
- * - 시트3 "월별 합계": 월 × 장소 금액·건수
+ * - 시트3 "월별 합계": 월 × 장소 승인 금액·건수·결제 확인 금액
  * - mask=true 이면 대관처를 감사 자료처럼 가림 처리 (기관명은 'OO어린이집'처럼, 개인은 성만)
+ * - basis=paid 이면 기간 필터를 결제일(paidAt)로 (결제 기록 없는 건 제외 · 2026-10-26)
+ * - 결제 열 라벨은 lib/labels.ts PAYMENT_LABELS 단일 출처
  */
 
 type Row = {
@@ -39,6 +43,13 @@ type Row = {
   discountKRW: number;
   discountReason: string;
   finalKRW: number;
+  // 결제 기록 (2026-10-26)
+  paymentStatus: string;
+  paidAt: string;
+  paymentMethod: string;
+  collectedKRW: number | null;
+  refundKRW: number | null;
+  homepageClosedAt: string;
   requestIds: string;
   decidedBy: string;
   decidedAt: string;
@@ -95,6 +106,7 @@ export async function GET(req: Request) {
     const from = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("from") ?? "") ? url.searchParams.get("from")! : `${year}-01-01`;
     const to = /^\d{4}-\d{2}-\d{2}$/.test(url.searchParams.get("to") ?? "") ? url.searchParams.get("to")! : `${year}-12-31`;
     const mask = url.searchParams.get("mask") === "true";
+    const basis: "usage" | "paid" = url.searchParams.get("basis") === "paid" ? "paid" : "usage";
 
     const db = getDatabase();
     const all = await db.getAllRequests();
@@ -125,7 +137,20 @@ export async function GET(req: Request) {
       }
       const sortedDates = dates.slice().sort();
       const firstDate = sortedDates[0];
-      if (!firstDate || firstDate < from || firstDate > to) continue;
+      if (!firstDate) continue;
+
+      // 결제 기록 (묶음 전 행 동일 값 — 대표 행에서)
+      const pr = paymentRep(list);
+      const paymentStatus = pr?.paymentStatus ?? "";
+      const paidAt = pr?.paidAt ?? "";
+      const collected = collectedKRWOf(pr);
+
+      // 기간 필터: usage=이용 시작일 · paid=결제일(결제 기록 없는 건 제외)
+      if (basis === "usage") {
+        if (firstDate < from || firstDate > to) continue;
+      } else {
+        if (!paidAt || paidAt < from || paidAt > to) continue;
+      }
 
       const fee = first.batchId ? computeFeesForBundle(approved) : computeFeesForRequest(first);
       const dateText =
@@ -148,16 +173,24 @@ export async function GET(req: Request) {
         discountKRW: fee.discountAmountKRW,
         discountReason: fee.discountReason || "",
         finalKRW: fee.finalFeeKRW,
+        paymentStatus: paymentStatus || "",
+        paidAt,
+        paymentMethod: pr?.paymentMethod ?? "",
+        collectedKRW: collected,
+        refundKRW: paymentStatus === "환불" ? Number(pr?.refundAmountKRW ?? 0) : null,
+        homepageClosedAt: pr?.homepageClosedAt ?? "",
         requestIds: approved.map((r) => r.requestId).join(", "),
         decidedBy: approved.map((r) => r.decidedBy || "").find(Boolean) || "",
         decidedAt: decided ? decided.slice(0, 10) : "",
       });
     }
 
-    rows.sort((a, b) => a.firstDate.localeCompare(b.firstDate));
+    rows.sort((a, b) => (basis === "paid" ? a.paidAt.localeCompare(b.paidAt) : a.firstDate.localeCompare(b.firstDate)));
 
-    const header = ["연번", "연도", "대관일자", "대관처", "장소", "금액", "유료/무료", "정가", "할인액", "할인 근거", "신청번호", "처리자", "처리일"];
-    const galleryHeader = ["연번", "연도", "전시기간", "신청처", "장소", "이용료", "유료/무료", "정가", "할인액", "할인 근거", "신청번호", "처리자", "처리일"];
+    const L = PAYMENT_LABELS.excel;
+    const paymentCols = [L.paymentStatus, L.paidAt, L.paymentMethod, L.collected, L.refund, L.homepageClosed];
+    const header = ["연번", "연도", "대관일자", "대관처", "장소", L.approvedFee, "유료/무료", "정가", "할인액", "할인 근거", ...paymentCols, "신청번호", "처리자", "처리일"];
+    const galleryHeader = ["연번", "연도", "전시기간", "신청처", "장소", L.approvedFee, "유료/무료", "정가", "할인액", "할인 근거", ...paymentCols, "신청번호", "처리자", "처리일"];
 
     function toAoa(list: Row[], head: string[]) {
       const aoa: (string | number)[][] = [head];
@@ -173,13 +206,21 @@ export async function GET(req: Request) {
           r.baseKRW,
           r.discountKRW,
           r.discountReason,
+          r.paymentStatus || "미확인",
+          r.paidAt,
+          r.paymentMethod,
+          r.collectedKRW ?? "",
+          r.refundKRW ?? "",
+          r.homepageClosedAt,
           r.requestIds,
           r.decidedBy,
           r.decidedAt,
         ]);
       });
       const total = list.reduce((acc, r) => acc + r.finalKRW, 0);
-      aoa.push(["소계", "", `${list.length}건`, "", "", total, "", "", "", "", "", "", ""]);
+      const collectedTotal = list.reduce((acc, r) => acc + (r.collectedKRW ?? 0), 0);
+      const unconfirmed = list.filter((r) => r.collectedKRW === null).length;
+      aoa.push(["소계", "", `${list.length}건`, "", "", total, "", "", "", "", PAYMENT_LABELS.unconfirmed(unconfirmed), "", "", collectedTotal, "", "", "", "", ""]);
       return aoa;
     }
 
@@ -187,27 +228,40 @@ export async function GET(req: Request) {
     const galleryRows = rows.filter((r) => r.isGallery);
 
     const wb = XLSX.utils.book_new();
-    const note = [`※ 기간 ${from} ~ ${to} · 승인 건 기준(묶음은 승인 회차만) · 금액 = 할인 후 청구액${mask ? " · 대관처 가림 처리" : ""}`];
+    const basisText = basis === "paid" ? "결제일 기준" : "이용 시작일 기준";
+    const note = [
+      `※ 기간 ${from} ~ ${to}(${basisText}) · 승인 건 기준(묶음은 승인 회차만) · ${L.approvedFee} = 할인 후 승인 요금 · ${PAYMENT_LABELS.excelNote}${mask ? " · 대관처 가림 처리" : ""}`,
+    ];
+    const cols = [6, 7, 24, 24, 14, 12, 9, 12, 10, 24, 10, 12, 12, 14, 10, 12, 30, 10, 12].map((wch) => ({ wch }));
 
     const ws1 = XLSX.utils.aoa_to_sheet([note, [], ...toAoa(rentalRows, header)]);
-    ws1["!cols"] = [6, 7, 24, 24, 14, 12, 9, 12, 10, 24, 30, 10, 12].map((wch) => ({ wch }));
+    ws1["!cols"] = cols;
     XLSX.utils.book_append_sheet(wb, ws1, "대관(강의실·E-스튜디오)");
 
     const ws2 = XLSX.utils.aoa_to_sheet([note, [], ...toAoa(galleryRows, galleryHeader)]);
-    ws2["!cols"] = [6, 7, 24, 24, 14, 12, 9, 12, 10, 24, 30, 10, 12].map((wch) => ({ wch }));
+    ws2["!cols"] = cols;
     XLSX.utils.book_append_sheet(wb, ws2, "전시(우리동네 갤러리)");
 
-    // 월별 합계 (월 × 장소)
+    // 월별 합계 (월 × 장소) — 건수 · 승인 금액 · 결제 확인 금액
+    const monthOf = (r: Row) => (basis === "paid" ? r.paidAt : r.firstDate).slice(0, 7);
     const places = Array.from(new Set(rows.map((r) => r.place)));
-    const months = Array.from(new Set(rows.map((r) => r.firstDate.slice(0, 7)))).sort();
-    const monthAoa: (string | number)[][] = [["월", ...places.flatMap((p) => [`${p} 건수`, `${p} 금액`]), "합계 건수", "합계 금액"]];
+    const months = Array.from(new Set(rows.map(monthOf))).sort();
+    const monthAoa: (string | number)[][] = [
+      ["월", ...places.flatMap((p) => [`${p} 건수`, `${p} ${L.approvedFee}`, `${p} ${L.collected}`]), "합계 건수", `합계 ${L.approvedFee}`, `합계 ${L.collected}`],
+    ];
     for (const ym of months) {
-      const inMonth = rows.filter((r) => r.firstDate.startsWith(ym));
+      const inMonth = rows.filter((r) => monthOf(r) === ym);
       const cells = places.flatMap((p) => {
         const sub = inMonth.filter((r) => r.place === p);
-        return [sub.length, sub.reduce((a, r) => a + r.finalKRW, 0)];
+        return [sub.length, sub.reduce((a, r) => a + r.finalKRW, 0), sub.reduce((a, r) => a + (r.collectedKRW ?? 0), 0)];
       });
-      monthAoa.push([ym, ...cells, inMonth.length, inMonth.reduce((a, r) => a + r.finalKRW, 0)]);
+      monthAoa.push([
+        ym,
+        ...cells,
+        inMonth.length,
+        inMonth.reduce((a, r) => a + r.finalKRW, 0),
+        inMonth.reduce((a, r) => a + (r.collectedKRW ?? 0), 0),
+      ]);
     }
     const ws3 = XLSX.utils.aoa_to_sheet(monthAoa);
     XLSX.utils.book_append_sheet(wb, ws3, "월별 합계");
@@ -217,10 +271,10 @@ export async function GET(req: Request) {
     auditLog({
       action: "EXPORT_LIST",
       ip: getClientIp(req),
-      details: { kind: "revenue", from, to, mask, rentalRows: rentalRows.length, galleryRows: galleryRows.length },
+      details: { kind: "revenue", from, to, mask, basis, rentalRows: rentalRows.length, galleryRows: galleryRows.length },
     });
 
-    const fname = encodeURIComponent(`수입내역(${from}~${to})${mask ? "_가림" : ""}.xlsx`);
+    const fname = encodeURIComponent(`수입내역(${from}~${to}${basis === "paid" ? "_결제일" : ""})${mask ? "_가림" : ""}.xlsx`);
     return new NextResponse(buf, {
       status: 200,
       headers: {

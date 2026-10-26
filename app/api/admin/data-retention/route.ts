@@ -18,6 +18,14 @@ function isExpired(createdAt: string): boolean {
 }
 
 /**
+ * 결제 기록 보유 행은 회계 증빙이므로 파기 대상에서 제외 (01_spec ⑧-A-9 · 2026-10-26)
+ * - paymentStatus(결제완료·환불·미결제)가 기록된 행. 가명 처리 설계는 별도 기능.
+ */
+function hasPaymentRecord(r: { paymentStatus?: string }): boolean {
+  return !!(r.paymentStatus ?? "").trim();
+}
+
+/**
  * GET: 보존기한(3년) 경과 건 조회
  *
  * 응답: { ok, expiredCount, expiredIds, cutoffDate }
@@ -31,7 +39,9 @@ export async function GET(req: Request) {
   try {
     const db = getDatabase();
     const all = await db.getAllRequests();
-    const expired = all.filter((r) => isExpired(r.createdAt));
+    const expiredAll = all.filter((r) => isExpired(r.createdAt));
+    const protectedByPayment = expiredAll.filter((r) => hasPaymentRecord(r));
+    const expired = expiredAll.filter((r) => !hasPaymentRecord(r));
 
     const cutoff = new Date();
     cutoff.setFullYear(cutoff.getFullYear() - RETENTION_YEARS);
@@ -39,12 +49,13 @@ export async function GET(req: Request) {
     auditLog({
       action: "DATA_RETENTION_CHECK",
       ip: getClientIp(req),
-      details: { expiredCount: expired.length },
+      details: { expiredCount: expired.length, protectedByPaymentCount: protectedByPayment.length },
     });
 
     return NextResponse.json({
       ok: true,
       expiredCount: expired.length,
+      protectedByPaymentCount: protectedByPayment.length,
       cutoffDate: cutoff.toISOString().slice(0, 10),
       expired: expired.map((r) => ({
         requestId: r.requestId,
@@ -92,11 +103,13 @@ export async function DELETE(req: Request) {
     const db = getDatabase();
     const all = await db.getAllRequests();
 
-    // 안전장치: 실제로 보존기한이 경과된 건만 삭제 대상으로 필터링
+    // 안전장치: 실제로 보존기한이 경과된 건만 삭제 대상으로 필터링 · 결제 기록 보유 행은 제외
     const expiredIdSet = new Set(
-      all.filter((r) => isExpired(r.createdAt)).map((r) => r.requestId)
+      all.filter((r) => isExpired(r.createdAt) && !hasPaymentRecord(r)).map((r) => r.requestId)
     );
+    const paymentIdSet = new Set(all.filter((r) => hasPaymentRecord(r)).map((r) => r.requestId));
     const validIds = requestIds.filter((id) => expiredIdSet.has(id));
+    const skippedByPayment = requestIds.filter((id) => paymentIdSet.has(id)).length;
 
     if (validIds.length === 0) {
       return NextResponse.json({ ok: false, message: "파기 대상에 해당하는 건이 없습니다." }, { status: 400 });
@@ -110,6 +123,7 @@ export async function DELETE(req: Request) {
       details: {
         requestedCount: requestIds.length,
         purgedCount: validIds.length,
+        skippedByPaymentCount: skippedByPayment,
         purgedIds: validIds,
       },
     });
@@ -117,6 +131,7 @@ export async function DELETE(req: Request) {
     return NextResponse.json({
       ok: true,
       purgedCount: validIds.length,
+      skippedByPaymentCount: skippedByPayment,
       message: `${validIds.length}건의 개인정보가 파기되었습니다.`,
     });
   } catch (e: unknown) {

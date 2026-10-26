@@ -3,7 +3,76 @@ export type RequestStatus = "접수" | "승인" | "반려" | "취소";
 /** 접수 경로 (서면 접수 등록 기능 · 2026-10-19) */
 export type IntakeChannel = "online" | "visit" | "email" | "fax";
 
-export type RentalRequest = {
+/** 결제 상태 — 빈값은 미결제로 해석 (결제 링크·결제 확인 기록 · 2026-10-26) */
+export type PaymentStatus = "" | "미결제" | "결제완료" | "환불";
+/** 결제 방식 */
+export type PaymentMethod = "홈페이지 온라인" | "현장 카드" | "현장 현금" | "계좌이체";
+
+/**
+ * 결제 기록 필드 — 묶음(batchId)은 전 행 동일 값(할인 필드와 같은 동기화 규칙)
+ * 결제 기록(paymentStatus 이하)은 회계 증빙이므로 개인정보 파기 대상에서 제외한다.
+ */
+export type PaymentFields = {
+  /** 홈페이지 강좌 결제 링크 (seochowomen.kr 호스트만) */
+  paymentLinkUrl?: string;
+  /** 결제 기한 YYYY-MM-DD = 홈페이지 접수기간 종료일 · 자동 취소 판정 기준 */
+  paymentDueDate?: string;
+  /** 홈페이지 웹게시 처리일 YYYY-MM-DD */
+  homepagePostedAt?: string;
+  /** 홈페이지 마감·미게시 처리일 YYYY-MM-DD */
+  homepageClosedAt?: string;
+  /** 결제 링크 포함 메일 발송 시각(ISO) */
+  paymentNoticeSentAt?: string;
+  /** D-1 리마인드 발송 시각(ISO) */
+  paymentReminderSentAt?: string;
+  /** 결제 기한 경과 자동 취소 시각(ISO) — 있으면 "자동 취소됨" */
+  autoCancelledAt?: string;
+  paymentStatus?: PaymentStatus;
+  paymentMethod?: PaymentMethod | "";
+  /** 결제일 YYYY-MM-DD */
+  paidAt?: string;
+  /** 결제 확인 금액(원) */
+  paidAmountKRW?: number;
+  /** 영수증·승인번호 앞자리·금액 차이 사유 등 */
+  paymentNote?: string;
+  /** 결제 기록 시각(ISO) */
+  paymentConfirmedAt?: string;
+  /** 결제 기록자(시설총무) */
+  paymentConfirmedBy?: string;
+  /** 환불일 YYYY-MM-DD */
+  refundedAt?: string;
+  refundAmountKRW?: number;
+  refundReason?: string;
+};
+
+/** 결제 필드 키 목록 — 시트 헤더(REQUEST_OPTIONAL_HEADERS)와 updateRequestPayment가 같은 출처를 쓴다 */
+export const PAYMENT_FIELD_KEYS = [
+  "paymentLinkUrl",
+  "paymentDueDate",
+  "homepagePostedAt",
+  "homepageClosedAt",
+  "paymentNoticeSentAt",
+  "paymentReminderSentAt",
+  "autoCancelledAt",
+  "paymentStatus",
+  "paymentMethod",
+  "paidAt",
+  "paidAmountKRW",
+  "paymentNote",
+  "paymentConfirmedAt",
+  "paymentConfirmedBy",
+  "refundedAt",
+  "refundAmountKRW",
+  "refundReason",
+] as const satisfies readonly (keyof PaymentFields)[];
+
+/** 숫자형 결제 필드 */
+export const PAYMENT_NUMERIC_KEYS: ReadonlySet<string> = new Set(["paidAmountKRW", "refundAmountKRW"]);
+
+/** 결제 필드 갱신 패치 — null 또는 "" 은 "비움" */
+export type PaymentPatch = { [K in keyof PaymentFields]?: PaymentFields[K] | null };
+
+export type RentalRequest = PaymentFields & {
   requestId: string;
   createdAt: string;
 

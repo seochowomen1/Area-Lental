@@ -34,7 +34,16 @@ export type AuditAction =
   | "EXPORT_FORM"
   | "PI_ACCESS"
   | "DATA_RETENTION_CHECK"
-  | "DATA_RETENTION_PURGE";
+  | "DATA_RETENTION_PURGE"
+  // 결제 링크·결제 확인 기록 (2026-10-26)
+  | "PAYMENT_NOTICE_SAVE"
+  | "PAYMENT_CONFIRM"
+  | "PAYMENT_UPDATE"
+  | "PAYMENT_REFUND"
+  | "HOMEPAGE_LISTING_CLOSE"
+  | "PAYMENT_AUTO_CANCEL_RESTORE"
+  | "PAYMENT_DEADLINE_AUTO_CANCEL"
+  | "PAYMENT_REMINDER_SEND";
 
 /** 시트에 영구 저장할 작업(데이터 변경). 조회성 작업(PI_ACCESS·STATS_VIEW·EXPORT_*)은 로그 폭증 방지를 위해 제외 */
 const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
@@ -56,6 +65,14 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "EMAIL_TEMPLATE_UPDATE",
   "SHEETS_INIT",
   "DATA_RETENTION_PURGE",
+  "PAYMENT_NOTICE_SAVE",
+  "PAYMENT_CONFIRM",
+  "PAYMENT_UPDATE",
+  "PAYMENT_REFUND",
+  "HOMEPAGE_LISTING_CLOSE",
+  "PAYMENT_AUTO_CANCEL_RESTORE",
+  "PAYMENT_DEADLINE_AUTO_CANCEL",
+  "PAYMENT_REMINDER_SEND",
 ]);
 
 /** 감사로그 시트의 작업명 한글 표기 */
@@ -78,6 +95,14 @@ const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   EMAIL_TEMPLATE_UPDATE: "메일 템플릿 수정",
   SHEETS_INIT: "시트 초기화",
   DATA_RETENTION_PURGE: "개인정보 파기",
+  PAYMENT_NOTICE_SAVE: "결제 안내 저장",
+  PAYMENT_CONFIRM: "결제 확인",
+  PAYMENT_UPDATE: "결제 기록 수정",
+  PAYMENT_REFUND: "환불 기록",
+  HOMEPAGE_LISTING_CLOSE: "홈페이지 마감 기록",
+  PAYMENT_AUTO_CANCEL_RESTORE: "자동 취소 복구",
+  PAYMENT_DEADLINE_AUTO_CANCEL: "결제 기한 경과 자동 취소",
+  PAYMENT_REMINDER_SEND: "결제 기한 리마인드",
 };
 
 export interface AuditEntry {

@@ -5,7 +5,7 @@
  * 환경 변수에 따라 자동으로 적절한 구현체를 선택합니다.
  */
 
-import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus } from "./types";
+import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch } from "./types";
 import { isMockMode } from "./env";
 
 /**
@@ -52,6 +52,8 @@ export interface Database {
     discountAmountKRW?: number;
     discountReason?: string;
   }): Promise<RentalRequest>;
+  /** 결제 기록 필드 갱신 — 묶음이면 전 행 동기화. 갱신된 행 전부 반환 (2026-10-26) */
+  updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]>;
   /** 반려/취소된 신청건 삭제 */
   deleteRequests(requestIds: string[]): Promise<void>;
 
@@ -107,6 +109,11 @@ class MockDatabase implements Database {
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
     const { mock_updateRequestStatus } = await this.mockdb;
     return mock_updateRequestStatus(args);
+  }
+
+  async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
+    const { mock_updateRequestPayment } = await this.mockdb;
+    return mock_updateRequestPayment(args);
   }
 
   async deleteRequests(requestIds: string[]) {
@@ -209,6 +216,14 @@ class SheetsDatabase implements Database {
     this.requestsCache.invalidate();
     const { updateRequestStatus } = await this.sheets;
     return updateRequestStatus(args);
+  }
+
+  async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
+    this.requestsCache.invalidate();
+    const { updateRequestPayment } = await this.sheets;
+    const result = await updateRequestPayment(args);
+    this.requestsCache.invalidate();
+    return result;
   }
 
   async deleteRequests(requestIds: string[]) {

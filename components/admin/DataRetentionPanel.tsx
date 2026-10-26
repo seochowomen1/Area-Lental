@@ -12,6 +12,8 @@ type ExpiredItem = {
 
 type CheckResult = {
   expiredCount: number;
+  /** 결제 기록 보유로 파기 대상에서 제외된 건수 (2026-10-26) */
+  protectedByPaymentCount?: number;
   cutoffDate: string;
   expired: ExpiredItem[];
 };
@@ -96,6 +98,9 @@ export default function DataRetentionPanel() {
             <strong className={result.expiredCount > 0 ? "text-red-600" : "text-green-600"}>
               {result.expiredCount}건
             </strong>
+            {(result.protectedByPaymentCount ?? 0) > 0 && (
+              <span className="ml-2 text-xs text-slate-500">· 결제 기록 보유로 제외 {result.protectedByPaymentCount}건</span>
+            )}
           </p>
 
           {result.expiredCount > 0 && (

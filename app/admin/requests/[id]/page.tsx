@@ -21,6 +21,11 @@ import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
 import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 import GianCopyButton from "@/components/admin/GianCopyButton";
+import PaymentSection from "@/components/admin/PaymentSection";
+import WelfareCopyButton from "@/components/admin/WelfareCopyButton";
+import { derivePaymentView } from "@/lib/payment";
+import { BADGE_TONE_CLASS, homepageBadge, paymentBadges, toPaymentViewDTO } from "@/lib/paymentUi";
+import { todayYmdSeoul } from "@/lib/datetime";
 import { Suspense } from "react";
 
 import {
@@ -156,6 +161,13 @@ export default async function AdminRequestDetail({
   const usingApprovedBasis = isBatch && approvedSessions.length > 0 && approvedSessions.length < sessions.length;
   const feeAll = isBatch ? computeFeesForBundle(sessions) : null;
   const feeBasis = isBatch ? computeFeesForBundle(feeBasisSessions) : computeFeesForRequest(req);
+
+  /* ── 결제 안내·확인 파생 상태 (payment-link-record · 2026-10-26) ── */
+  const todayYmd = todayYmdSeoul();
+  const paymentView = derivePaymentView(sessions, todayYmd);
+  const paymentDto = toPaymentViewDTO(paymentView);
+  const payBadges = paymentBadges(paymentDto);
+  const hpBadge = homepageBadge(paymentDto.homepageState);
 
   /* ── Server Actions ── */
   const decideSingle = decideSingleAction.bind(null, req.requestId);
@@ -294,7 +306,7 @@ export default async function AdminRequestDetail({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Link href={backToListHref} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
               ← 목록
             </Link>
@@ -322,6 +334,7 @@ export default async function AdminRequestDetail({
               className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
             />
             <GianCopyButton payload={gianPayload} />
+            <WelfareCopyButton requestId={req.requestId} />
           </div>
         </div>
       </div>
@@ -329,7 +342,7 @@ export default async function AdminRequestDetail({
       {/* ═══ 2. 상태 요약 스트립 ═══ */}
       <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+          <div className="flex flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center md:gap-4">
             <div className="flex items-center gap-2">
               <span className="text-sm font-semibold text-gray-600">처리 상태</span>
               <StatusBadge status={statusForFilter} />
@@ -339,11 +352,35 @@ export default async function AdminRequestDetail({
             </div>
 
             {isBatch && (
-              <div className="flex items-center gap-3 border-l border-gray-200 pl-4 text-sm text-gray-600">
+              <div className="flex items-center gap-3 text-sm text-gray-600 md:border-l md:border-gray-200 md:pl-4">
                 <span>승인 <b className="text-emerald-700">{bundle!.approvedCount}</b></span>
                 <span>반려 <b className="text-rose-700">{bundle!.rejectedCount}</b></span>
                 <span>대기 <b className="text-amber-700">{bundle!.pendingCount}</b></span>
               </div>
+            )}
+
+            {/* 결제·홈페이지 배지 — 승인 회차가 있거나 자동 취소된 건만 (01_spec ③-(가)-2) */}
+            {payBadges.length > 0 && (
+              <>
+                <div className="flex flex-wrap items-center gap-2 md:border-l md:border-gray-200 md:pl-4">
+                  <span className="text-sm font-semibold text-gray-600">결제</span>
+                  {payBadges.map((b) => (
+                    <span
+                      key={b.text}
+                      title={b.title}
+                      className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${BADGE_TONE_CLASS[b.tone]}`}
+                    >
+                      {b.text}
+                    </span>
+                  ))}
+                </div>
+                <div className="flex items-center gap-2 md:border-l md:border-gray-200 md:pl-4">
+                  <span className="text-sm font-semibold text-gray-600">홈페이지</span>
+                  <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${BADGE_TONE_CLASS[hpBadge.tone]}`}>
+                    {hpBadge.text}
+                  </span>
+                </div>
+              </>
             )}
           </div>
 
@@ -768,6 +805,9 @@ export default async function AdminRequestDetail({
           )}
         </div>
       </section>
+
+      {/* ═══ 8. 결제 안내·확인 (payment-link-record) — 경고 띠 + 4단계 체크리스트 ═══ */}
+      <PaymentSection requestId={req.requestId} view={paymentDto} todayYmd={todayYmd} />
 
       {/* 메일 발송 섹션 + 모달 */}
       <Suspense>

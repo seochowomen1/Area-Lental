@@ -1,13 +1,15 @@
 import { getGoogleClient } from "@/lib/google";
 import { isMockMode, requireGoogleEnv } from "@/lib/env";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch } from "@/lib/types";
+import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { ROOMS } from "@/lib/config";
 import {
   mock_getAllRequests,
   mock_getRequestById,
   mock_appendRequest,
   mock_updateRequestStatus,
+  mock_updateRequestPayment,
   mock_getBlocks,
   mock_addBlock,
   mock_deleteBlock,
@@ -63,6 +65,25 @@ export const REQUEST_OPTIONAL_HEADERS = [
   "intakeChannel",
   "appliedAt",
   "intakeNote",
+
+  // 결제 링크·결제 확인 기록 (2026-10-26) — 열 이름 = 필드 이름 (lib/types.ts PAYMENT_FIELD_KEYS와 동일 순서)
+  "paymentLinkUrl",
+  "paymentDueDate",
+  "homepagePostedAt",
+  "homepageClosedAt",
+  "paymentNoticeSentAt",
+  "paymentReminderSentAt",
+  "autoCancelledAt",
+  "paymentStatus",
+  "paymentMethod",
+  "paidAt",
+  "paidAmountKRW",
+  "paymentNote",
+  "paymentConfirmedAt",
+  "paymentConfirmedBy",
+  "refundedAt",
+  "refundAmountKRW",
+  "refundReason",
 ] as const;
 
 function colToLetter(col1: number): string {
@@ -170,7 +191,38 @@ function buildRecordValueMap(record: RentalRequest): Record<string, string> {
     intakeChannel: record.intakeChannel ?? "",
     appliedAt: record.appliedAt ?? "",
     intakeNote: record.intakeNote ?? "",
+    // 결제 기록 (2026-10-26)
+    ...paymentValueMap(record),
   };
+}
+
+/** 결제 필드 → 시트 문자열 값 (숫자는 "0" 대신 빈칸 유지 → 미기록과 0원을 구분) */
+function paymentValueMap(record: Partial<PaymentFields>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const k of PAYMENT_FIELD_KEYS) {
+    const v = record[k];
+    if (v === undefined || v === null) { out[k] = ""; continue; }
+    out[k] = typeof v === "number" ? String(v) : String(v);
+  }
+  return out;
+}
+
+/** 시트 행 → 결제 필드 (헤더 이름으로 찾음 · 없으면 undefined) */
+function parsePaymentFields(r: string[], opt: (name: string) => number): PaymentFields {
+  const out: PaymentFields = {};
+  for (const k of PAYMENT_FIELD_KEYS) {
+    const i = opt(k);
+    if (i < 0) continue;
+    const raw = String(r[i] ?? "").trim();
+    if (!raw) continue;
+    if (PAYMENT_NUMERIC_KEYS.has(k)) {
+      const n = parseInt(raw, 10);
+      if (Number.isFinite(n)) (out as Record<string, unknown>)[k] = n;
+    } else {
+      (out as Record<string, unknown>)[k] = raw;
+    }
+  }
+  return out;
 }
 
 /**
@@ -356,6 +408,9 @@ export async function getAllRequests(): Promise<RentalRequest[]> {
       intakeChannel: iIntakeChannel >= 0 ? ((String(r[iIntakeChannel] ?? "").trim() || undefined) as RentalRequest["intakeChannel"]) : undefined,
       appliedAt: iAppliedAt >= 0 ? (String(r[iAppliedAt] ?? "").trim() || undefined) : undefined,
       intakeNote: iIntakeNote >= 0 ? (String(r[iIntakeNote] ?? "").trim() || undefined) : undefined,
+
+      // 결제 기록 (2026-10-26) — 헤더 이름으로 찾음
+      ...parsePaymentFields(r, opt),
 
       applicantName: r[idx("applicantName")],
       birth: r[idx("birth")],
@@ -767,6 +822,55 @@ export async function updateRequestStatus(args: {
   const updated = await getRequestById(args.requestId);
   if (!updated) throw new Error("업데이트 후 데이터를 다시 불러오지 못했습니다.");
   return updated;
+}
+
+/**
+ * 결제 기록 필드 갱신 (2026-10-26)
+ * - 묶음(batchId)이면 같은 묶음 전 행에 동일 값 기록(할인 필드와 같은 규칙)
+ * - 열은 헤더 이름으로 찾는다(고정 열 금지). 없는 열은 ensureRequestOptionalHeaders가 끝에 추가.
+ * - patch 값 null/"" → 빈칸(비움). undefined → 건드리지 않음.
+ */
+export async function updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]> {
+  if (isMockMode()) return mock_updateRequestPayment(args);
+
+  const env = requireGoogleEnv();
+  await ensureRequestOptionalHeaders();
+
+  const { sheets } = getGoogleClient();
+  const all = await getAllRequests();
+  const current = all.find((r) => r.requestId === args.requestId);
+  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
+
+  const loc = await locateRequestRows();
+  const batchId = (current.batchId ?? "").trim();
+  const targets = batchId ? all.filter((r) => (r.batchId ?? "").trim() === batchId) : [current];
+  const rowNumbers = targets.map((r) => loc.rowOf.get(r.requestId) ?? 0).filter((n) => n > 0);
+  if (!rowNumbers.length) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
+
+  const data: Array<{ range: string; values: string[][] }> = [];
+  for (const k of PAYMENT_FIELD_KEYS) {
+    if (!(k in args.patch)) continue;
+    const v = args.patch[k];
+    if (v === undefined) continue;
+    const ci = loc.col.get(k);
+    if (ci === undefined) throw new Error(`requests 시트에 '${k}' 헤더가 없습니다.`);
+    const letter = colToLetter(ci + 1);
+    const value = v === null ? "" : String(v);
+    for (const rn of rowNumbers) {
+      data.push({ range: `${SHEET_REQUESTS}!${letter}${rn}:${letter}${rn}`, values: [[value]] });
+    }
+  }
+
+  if (data.length) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      requestBody: { valueInputOption: "RAW", data },
+    });
+  }
+
+  const refreshed = await getAllRequests();
+  const ids = new Set(targets.map((t) => t.requestId));
+  return refreshed.filter((r) => ids.has(r.requestId));
 }
 
 // class_schedule 시트의 선택 컬럼(없으면 헤더 끝에 자동 추가) — 업무 시스템 동기화 표식

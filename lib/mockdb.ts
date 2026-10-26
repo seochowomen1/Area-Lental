@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPatch } from "@/lib/types";
+import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
 
@@ -299,6 +300,35 @@ export async function mock_updateRequestStatus(args: {
 
   saveDb(db);
   return db.requests[idx];
+}
+
+/**
+ * 결제 기록 필드 갱신 (Mock) — 묶음이면 같은 batchId 전 행 동기화
+ * patch 값 null/"" → 필드 제거(비움), undefined → 유지
+ */
+export async function mock_updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]> {
+  const db = ensureDb();
+  const current = db.requests.find(r => r.requestId === args.requestId);
+  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  const batchId = (current.batchId ?? "").trim();
+  const isTarget = (r: RentalRequest) => (batchId ? (r.batchId ?? "").trim() === batchId : r.requestId === current.requestId);
+
+  const updated: RentalRequest[] = [];
+  for (let i = 0; i < db.requests.length; i++) {
+    if (!isTarget(db.requests[i])) continue;
+    const next: Record<string, unknown> = { ...db.requests[i] };
+    for (const k of PAYMENT_FIELD_KEYS) {
+      if (!(k in args.patch)) continue;
+      const v = args.patch[k];
+      if (v === undefined) continue;
+      if (v === null || v === "") { delete next[k]; continue; }
+      next[k] = PAYMENT_NUMERIC_KEYS.has(k) ? Number(v) : v;
+    }
+    db.requests[i] = next as RentalRequest;
+    updated.push(db.requests[i]);
+  }
+  saveDb(db);
+  return updated;
 }
 
 export async function mock_getClassSchedules(): Promise<ClassSchedule[]> {

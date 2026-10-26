@@ -1,7 +1,7 @@
-import crypto from "crypto";
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { cronAuthOk } from "@/lib/cronAuth";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
 import { handleApiError, jsonError } from "@/lib/apiResponse";
@@ -10,17 +10,6 @@ import { classroomSyncConfigured, runClassroomSync } from "@/lib/classroomSync";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
-
-/** Vercel Cron 호출 인증: Authorization: Bearer <CRON_SECRET> */
-function cronAuthOk(req: Request): boolean {
-  const secret = (process.env.CRON_SECRET || "").trim();
-  if (!secret) return false;
-  const auth = req.headers.get("authorization") || "";
-  const given = auth.startsWith("Bearer ") ? auth.slice(7).trim() : "";
-  const a = Buffer.from(given.padEnd(128, "\0"));
-  const b = Buffer.from(secret.padEnd(128, "\0"));
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
-}
 
 async function handle(req: Request) {
   let trigger: "cron" | "admin" = "cron";

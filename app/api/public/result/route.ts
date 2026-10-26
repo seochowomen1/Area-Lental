@@ -13,6 +13,7 @@ import { auditLog } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 import { normalizeEmail } from "@/lib/apiResponse";
 import { todayYmdSeoul } from "@/lib/datetime";
+import { derivePaymentView, publicPaymentText } from "@/lib/payment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -35,10 +36,7 @@ function approvalLabel(status: string, decidedBy?: string) {
   return "승인대기";
 }
 
-function paymentLabel(status: string) {
-  // 결제는 센터 현장 또는 내부 프로그램으로 처리(앱에서 결제 여부를 기록하지 않음)
-  return status === "승인" ? "센터 방문 결제" : "-";
-}
+// NOTE: 결제 열 문구는 lib/payment.ts publicPaymentText (결제 필드 기반 · 2026-10-26)
 
 function reservationLabel(status: string, decidedBy?: string) {
   if (status === "취소") {
@@ -123,7 +121,12 @@ export async function POST(req: Request) {
 
   const approvalStatusText = approvalLabel(overallStatus, overallDecidedBy);
   const reservationStatusText = reservationLabel(overallStatus, overallDecidedBy);
-  const paymentStatusText = paymentLabel(overallStatus);
+
+  // 결제 열 — 결제 필드 기반 파생 상태 (03_api §8-3)
+  const today = todayYmdSeoul();
+  const pay = derivePaymentView(sessions, today);
+  const paymentStatusText = publicPaymentText(pay);
+  const showPayLink = (pay.paymentState === "waiting" || pay.paymentState === "dueTomorrow") && !!pay.paymentLinkUrl;
 
   const payableFeeKRW = feeAvailable ? fee.finalFeeKRW : estimateFee.finalFeeKRW;
 
@@ -135,7 +138,7 @@ export async function POST(req: Request) {
   const cancelable =
     !["취소", "반려"].includes(overallStatus) &&
     sessions.every((s) => s.status !== "취소" && s.status !== "반려" && s.status !== "승인") &&
-    !(lastSessionDate && lastSessionDate < todayYmdSeoul());
+    !(lastSessionDate && lastSessionDate < today);
 
   auditLog({
     action: "PI_ACCESS",
@@ -150,6 +153,14 @@ export async function POST(req: Request) {
     approvalStatusText,
     reservationStatusText,
     paymentStatusText,
+    // 결제 안내 (미결제·기한 전일 때만 링크 노출 · 결제·취소 후 재노출 방지)
+    paymentStatus: pay.paymentStatus,
+    paymentLinkUrl: showPayLink ? pay.paymentLinkUrl : "",
+    paymentDueDate: pay.paymentState === "paid" || pay.paymentState === "refunded" || pay.paymentState === "none" || pay.paymentState === "unnoticed" ? "" : pay.paymentDueDate,
+    paymentDueDateText: pay.paymentState === "waiting" || pay.paymentState === "dueTomorrow" || pay.paymentState === "overdue" ? pay.paymentDueDateKo : "",
+    paidAt: pay.paymentState === "paid" ? pay.paidAt : "",
+    refundedAt: pay.paymentState === "refunded" ? pay.refundedAt : "",
+    autoCancelled: pay.paymentState === "autoCancelled",
 
     requestId: representative.requestId,
     roomName: representative.roomName,

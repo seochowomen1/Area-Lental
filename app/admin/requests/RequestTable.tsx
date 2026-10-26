@@ -31,7 +31,28 @@ export type TableRowData = {
   discountRatePct: number;
   discountAmountKRW: number;
   finalFeeKRW: number;
+
+  /** 결제 열 칩 (lib/payment paymentListChip) — posted=홈페이지 게시중이면 주황 점 */
+  paymentChip: { text: string; tone: "none" | "gray" | "red" | "green"; posted: boolean };
 };
+
+function PaymentChip({ chip }: { chip: TableRowData["paymentChip"] }) {
+  if (chip.tone === "none") return <span className="text-gray-400">-</span>;
+  const cls =
+    chip.tone === "green"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-800"
+      : chip.tone === "red"
+        ? "border-red-200 bg-red-50 text-red-800"
+        : "border-gray-200 bg-gray-50 text-gray-700";
+  return (
+    <span className="inline-flex items-center gap-1.5">
+      <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold ${cls}`}>{chip.text}</span>
+      {chip.posted && (
+        <span className="inline-block h-2 w-2 rounded-full bg-amber-500" title="홈페이지 게시중" aria-label="홈페이지 게시중" />
+      )}
+    </span>
+  );
+}
 
 function formatKRW(value: number): string {
   const n = Number.isFinite(value) ? Math.round(value) : 0;
@@ -195,6 +216,7 @@ export default function RequestTable({
                 <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">할인</th>
               )}
               <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700 text-right">최종금액</th>
+              <th scope="col" className="whitespace-nowrap px-4 py-3 font-semibold text-gray-700">결제</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -279,12 +301,15 @@ export default function RequestTable({
                 <td className="px-4 py-3 whitespace-nowrap text-right tabular-nums font-semibold">
                   {formatKRW(r.finalFeeKRW)}
                 </td>
+                <td className="px-4 py-3 whitespace-nowrap">
+                  <PaymentChip chip={r.paymentChip} />
+                </td>
               </tr>
             ))}
             {visibleRows.length === 0 && (
               <tr>
                 <td
-                  colSpan={isGalleryCategory ? (hasDeletable ? 9 : 8) : (hasDeletable ? 10 : 9)}
+                  colSpan={isGalleryCategory ? (hasDeletable ? 10 : 9) : (hasDeletable ? 11 : 10)}
                   className="px-4 py-12 text-center text-gray-400"
                 >
                   조건에 맞는 신청이 없습니다.

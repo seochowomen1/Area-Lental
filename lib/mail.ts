@@ -3,8 +3,63 @@ import { getBaseEnv, getSmtpEnvOptional, isMockMode } from "@/lib/env";
 import type { RentalRequest } from "@/lib/types";
 import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEquipmentDetails } from "@/lib/pricing";
 import { ROOMS_BY_ID } from "@/lib/space";
-import { getTemplate, renderTemplate, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
+import { getTemplate, renderTemplate, applyGalleryWording, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
 import { maskPhone, maskEmail } from "@/lib/mask";
+import { formatDueDateKo, paymentRep } from "@/lib/payment";
+import { buildProgramName } from "@/lib/welfareCopy";
+
+/* ───────────────── 결제 안내 블록 (2026-10-26 · 01_spec ③-(나)) ───────────────── */
+
+/**
+ * 승인 메일 [결제 안내] 블록 — 승인 ≥1 · paymentLinkUrl 있을 때만. 블록에는 "대관" 단어가 없다.
+ * (강좌명의 "[대관]" 접두사는 데이터이므로 갤러리 문구 변환 대상이 아니며, 변수 값으로 들어가 템플릿 변환과 분리된다)
+ */
+export function buildPaymentNoticeBlock(sessions: RentalRequest[]): string {
+  const approved = sessions.filter((r) => r.status === "승인");
+  if (!approved.length) return "";
+  const rep = paymentRep(sessions);
+  const link = rep?.paymentLinkUrl ?? "";
+  if (!link) return "";
+  const due = rep?.paymentDueDate ?? "";
+  const programName = buildProgramName(approved);
+  return [
+    "[결제 안내]",
+    "- 결제 방법: 서초여성가족플라자 홈페이지에서 온라인 결제",
+    `- 결제 링크: ${link}`,
+    due ? `- 결제 기한: ${formatDueDateKo(due)}까지` : "",
+    "- 링크가 열리지 않으면 홈페이지 > 강좌 신청 > 강좌목록(카테고리 '기타')에서",
+    `  "${programName}" 를 찾아 신청·결제해 주세요.`,
+    "- 결제 기한까지 결제가 확인되지 않으면 신청이 자동 취소됩니다.",
+  ]
+    .filter((l) => l !== "")
+    .join("\n");
+}
+
+/** 템플릿에 {{결제안내}}가 있으면 그 자리, 없으면 {{요금정보}} 값 끝에 이어 붙인다 */
+function mergePaymentNotice(templateBody: string, feeBlock: string, noticeBlock: string): { 요금정보: string; 결제안내: string } {
+  if (!noticeBlock) return { 요금정보: feeBlock, 결제안내: "" };
+  if (templateBody.includes("{{결제안내}}")) return { 요금정보: feeBlock, 결제안내: noticeBlock };
+  return { 요금정보: feeBlock ? `${feeBlock}\n\n${noticeBlock}` : noticeBlock, 결제안내: "" };
+}
+
+/** 자동 취소 메일 [자동 취소 안내] 블록 */
+export function buildAutoCancelBlock(dueDate: string): string {
+  return [
+    "[자동 취소 안내]",
+    `- 사유: 결제 기한(${dueDate}) 경과로 자동 취소`,
+    "- 결제 기한까지 결제가 확인되지 않아 신청이 자동 취소되었습니다.",
+    "- 다시 이용을 원하시면 새로 신청해 주세요. 이미 결제하셨다면 센터로 연락해 주세요.",
+  ].join("\n");
+}
+
+/** 템플릿에 {{취소사유}}가 없으면 "처리상태" 줄 뒤에 블록 삽입 */
+function insertAfterStatusLine(body: string, block: string): string {
+  const lines = body.split("\n");
+  const idx = lines.findIndex((l) => l.includes("처리상태"));
+  if (idx < 0) return `${body.trimEnd()}\n\n${block}\n`;
+  lines.splice(idx + 1, 0, "", block);
+  return lines.join("\n");
+}
 
 function isGallery(r: RentalRequest) {
   return r.roomId === "gallery";
@@ -232,8 +287,10 @@ export async function sendApplicantReceivedEmailBatch(reqs: RentalRequest[]) {
   await maybeSend({ to: first.email, subject: rendered.subject, text: rendered.body });
 }
 
+export type DecisionEmailContent = { to: string; subject: string; body: string; paymentGuideIncluded: boolean };
+
 /** 단일 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
-export async function generateDecisionEmailContent(req: RentalRequest): Promise<{ to: string; subject: string; body: string } | null> {
+export async function generateDecisionEmailContent(req: RentalRequest): Promise<DecisionEmailContent | null> {
   if (!req.email) return null;
   const cat = spaceCategoryLabel(req);
   const catId = getRoomCategory(req) as TemplateCategory;
@@ -255,6 +312,8 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
   if (["접수", "승인", "반려", "취소"].includes(status)) {
     const eqLine = !isGallery(req) ? `- ${getRoomCategory(req) === "studio" ? "촬영장비" : "기자재"}: ${formatEquipmentForEmail(req)}` : "";
     const template = await getTemplate(catId, status);
+    const noticeBlock = req.status === "승인" ? buildPaymentNoticeBlock([req]) : "";
+    const merged = mergePaymentNotice(template.body, req.status === "승인" ? feeBlock : "", noticeBlock);
     const vars: Record<string, string> = {
       "신청번호": req.requestId,
       "공간": req.roomName,
@@ -262,13 +321,15 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
       "일시": formatWhenSingle(req),
       "신청자": req.applicantName,
       "상태": req.status,
-      "요금정보": req.status === "승인" ? feeBlock : "",
+      "요금정보": merged.요금정보,
+      "결제안내": merged.결제안내,
       "반려사유": req.rejectReason || "(사유 미입력)",
       "조회링크": resultUrl,
       "장비정보": eqLine,
+      "취소사유": req.status === "취소" ? (req.rejectReason || "") : "",
     };
     const rendered = renderTemplate(template, vars);
-    return { to: req.email, subject: rendered.subject, body: rendered.body };
+    return { to: req.email, subject: rendered.subject, body: rendered.body, paymentGuideIncluded: !!noticeBlock };
   }
 
   // Fallback (접수 등)
@@ -287,7 +348,7 @@ ${resultUrl}
 감사합니다.
 `;
 
-  return { to: req.email, subject, body };
+  return { to: req.email, subject, body, paymentGuideIncluded: false };
 }
 
 export async function sendApplicantDecisionEmail(req: RentalRequest) {
@@ -297,7 +358,7 @@ export async function sendApplicantDecisionEmail(req: RentalRequest) {
 }
 
 /** 묶음 건 결정 메일 내용을 생성합니다 (발송하지 않음) */
-export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): { to: string; subject: string; body: string } | null {
+export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): DecisionEmailContent | null {
   const list = (Array.isArray(reqs) ? reqs : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
   if (list.length === 0) return null;
   const first = list[0];
@@ -359,10 +420,14 @@ ${sessions}
     ? `\n반려된 회차가 있습니다. (사유는 위 회차별 현황에 함께 표기했습니다.)\n`
     : "\n";
 
+  // 결제 안내 블록 (승인 ≥1 · 링크 있음) — 요금 블록 바로 뒤
+  const noticeBlock = feeAvailable ? buildPaymentNoticeBlock(list) : "";
+
   const body =
     header +
     "\n" +
     (feeAvailable ? feeBlock + "\n" : "") +
+    (noticeBlock ? noticeBlock + "\n\n" : "") +
     tail +
 `결과는 아래 페이지에서도 확인할 수 있습니다.
 ${resultUrl}
@@ -370,7 +435,130 @@ ${resultUrl}
 감사합니다.
 `;
 
+  return { to: first.email, subject, body, paymentGuideIncluded: !!noticeBlock };
+}
+
+/* ───────────────── 결제 기한 자동 취소 · 리마인드 메일 (2026-10-26) ───────────────── */
+
+/**
+ * 결제 기한 경과 자동 취소 메일 — 묶음 1통(대표 이메일)
+ * - 기존 "취소" 템플릿 + {{취소사유}} 변수(없으면 "처리상태" 줄 뒤 블록 삽입) · 갤러리 문구 변환
+ * - 묶음은 {{일시}}에 취소된(승인됐던) 회차 목록
+ */
+export async function sendApplicantAutoCancelEmail(cancelledSessions: RentalRequest[], dueDate: string) {
+  const content = await generateAutoCancelEmailContent(cancelledSessions, dueDate);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 자동 취소 메일 내용 생성 (발송하지 않음 · 테스트용 분리) */
+export async function generateAutoCancelEmailContent(
+  cancelledSessions: RentalRequest[],
+  dueDate: string
+): Promise<{ to: string; subject: string; body: string } | null> {
+  const list = (Array.isArray(cancelledSessions) ? cancelledSessions : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
+  if (!list.length) return null;
+  const first = list[0];
+  if (!first.email) return null;
+  const cat = spaceCategoryLabel(first);
+  const catId = getRoomCategory(first) as TemplateCategory;
+  const base = getBaseEnv();
+  const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(first.requestId)}`;
+  const block = buildAutoCancelBlock(dueDate);
+
+  const when =
+    list.length === 1
+      ? formatWhenSingle(first)
+      : `${list.length}${isGallery(first) ? "일" : "회"}\n\n[${isGallery(first) ? "전시일(일 단위)" : "이용일시"}]\n${list.map((r, i) => `  ${i + 1}. ${formatSession(r)}`).join("\n")}`;
+
+  const template = await getTemplate(catId, "취소");
+  const hasVar = template.body.includes("{{취소사유}}");
+  const vars: Record<string, string> = {
+    "신청번호": first.requestId,
+    "공간": first.roomName,
+    "카테고리": cat,
+    "일시": when,
+    "신청자": first.applicantName,
+    "상태": "취소",
+    "요금정보": "",
+    "결제안내": "",
+    "반려사유": "",
+    "조회링크": resultUrl,
+    "장비정보": "",
+    "취소사유": hasVar ? block : "",
+  };
+  const rendered = renderTemplate(template, vars);
+  const body = hasVar ? rendered.body : insertAfterStatusLine(rendered.body, block);
+  return { to: first.email, subject: rendered.subject, body };
+}
+
+/** D-1 결제 기한 리마인드 — 묶음 1통 · 갤러리 문구 변환 */
+export async function sendApplicantPaymentReminderEmail(approvedSessions: RentalRequest[], dueDate: string) {
+  const content = generateReminderEmailContent(approvedSessions, dueDate);
+  if (!content) return;
+  await maybeSend({ to: content.to, subject: content.subject, text: content.body });
+}
+
+/** 리마인드 메일 내용 생성 (발송하지 않음 · 테스트용 분리) */
+export function generateReminderEmailContent(approvedSessions: RentalRequest[], dueDate: string): { to: string; subject: string; body: string } | null {
+  const list = (Array.isArray(approvedSessions) ? approvedSessions : []).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
+  if (!list.length) return null;
+  const first = list[0];
+  if (!first.email) return null;
+  const rep = paymentRep(list);
+  const link = rep?.paymentLinkUrl ?? "";
+  const when =
+    list.length === 1
+      ? formatWhenSingle(first)
+      : `${list.length}${isGallery(first) ? "일" : "회"} (${list.map((r) => formatSession(r)).join(", ")})`;
+
+  const subject = `[결제 안내] 내일(${dueDate})까지 결제해 주세요 (${first.requestId})`;
+  const text =
+`안녕하세요. 서초여성가족플라자 서초센터입니다.
+
+아래 신청의 결제 기한이 내일(${dueDate})까지입니다.
+- 신청번호: ${first.requestId}
+- 공간: ${first.roomName}
+- 일시: ${when}
+- 결제 링크: ${link}
+
+결제 기한까지 결제가 확인되지 않으면 신청이 자동 취소됩니다.
+이미 결제하셨다면 이 메일은 무시하셔도 됩니다.
+
+감사합니다.
+`;
+  const body = isGallery(first) ? applyGalleryWording(text) : text;
   return { to: first.email, subject, body };
+}
+
+/** 크론 실행 결과 관리자 요약 메일 — 신청번호·공간·기한만(개인정보 없음) */
+export async function sendAdminPaymentDeadlineSummaryEmail(result: {
+  today: string;
+  candidates: number;
+  cancelled: Array<{ key: string; requestIds: string[]; roomName: string; paymentDueDate: string; approvedCount: number; mailOk: boolean | null }>;
+  skippedOverCap: number;
+  reminders: { enabled: boolean; sent: number; failed: number };
+  errors: Array<{ key: string; stage: string; message: string }>;
+}) {
+  const smtp = getSmtpEnvOptional();
+  const to = smtp?.ADMIN_NOTIFY_EMAIL ?? "admin@example.com";
+  const base = getBaseEnv();
+  const subject = `[결제 기한 자동 취소] ${result.today} · 취소 ${result.cancelled.length}건${result.skippedOverCap ? ` · 미처리 ${result.skippedOverCap}건` : ""}${result.errors.length ? ` · 오류 ${result.errors.length}건` : ""}`;
+  const lines = result.cancelled.map(
+    (c) => `  - ${c.requestIds[0]}${c.requestIds.length > 1 ? ` 외 ${c.requestIds.length - 1}건` : ""} · ${c.roomName} · 기한 ${c.paymentDueDate} · 메일 ${c.mailOk ? "발송" : "실패"}`
+  );
+  const text =
+`결제 기한 경과 자동 취소 실행 결과입니다. (${result.today})
+
+- 대상 ${result.candidates}건 · 취소 ${result.cancelled.length}건 · 상한 초과로 다음 실행에 넘긴 건 ${result.skippedOverCap}건
+- 리마인드: ${result.reminders.enabled ? `발송 ${result.reminders.sent} · 실패 ${result.reminders.failed}` : "꺼짐"}
+
+[취소된 신청 — 복지종합시스템·홈페이지 강좌는 자동으로 닫히지 않습니다. 마감·미게시로 바꾼 뒤 상세 4단계를 눌러 주세요]
+${lines.length ? lines.join("\n") : "  (없음)"}
+${result.errors.length ? `\n[오류]\n${result.errors.map((e) => `  - ${e.key} · ${e.stage} · ${e.message}`).join("\n")}\n` : ""}
+관리자: ${base.APP_BASE_URL}/admin
+`;
+  await maybeSend({ to, subject, text });
 }
 
 export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {

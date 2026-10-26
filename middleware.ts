@@ -138,10 +138,12 @@ export async function middleware(req: NextRequest) {
   if (pathname.startsWith("/admin/login")) return withSecurityHeaders(NextResponse.next());
   if (pathname === "/api/admin/login") return withSecurityHeaders(NextResponse.next());
 
-  // 업무 시스템 동기화 크론(GET + Authorization: Bearer CRON_SECRET)은 라우트가 직접 검증한다.
+  // 크론 라우트(GET + Authorization: Bearer CRON_SECRET)는 라우트가 직접 검증한다(lib/cronAuth.ts).
   // 토큰이 틀리면 라우트가 관리자 쿠키 검사로 넘어가 401을 돌려준다.
+  // - 업무 시스템 동기화: /api/admin/class-schedules/sync
+  // - 결제 기한 경과 자동 취소: /api/admin/payment-deadline/run (2026-10-26)
   if (
-    pathname === "/api/admin/class-schedules/sync" &&
+    (pathname === "/api/admin/class-schedules/sync" || pathname === "/api/admin/payment-deadline/run") &&
     req.method === "GET" &&
     (req.headers.get("authorization") || "").startsWith("Bearer ")
   ) {

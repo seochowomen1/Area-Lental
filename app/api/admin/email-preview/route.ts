@@ -1,11 +1,17 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { generateDecisionEmailContent, generateBatchDecisionEmailContent } from "@/lib/mail";
+import { generateDecisionEmailContent, generateBatchDecisionEmailContent, type DecisionEmailContent } from "@/lib/mail";
+import { analyzeBundle } from "@/lib/bundle";
+import { derivePaymentView } from "@/lib/payment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+/**
+ * GET /api/admin/email-preview?requestId=
+ * 응답: { ok, to, subject, body, status, paymentGuideIncluded, paymentDueDate, paymentLinkUrl } (03_api §8-1)
+ */
 export async function GET(req: Request) {
   const auth = assertAdminApiAuth(req);
   if (!auth.ok) {
@@ -25,12 +31,13 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "신청을 찾을 수 없습니다." }, { status: 404 });
   }
 
-  let content: { to: string; subject: string; body: string } | null = null;
+  let content: DecisionEmailContent | null = null;
+  let sessions = [current];
 
   if (current.batchId) {
-    const sessions = await db.getRequestsByBatchId(current.batchId);
-    const sorted = sessions.slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
-    content = generateBatchDecisionEmailContent(sorted);
+    const batch = await db.getRequestsByBatchId(current.batchId);
+    sessions = (batch.length ? batch : [current]).slice().sort((a, b) => (a.batchSeq ?? 0) - (b.batchSeq ?? 0));
+    content = generateBatchDecisionEmailContent(sessions);
   } else {
     content = await generateDecisionEmailContent(current);
   }
@@ -39,5 +46,17 @@ export async function GET(req: Request) {
     return NextResponse.json({ ok: false, message: "이메일 내용을 생성할 수 없습니다." }, { status: 400 });
   }
 
-  return NextResponse.json({ ok: true, ...content });
+  const view = derivePaymentView(sessions);
+  const status = current.batchId ? analyzeBundle(sessions).displayStatus : current.status;
+
+  return NextResponse.json({
+    ok: true,
+    to: content.to,
+    subject: content.subject,
+    body: content.body,
+    status,
+    paymentGuideIncluded: content.paymentGuideIncluded,
+    paymentDueDate: view.paymentDueDate,
+    paymentLinkUrl: view.paymentLinkUrl,
+  });
 }

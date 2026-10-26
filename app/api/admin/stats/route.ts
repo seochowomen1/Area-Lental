@@ -9,6 +9,7 @@ import type { RentalRequest } from "@/lib/types";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
 import { handleApiError } from "@/lib/apiResponse";
+import { collectedKRWOf, paymentRep } from "@/lib/payment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -19,7 +20,12 @@ type CategoryId = "lecture" | "studio" | "gallery";
 type CategoryStats = {
   uniqueApplicants: number;
   totalDays: number;
+  /** 수입 = 승인 금액(할인 후) 합계 — 기존 */
   totalRevenue: number;
+  /** 결제 확인 금액 = 결제완료 금액 − 환불 금액 (2026-10-26) */
+  collectedKRW: number;
+  /** 결제 미확인 묶음 수 (승인됐지만 결제완료·환불 아님) */
+  unconfirmedCount: number;
 };
 
 type MonthStats = {
@@ -39,7 +45,7 @@ function getMonth(dateStr: string): string {
 }
 
 function emptyStats(): CategoryStats {
-  return { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
+  return { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0, collectedKRW: 0, unconfirmedCount: 0 };
 }
 
 /** 날짜 범위를 일별로 순회하여 월별 전시일수(일요일·공휴일 제외)를 계산 */
@@ -94,7 +100,14 @@ export async function GET(req: Request) {
     }
 
     // 월별 통계 수집
-    const monthMap = new Map<string, { lecture: Map<string, Set<string>>; studio: Map<string, Set<string>>; gallery: Map<string, Set<string>>; lectureDays: number; studioDays: number; galleryDays: number; lectureRevenue: number; studioRevenue: number; galleryRevenue: number }>();
+    type MonthAcc = {
+      lecture: Map<string, Set<string>>; studio: Map<string, Set<string>>; gallery: Map<string, Set<string>>;
+      lectureDays: number; studioDays: number; galleryDays: number;
+      lectureRevenue: number; studioRevenue: number; galleryRevenue: number;
+      lectureCollected: number; studioCollected: number; galleryCollected: number;
+      lectureUnconfirmed: number; studioUnconfirmed: number; galleryUnconfirmed: number;
+    };
+    const monthMap = new Map<string, MonthAcc>();
 
     function ensureMonth(m: string) {
       if (!monthMap.has(m)) {
@@ -102,9 +115,23 @@ export async function GET(req: Request) {
           lecture: new Map(), studio: new Map(), gallery: new Map(),
           lectureDays: 0, studioDays: 0, galleryDays: 0,
           lectureRevenue: 0, studioRevenue: 0, galleryRevenue: 0,
+          lectureCollected: 0, studioCollected: 0, galleryCollected: 0,
+          lectureUnconfirmed: 0, studioUnconfirmed: 0, galleryUnconfirmed: 0,
         });
       }
       return monthMap.get(m)!;
+    }
+
+    // 묶음의 결제 확인 금액(null = 미확인) — 승인 회차만 넘어오므로 전체 행에서 대표를 찾는다
+    const bundleAll = new Map<string, RentalRequest[]>();
+    for (const r of allRequests) {
+      const key = groupKey(r);
+      const arr = bundleAll.get(key) ?? [];
+      arr.push(r);
+      bundleAll.set(key, arr);
+    }
+    function collectedOf(key: string): number | null {
+      return collectedKRWOf(paymentRep(bundleAll.get(key) ?? []));
     }
 
     for (const [key, items] of groups.entries()) {
@@ -120,6 +147,7 @@ export async function GET(req: Request) {
 
         const daysByMonth = countDaysByMonth(rep.startDate, rep.endDate);
         const totalDays = [...daysByMonth.values()].reduce((a, b) => a + b, 0);
+        const collected = collectedOf(key);
 
         for (const [month, days] of daysByMonth) {
           if (!month.startsWith(year)) continue;
@@ -132,8 +160,10 @@ export async function GET(req: Request) {
           // 연인원: 해당 월의 전시일수
           data.galleryDays += days;
 
-          // 수입: 일수 비례 배분
+          // 수입: 일수 비례 배분 · 결제 확인 금액도 같은 비율
           data.galleryRevenue += totalDays > 0 ? Math.round(totalRevenue * days / totalDays) : 0;
+          if (collected === null) data.galleryUnconfirmed += 1;
+          else data.galleryCollected += totalDays > 0 ? Math.round(collected * days / totalDays) : 0;
         }
         continue;
       }
@@ -164,15 +194,19 @@ export async function GET(req: Request) {
 
       // 연인원 (대관 일수 = 회차 수)
       const days = items.length;
+      const collected = collectedOf(key);
       if (cat === "lecture") {
         data.lectureDays += days;
         data.lectureRevenue += revenue;
+        if (collected === null) data.lectureUnconfirmed += 1; else data.lectureCollected += collected;
       } else if (cat === "studio") {
         data.studioDays += days;
         data.studioRevenue += revenue;
+        if (collected === null) data.studioUnconfirmed += 1; else data.studioCollected += collected;
       } else {
         data.galleryDays += days;
         data.galleryRevenue += revenue;
+        if (collected === null) data.galleryUnconfirmed += 1; else data.galleryCollected += collected;
       }
     }
 
@@ -221,16 +255,22 @@ export async function GET(req: Request) {
         uniqueApplicants: lectureApplicants.size,
         totalDays: data?.lectureDays ?? 0,
         totalRevenue: data?.lectureRevenue ?? 0,
+        collectedKRW: data?.lectureCollected ?? 0,
+        unconfirmedCount: data?.lectureUnconfirmed ?? 0,
       };
       const studio: CategoryStats = {
         uniqueApplicants: studioApplicants.size,
         totalDays: data?.studioDays ?? 0,
         totalRevenue: data?.studioRevenue ?? 0,
+        collectedKRW: data?.studioCollected ?? 0,
+        unconfirmedCount: data?.studioUnconfirmed ?? 0,
       };
       const gallery: CategoryStats = {
         uniqueApplicants: galleryApplicants.size,
         totalDays: data?.galleryDays ?? 0,
         totalRevenue: data?.galleryRevenue ?? 0,
+        collectedKRW: data?.galleryCollected ?? 0,
+        unconfirmedCount: data?.galleryUnconfirmed ?? 0,
       };
 
       // 강의실 + E-스튜디오 합산 (실인원은 이메일 중복 제거)
@@ -242,6 +282,8 @@ export async function GET(req: Request) {
         uniqueApplicants: lectureStudioApplicants.size,
         totalDays: lecture.totalDays + studio.totalDays,
         totalRevenue: lecture.totalRevenue + studio.totalRevenue,
+        collectedKRW: lecture.collectedKRW + studio.collectedKRW,
+        unconfirmedCount: lecture.unconfirmedCount + studio.unconfirmedCount,
       };
 
       months.push({

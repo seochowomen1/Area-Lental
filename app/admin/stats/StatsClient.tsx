@@ -2,11 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
+import { PAYMENT_LABELS } from "@/lib/labels";
 
 type CategoryStats = {
   uniqueApplicants: number;
   totalDays: number;
   totalRevenue: number;
+  /** 결제 확인 금액 (결제완료 금액 − 환불 금액) · 03_api §8-4 */
+  collectedKRW?: number;
+  /** 결제 미확인 묶음 수 */
+  unconfirmedCount?: number;
 };
 
 type MonthStats = {
@@ -29,6 +34,11 @@ const MONTH_LABELS = [
   "7월", "8월", "9월", "10월", "11월", "12월",
 ];
 
+/** 결제 확인 금액을 병기하기 시작하는 이용월 (01_spec ⑧-A-7 · 2026-11 이용분부터) */
+const COLLECTED_SINCE_MONTH = "2026-11";
+/** 이 연도부터 결제 확인 금액이 기본(위 줄)·수입은 참고(아래 줄) — 상수 1개로 전환 (02_ui §5) */
+const COLLECTED_PRIMARY_FROM_YEAR = 2027;
+
 function formatRevenue(v: number): string {
   if (v === 0) return "-";
   return `${v.toLocaleString("ko-KR")}원`;
@@ -38,11 +48,56 @@ function formatCount(v: number): string {
   return v === 0 ? "-" : String(v);
 }
 
+function sumCat(a: CategoryStats, b: CategoryStats): CategoryStats {
+  return {
+    uniqueApplicants: a.uniqueApplicants + b.uniqueApplicants,
+    totalDays: a.totalDays + b.totalDays,
+    totalRevenue: a.totalRevenue + b.totalRevenue,
+    collectedKRW: (a.collectedKRW ?? 0) + (b.collectedKRW ?? 0),
+    unconfirmedCount: (a.unconfirmedCount ?? 0) + (b.unconfirmedCount ?? 0),
+  };
+}
+
+/**
+ * "수입" 셀 2줄 — 1줄 수입(승인 금액 합계) · 2줄 `결제 확인 ○원 · 미확인 N건` (02_ui §5 · 용어 03_api §11)
+ * showCollected=false(2026-10 이전 이용월)면 1줄만.
+ */
+function RevenueCell({ c, showCollected, collectedPrimary }: { c: CategoryStats; showCollected: boolean; collectedPrimary: boolean }) {
+  const collected = c.collectedKRW ?? 0;
+  const unconfirmed = c.unconfirmedCount ?? 0;
+  const hasAny = c.totalRevenue > 0 || collected > 0 || unconfirmed > 0;
+  const revenueText = formatRevenue(c.totalRevenue);
+  if (!showCollected || !hasAny) return <>{revenueText}</>;
+
+  const collectedLine = (
+    <>
+      <span className="text-emerald-700">{PAYMENT_LABELS.collectedShort} {collected.toLocaleString("ko-KR")}</span>
+      {unconfirmed > 0 && <span className="text-amber-700"> · 미확인 {unconfirmed}건</span>}
+    </>
+  );
+
+  if (collectedPrimary) {
+    return (
+      <>
+        <span className="block">{collectedLine}</span>
+        <span className="mt-0.5 block text-xs leading-4 text-slate-500">{PAYMENT_LABELS.revenue} {revenueText}</span>
+      </>
+    );
+  }
+  return (
+    <>
+      <span className="block">{revenueText}</span>
+      <span className="mt-0.5 block text-xs leading-4">{collectedLine}</span>
+    </>
+  );
+}
+
 export default function StatsClient() {
   const currentYear = new Date().getFullYear();
   const [year, setYear] = useState(currentYear);
   const [revFrom, setRevFrom] = useState("");
   const [revTo, setRevTo] = useState("");
+  const [revBasis, setRevBasis] = useState<"usage" | "paid">("usage");
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -56,21 +111,30 @@ export default function StatsClient() {
   }, [year]);
 
   const years = Array.from({ length: 5 }, (_, i) => currentYear - 2 + i);
+  const collectedPrimary = year >= COLLECTED_PRIMARY_FROM_YEAR;
+  const revenueHeader = collectedPrimary
+    ? `${PAYMENT_LABELS.collectedShort} / ${PAYMENT_LABELS.revenue}`
+    : `${PAYMENT_LABELS.revenue} / ${PAYMENT_LABELS.collectedShort}`;
 
   // 연간 합계 (데이터 변경 시에만 재계산)
   const yearTotal = useMemo(() => {
     if (!data?.months) return undefined;
-    const emptyC = { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0 };
+    const emptyC: CategoryStats = { uniqueApplicants: 0, totalDays: 0, totalRevenue: 0, collectedKRW: 0, unconfirmedCount: 0 };
     return data.months.reduce(
       (acc, m) => ({
-        lecture: { uniqueApplicants: acc.lecture.uniqueApplicants + m.lecture.uniqueApplicants, totalDays: acc.lecture.totalDays + m.lecture.totalDays, totalRevenue: acc.lecture.totalRevenue + m.lecture.totalRevenue },
-        studio: { uniqueApplicants: acc.studio.uniqueApplicants + m.studio.uniqueApplicants, totalDays: acc.studio.totalDays + m.studio.totalDays, totalRevenue: acc.studio.totalRevenue + m.studio.totalRevenue },
-        lectureStudio: { uniqueApplicants: acc.lectureStudio.uniqueApplicants + m.lectureStudio.uniqueApplicants, totalDays: acc.lectureStudio.totalDays + m.lectureStudio.totalDays, totalRevenue: acc.lectureStudio.totalRevenue + m.lectureStudio.totalRevenue },
-        gallery: { uniqueApplicants: acc.gallery.uniqueApplicants + m.gallery.uniqueApplicants, totalDays: acc.gallery.totalDays + m.gallery.totalDays, totalRevenue: acc.gallery.totalRevenue + m.gallery.totalRevenue },
+        lecture: sumCat(acc.lecture, m.lecture),
+        studio: sumCat(acc.studio, m.studio),
+        lectureStudio: sumCat(acc.lectureStudio, m.lectureStudio),
+        gallery: sumCat(acc.gallery, m.gallery),
       }),
       { lecture: { ...emptyC }, studio: { ...emptyC }, lectureStudio: { ...emptyC }, gallery: { ...emptyC } }
     );
   }, [data?.months]);
+
+  const revFromValue = revFrom || `${year}-01-01`;
+  const revToValue = revTo || `${year}-12-31`;
+  const revenueHref = (mask: boolean) =>
+    `/api/admin/export/revenue?from=${revFromValue}&to=${revToValue}&basis=${revBasis}${mask ? "&mask=true" : ""}`;
 
   return (
     <div>
@@ -98,15 +162,27 @@ export default function StatsClient() {
           <div>
             <p className="text-sm font-bold text-slate-900">수입 내역 엑셀 (감사 자료 양식)</p>
             <p className="mt-0.5 text-xs text-slate-500">
-              승인 건 기준 · 연도·대관일자·대관처·장소·금액 · 대관과 전시(갤러리) 시트 분리 · 월별 합계 포함
+              승인 건 기준 · 연도·대관일자·대관처·장소·{PAYMENT_LABELS.approvedFee}·결제 상태·결제일·{PAYMENT_LABELS.collected} · 대관과 전시(갤러리) 시트 분리 · 월별 합계 포함
             </p>
           </div>
           <div className="ml-auto flex flex-wrap items-end gap-2">
             <label className="text-xs text-slate-600">
+              기간 기준
+              <select
+                value={revBasis}
+                onChange={(e) => setRevBasis(e.target.value === "paid" ? "paid" : "usage")}
+                className="ml-1 rounded-lg border border-slate-300 bg-white px-2 py-1.5 text-sm"
+                aria-label="수입 엑셀 기간 기준"
+              >
+                <option value="usage">이용일 기준(기본)</option>
+                <option value="paid">결제일 기준</option>
+              </select>
+            </label>
+            <label className="text-xs text-slate-600">
               시작
               <input
                 type="date"
-                value={revFrom || `${year}-01-01`}
+                value={revFromValue}
                 onChange={(e) => setRevFrom(e.target.value)}
                 className="ml-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
               />
@@ -115,25 +191,28 @@ export default function StatsClient() {
               종료
               <input
                 type="date"
-                value={revTo || `${year}-12-31`}
+                value={revToValue}
                 onChange={(e) => setRevTo(e.target.value)}
                 className="ml-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm"
               />
             </label>
             <a
-              href={`/api/admin/export/revenue?from=${revFrom || `${year}-01-01`}&to=${revTo || `${year}-12-31`}`}
+              href={revenueHref(false)}
               className="rounded-lg bg-[rgb(var(--brand-primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-95"
             >
               엑셀 받기
             </a>
             <a
-              href={`/api/admin/export/revenue?from=${revFrom || `${year}-01-01`}&to=${revTo || `${year}-12-31`}&mask=true`}
+              href={revenueHref(true)}
               className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
             >
               대관처 가림본
             </a>
           </div>
         </div>
+        {revBasis === "paid" && (
+          <p className="mt-2 text-xs text-amber-700">결제일 기준: 기간 안에 결제일이 있는 건만 들어갑니다. 결제 기록이 없는 승인 건은 제외됩니다.</p>
+        )}
       </div>
 
       {loading ? (
@@ -157,19 +236,19 @@ export default function StatsClient() {
                   {/* 강의실 */}
                   <th className="px-3 py-2 text-center border-l border-slate-200">실인원</th>
                   <th className="px-3 py-2 text-center">연인원</th>
-                  <th className="px-3 py-2 text-center border-r border-slate-200">수입</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center border-r border-slate-200">{revenueHeader}</th>
                   {/* E-스튜디오 */}
                   <th className="px-3 py-2 text-center">실인원</th>
                   <th className="px-3 py-2 text-center">연인원</th>
-                  <th className="px-3 py-2 text-center border-r border-slate-200">수입</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center border-r border-slate-200">{revenueHeader}</th>
                   {/* 강의실+E-스튜디오 합산 */}
                   <th className="px-3 py-2 text-center">실인원</th>
                   <th className="px-3 py-2 text-center">연인원</th>
-                  <th className="px-3 py-2 text-center border-r border-slate-200">수입</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center border-r border-slate-200">{revenueHeader}</th>
                   {/* 갤러리 */}
                   <th className="px-3 py-2 text-center">실인원</th>
                   <th className="px-3 py-2 text-center">연인원</th>
-                  <th className="px-3 py-2 text-center">수입</th>
+                  <th className="whitespace-nowrap px-3 py-2 text-center">{revenueHeader}</th>
                 </tr>
               </thead>
               <tbody>
@@ -177,6 +256,7 @@ export default function StatsClient() {
                   const hasData = m.lecture.uniqueApplicants > 0 || m.lecture.totalDays > 0 || m.lecture.totalRevenue > 0
                     || m.studio.uniqueApplicants > 0 || m.studio.totalDays > 0 || m.studio.totalRevenue > 0
                     || m.gallery.uniqueApplicants > 0 || m.gallery.totalDays > 0 || m.gallery.totalRevenue > 0;
+                  const showCollected = m.month >= COLLECTED_SINCE_MONTH;
                   return (
                     <tr
                       key={m.month}
@@ -189,19 +269,19 @@ export default function StatsClient() {
                       {/* 강의실 */}
                       <td className="px-3 py-3 text-center border-l border-slate-100">{formatCount(m.lecture.uniqueApplicants)}</td>
                       <td className="px-3 py-3 text-center">{formatCount(m.lecture.totalDays)}</td>
-                      <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums">{formatRevenue(m.lecture.totalRevenue)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={m.lecture} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                       {/* E-스튜디오 */}
                       <td className="px-3 py-3 text-center">{formatCount(m.studio.uniqueApplicants)}</td>
                       <td className="px-3 py-3 text-center">{formatCount(m.studio.totalDays)}</td>
-                      <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums">{formatRevenue(m.studio.totalRevenue)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={m.studio} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                       {/* 강의실+E-스튜디오 합산 */}
                       <td className="px-3 py-3 text-center bg-indigo-50/30 font-medium">{formatCount(m.lectureStudio.uniqueApplicants)}</td>
                       <td className="px-3 py-3 text-center bg-indigo-50/30 font-medium">{formatCount(m.lectureStudio.totalDays)}</td>
-                      <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30 font-medium">{formatRevenue(m.lectureStudio.totalRevenue)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30 font-medium"><RevenueCell c={m.lectureStudio} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                       {/* 갤러리 */}
                       <td className="px-3 py-3 text-center">{formatCount(m.gallery.uniqueApplicants)}</td>
                       <td className="px-3 py-3 text-center">{formatCount(m.gallery.totalDays)}</td>
-                      <td className="px-3 py-3 text-right tabular-nums">{formatRevenue(m.gallery.totalRevenue)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><RevenueCell c={m.gallery} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                     </tr>
                   );
                 })}
@@ -212,16 +292,16 @@ export default function StatsClient() {
                     <td className="px-4 py-3 border-r border-slate-200">연간 합계</td>
                     <td className="px-3 py-3 text-center border-l border-slate-100">{formatCount(yearTotal.lecture.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.lecture.totalDays)}</td>
-                    <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums">{formatRevenue(yearTotal.lecture.totalRevenue)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={yearTotal.lecture} showCollected collectedPrimary={collectedPrimary} /></td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.studio.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.studio.totalDays)}</td>
-                    <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums">{formatRevenue(yearTotal.studio.totalRevenue)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={yearTotal.studio} showCollected collectedPrimary={collectedPrimary} /></td>
                     <td className="px-3 py-3 text-center bg-indigo-50/30">{formatCount(yearTotal.lectureStudio.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center bg-indigo-50/30">{formatCount(yearTotal.lectureStudio.totalDays)}</td>
-                    <td className="px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30">{formatRevenue(yearTotal.lectureStudio.totalRevenue)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30"><RevenueCell c={yearTotal.lectureStudio} showCollected collectedPrimary={collectedPrimary} /></td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.gallery.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.gallery.totalDays)}</td>
-                    <td className="px-3 py-3 text-right tabular-nums">{formatRevenue(yearTotal.gallery.totalRevenue)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><RevenueCell c={yearTotal.gallery} showCollected collectedPrimary={collectedPrimary} /></td>
                   </tr>
                 )}
               </tbody>
@@ -231,7 +311,8 @@ export default function StatsClient() {
           <div className="rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500 space-y-1">
             <p><span className="font-semibold text-slate-700">실인원</span>: 해당 월 승인 완료된 개별 신청자 수 (이메일 기준 중복 제거)</p>
             <p><span className="font-semibold text-slate-700">연인원</span>: 해당 월 총 대관(전시) 일수 (회차 수)</p>
-            <p><span className="font-semibold text-slate-700">수입</span>: 해당 월 총 대관료(갤러리는 이용료) (승인 건 기준, 할인 적용 후)</p>
+            <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.revenue}</span>: 해당 월 총 대관료(갤러리는 이용료) (승인 건 기준, 할인 적용 후)</p>
+            <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.collected}</span>: 결제완료 건의 결제 금액 − 환불 금액 · 결제 미확인 건은 공란 · 2026년 11월 이용분부터 표시</p>
             <p><span className="font-semibold text-indigo-700">강의실+E-스튜디오</span>: 강의실과 E-스튜디오의 합산 실적 (실인원은 이메일 기준 중복 제거)</p>
           </div>
         </div>
