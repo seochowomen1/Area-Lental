@@ -23,7 +23,7 @@ export default function HomeReservationCheck() {
         {/* 타이틀 + 설명 */}
         <div className="flex-1 text-center sm:text-left">
           <h2 className="text-lg font-bold text-slate-900">신청 내역 조회</h2>
-          <p className="mt-0.5 text-sm text-slate-500">이메일과 생년월일로 신청 내역을 확인하세요</p>
+          <p className="mt-0.5 text-sm text-slate-500">이메일로 받은 조회 링크로 신청 내역을 확인하세요</p>
         </div>
 
         {/* 버튼 */}

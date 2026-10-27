@@ -9,8 +9,9 @@ import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 import RequestTable, { type TableRowData } from "./RequestTable";
 import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 import PaymentStatusChips, { type PaymentFocus } from "@/components/admin/PaymentStatusChips";
-import { derivePaymentView, paymentListChip, summarizePaymentChips, type PaymentView } from "@/lib/payment";
+import { DELETION_BLOCK_LABEL, deletionBlockReason, derivePaymentView, paymentListChip, summarizePaymentChips, type PaymentView } from "@/lib/payment";
 import { todayYmdSeoul } from "@/lib/datetime";
+import { assertAdminAuth } from "@/lib/adminAuth";
 
 const PAYMENT_FOCUS_VALUES: readonly PaymentFocus[] = ["payment-waiting", "close-needed", "auto-cancelled"];
 
@@ -96,6 +97,7 @@ export default async function AdminRequestsPage({
 }: {
   searchParams: { category?: string; roomId?: string; status?: string; q?: string; date?: string; view?: string; focus?: string };
 }) {
+  await assertAdminAuth();
   const category = normalizeRoomCategory(searchParams.category);
   const isGalleryCategory = category === "gallery";
   const roomsInCategory = getRoomsByCategory(category);
@@ -216,6 +218,15 @@ export default async function AdminRequestsPage({
 
   // 테이블 행 데이터를 클라이언트 컴포넌트용으로 직렬화
   const DELETABLE_STATUSES = new Set(["반려", "취소"]);
+  /** [8] 반려·취소 건 중 결제·환불 기록 또는 홈페이지 마감 전이면 삭제 잠금(서버 DELETE도 같은 함수로 409) */
+  const blockLabelOf = (items: RentalRequest[]): string | null => {
+    if (!items.every((r) => DELETABLE_STATUSES.has(r.status))) return null;
+    for (const r of items) {
+      const reason = deletionBlockReason(r);
+      if (reason) return DELETION_BLOCK_LABEL[reason];
+    }
+    return null;
+  };
 
   const tableRows: TableRowData[] = view === "group"
     ? filteredGroups.map((g) => {
@@ -226,12 +237,14 @@ export default async function AdminRequestsPage({
         const fee = isBatch ? computeFeesForBundle(feeBasis) : computeFeesForRequest(rep);
         const usingApprovedBasis = isBatch && g.approvedCount > 0 && g.approvedCount < g.totalCount;
         const p = formatPeriod(g.items);
-        const isDeletable = g.items.every((r) => DELETABLE_STATUSES.has(r.status));
+        const deleteBlockLabel = blockLabelOf(g.items);
+        const isDeletable = g.items.every((r) => DELETABLE_STATUSES.has(r.status)) && !deleteBlockLabel;
 
         return {
           key: g.key,
           requestIds: g.items.map((r) => r.requestId),
           isDeletable,
+          deleteBlockLabel,
           primaryId: rep.requestId,
           idLink: `/admin/requests/${encodeURIComponent(rep.requestId)}?category=${encodeURIComponent(category)}`,
           extraCount: isBatch && hasMultiple ? g.items.length - 1 : 0,
@@ -266,7 +279,8 @@ export default async function AdminRequestsPage({
         return {
           key: r.requestId,
           requestIds: [r.requestId],
-          isDeletable: DELETABLE_STATUSES.has(r.status),
+          isDeletable: DELETABLE_STATUSES.has(r.status) && !blockLabelOf([r]),
+          deleteBlockLabel: blockLabelOf([r]),
           primaryId: r.requestId,
           idLink: `/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(category)}`,
           extraCount: 0,

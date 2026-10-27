@@ -26,7 +26,7 @@ const ACTIVE: RequestStatus[] = ["접수", "승인"];
  * - 겹침 재검증: 다른 신청(접수·승인) · 차단 · 정규 수업 · 갤러리 점유(준비일 포함)
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
 
   try {
@@ -45,7 +45,7 @@ export async function POST(req: Request, { params }: { params: { id: string } })
     if (view.paymentState !== "autoCancelled" || toRestore.length === 0) return jsonError(MSG.restoreOnlyAuto, 409, "CONFLICT");
 
     // 겹침 재검증
-    const all = await db.getAllRequests();
+    const all = await db.getAllRequestsFresh();
     const ownIds = new Set(sessions.map((s) => s.requestId));
     const others = all.filter((r) => !ownIds.has(r.requestId));
     const blocks = await db.getBlocks();
@@ -108,15 +108,16 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // 복구: 승인으로 되돌리고 결제 기한 재설정 · autoCancelledAt·리마인드 기록 비움
     const actor = getDefaultDecidedBy();
-    for (const s of toRestore) {
-      await db.updateRequestStatus({
+    // 묶음 전 회차를 시트 쓰기 1회로 복구 (audit-fix-1 [9])
+    await db.updateRequestsStatusBatch(
+      toRestore.map((s) => ({
         requestId: s.requestId,
-        status: "승인",
+        status: "승인" as const,
         adminMemo: s.adminMemo ?? "",
         rejectReason: "",
         decidedBy: actor,
-      });
-    }
+      }))
+    );
     const updated = await db.updateRequestPayment({
       requestId: loaded.current.requestId,
       patch: { autoCancelledAt: null, paymentDueDate: dueDate, paymentReminderSentAt: null },

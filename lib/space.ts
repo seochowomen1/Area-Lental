@@ -37,6 +37,10 @@ export type SpaceRoom = {
   capacity: number;
   durationLimitHours: number;
   feeKRW: number;
+  /** 기본 인원(이 인원까지는 feeKRW만) — 초과 인원 가산이 있는 공간만 (E-스튜디오 2) */
+  baseHeadcount?: number;
+  /** 기본 인원 초과 1인당 시간당 가산율(%) — feeKRW 기준 (조례 별표1 · E-스튜디오 50) */
+  extraPersonRatePct?: number;
   contactName: string;
   contactPhone: string;
   /** 공간 이미지 경로 (e.g., "/rooms/bookcafe.jpg") */
@@ -221,10 +225,13 @@ export const ROOMS: SpaceRoom[] = [
     durationLimitHours: 6,
     // 시간당 대관료 (기본 인원 2명)
     feeKRW: 20000,
+    // 조례 별표1: 기준 인원(2인) 초과 시 1인당 시간당 50% 가산 = 10,000원 (audit-fix-1 결3 · lib/pricing.ts에서만 계산)
+    baseHeadcount: 2,
+    extraPersonRatePct: 50,
     contactName: "담당자",
     contactPhone: "070-7163-2953",
     image: "/room/media.jpg",
-    note: "촬영·녹음·편집 등 미디어 활동을 지원하는 스튜디오 공간입니다. 기본 2인 이상 인원 추가 시 시간당 5,000원이 추가됩니다.",
+    note: "촬영·녹음·편집 등 미디어 활동을 지원하는 스튜디오 공간입니다. 기본 2인을 넘으면 1인마다 시간당 10,000원이 추가됩니다.",
     equipment: [
       { title: "기본 비치", items: ["테이블", "의자", "전원(콘센트)", "냉·난방", "조명"] },
       {
@@ -241,10 +248,10 @@ export const ROOMS: SpaceRoom[] = [
       {
         title: "이용 안내",
         items: [
-          "기본 2인 초과 시 1인당 시간당 5,000원 추가",
+          "기본 2인 초과 시 1인당 시간당 10,000원 추가 (최대 12인)",
           "유료 장비는 대관 이용시간 중 1일 1회만 과금",
           "신청서를 접수하면 담당자가 확인 후 변동사항과 비용을 안내",
-          "대관료 결제가 확인되어야 예약 확정 (준비할 사항이 있으면 사전 안내)",
+          "승인 후 메일로 받은 홈페이지 결제 링크로 결제 기한(기본: 승인일로부터 7일) 안에 결제해야 예약 확정 · 기한 안에 결제가 없으면 자동 취소",
           "촬영 영상을 저장할 카메라용 SD카드 또는 외장하드를 반드시 준비",
         ],
       },

@@ -22,7 +22,7 @@ export const maxDuration = 60;
 async function handle(req: Request) {
   let trigger: "cron" | "admin" = "cron";
   if (!cronAuthOk(req)) {
-    const auth = assertAdminApiAuth(req);
+    const auth = await assertAdminApiAuth(req);
     if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
     trigger = "admin";
   }

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { getGoogleClient } from "@/lib/google";
 import { requireGoogleEnv } from "@/lib/env";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import { AUDIT_HEADERS, REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
+import { ADMIN_SESSION_HEADERS, AUDIT_HEADERS, REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,10 +46,15 @@ const SHEETS_CONFIG = [
     title: "audit_log",
     headers: [...AUDIT_HEADERS],
   },
+  {
+    // 로그아웃으로 폐기된 관리자 세션 (audit-fix-1 [7]) — 개인정보 없음
+    title: "admin_sessions",
+    headers: [...ADMIN_SESSION_HEADERS],
+  },
 ];
 
 export async function POST(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const env = requireGoogleEnv();

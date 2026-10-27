@@ -1,10 +1,8 @@
 "use client";
 
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function AdminLogoutButton({ variant = "light" }: { variant?: "light" | "dark" }) {
-  const router = useRouter();
   const [loading, setLoading] = useState(false);
 
   async function handleLogout() {
@@ -14,7 +12,8 @@ export default function AdminLogoutButton({ variant = "light" }: { variant?: "li
     } catch {
       // ignore
     }
-    router.push("/admin/login");
+    // 전체 이동 + 현재 기록 대체 — 뒤로가기로 관리자 화면 캐시가 다시 보이지 않게 (audit-fix-1 [7])
+    window.location.replace("/admin/login?out=1");
   }
 
   const cls = variant === "dark"

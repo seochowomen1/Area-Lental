@@ -22,6 +22,40 @@ import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
 import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
 import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
+import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
+import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
+import { PAYMENT_FLOW_SHORT } from "@/lib/policy";
+import { computeBaseTotalKRW } from "@/lib/pricing";
+import { handleApplySuccess, parseApplyError } from "@/lib/applySubmit";
+
+/** E-스튜디오 이용 인원 상한(01_spec ③-E) — 서버도 capacity로 다시 검사한다 */
+const STUDIO_MAX_HEADCOUNT_MESSAGE = "E-스튜디오 최대 인원은 12명입니다.";
+const STUDIO_MIN_HEADCOUNT_MESSAGE = "이용 인원을 1명 이상 입력해 주세요.";
+
+const ApplyFormSchema = RequestInputSchema.superRefine((v, ctx) => {
+  const room = getRoom(v.roomId);
+  if (room?.category === "studio" && Number(v.headcount) > (room.capacity ?? 12)) {
+    ctx.addIssue({ code: "custom", path: ["headcount"], message: STUDIO_MAX_HEADCOUNT_MESSAGE });
+  }
+});
+
+/** 빠진 항목 요약용 라벨·포커스 대상(01_spec · ux.md Top④) */
+const FIELD_META: Array<{ key: keyof RequestInput; label: string; targetId: string }> = [
+  { key: "date", label: "날짜", targetId: "field-date" },
+  { key: "startTime", label: "시작 시간", targetId: "startTime" },
+  { key: "endTime", label: "종료 시간", targetId: "endTime" },
+  { key: "applicantName", label: "성명", targetId: "applicantName" },
+  { key: "birth", label: "생년월일", targetId: "birthYear" },
+  { key: "address", label: "주소", targetId: "address" },
+  { key: "phone", label: "연락처", targetId: "phone" },
+  { key: "email", label: "이메일", targetId: "email" },
+  { key: "orgName", label: "단체명", targetId: "orgName" },
+  { key: "headcount", label: "인원", targetId: "headcount" },
+  { key: "purpose", label: "사용 목적/행사 내용", targetId: "purpose" },
+  { key: "privacyAgree", label: "개인정보 동의", targetId: "privacyAgreeBox" },
+  { key: "pledgeAgree", label: "서약 동의", targetId: "pledgeAgreeBox" },
+  { key: "pledgeName", label: "서약자 성명", targetId: "pledgeName" },
+];
 
 function fromMinutes(min: number) {
   const h = Math.floor(min / 60);
@@ -61,6 +95,7 @@ export default function ApplyClient() {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("처리 중 오류가 발생했습니다");
   const [batchError, setBatchError] = useState<string | null>(null);
   const [sessionError, setSessionError] = useState<string | null>(null);
   const [extraOpen, setExtraOpen] = useState(false);
@@ -98,9 +133,9 @@ export default function ApplyClient() {
     setValue,
     setError: setFormError,
     clearErrors,
-    formState: { errors },
+    formState: { errors, submitCount },
   } = useForm<RequestInput>({
-    resolver: zodResolver(RequestInputSchema),
+    resolver: zodResolver(ApplyFormSchema),
     defaultValues: {
       roomId: roomId,
       date: "",
@@ -181,7 +216,8 @@ export default function ApplyClient() {
     const meta = getRoom(roomId);
     if (meta?.category === "studio") {
       setValue("orgName", "-", { shouldDirty: true });
-      setValue("headcount", 1, { shouldDirty: true });
+      // [결3] E-스튜디오 이용 인원 기본 2명(기본 인원) · 1~12
+      setValue("headcount", 2, { shouldDirty: true });
       setValue("purpose", "E-스튜디오 대관", { shouldDirty: true });
     }
   }, [roomId, setValue]);
@@ -488,11 +524,8 @@ export default function ApplyClient() {
     : (equipment[0] ? EQUIPMENT_FEE_KRW.laptop : 0) +
       (equipment[1] ? EQUIPMENT_FEE_KRW.projector : 0) +
       (equipment[2] ? EQUIPMENT_FEE_KRW.audio : 0);
-  const rentalFee = useMemo(() => {
-    if (!hourlyFee || !durationMinutes) return 0;
-    // 30분 단위이므로 (feeKRW * minutes / 60)은 사실상 정수로 떨어짐
-    return Math.round((hourlyFee * durationMinutes) / 60);
-  }, [hourlyFee, durationMinutes]);
+  const headcountRaw = watch("headcount");
+  const headcountNum = Number(headcountRaw);
 
   function handleConfirm(values: RequestInput) {
     setError(null);
@@ -508,6 +541,7 @@ export default function ApplyClient() {
 
   async function onSubmit(values: RequestInput) {
     setError(null);
+    setErrorTitle("처리 중 오류가 발생했습니다");
     setBatchError(null);
     setSubmitting(true);
     try {
@@ -528,31 +562,15 @@ export default function ApplyClient() {
       const res = await fetch("/api/requests", { method: "POST", body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        if (data?.code === "BATCH_CONFLICT" && Array.isArray(data?.issues)) {
-          const lines = data.issues
-            .map((it: any) => `• ${it.date}${it.startTime && it.endTime ? ` ${it.startTime}-${it.endTime}` : ""}: ${it.message}`)
-            .join("\n");
-          setBatchError(lines);
-        }
-        throw new Error(data?.message ?? "신청에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        // ★ [2][6] 409 BATCH_CONFLICT(저장 전 겹침) / SLOT_TAKEN(저장 직후 먼저 들어온 신청) · 400 SESSION_INVALID(회차별)
+        const v = parseApplyError(data, false);
+        setErrorTitle(v.title);
+        if (v.issueLines.length) setBatchError(v.issueLines.join("\n"));
+        throw new Error(v.message);
       }
       const data = await res.json().catch(() => null);
-      const requestId = data?.requestId;
-      const batchId = String(data?.batchId ?? "");
-      const count = Number(data?.count ?? 1);
-      const token = String(data?.token ?? "");
-
-      // localStorage에 토큰 저장 (이메일 인증 없이 내 신청 조회 가능)
-      if (token) {
-        try { localStorage.setItem("applicantToken", token); } catch {}
-      }
-
-      const qp = new URLSearchParams();
-      if (requestId) qp.set("requestId", requestId);
-      if (batchId) qp.set("batchId", batchId);
-      if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
-      if (token) qp.set("token", token);
-      router.push(qp.toString() ? `/success?${qp.toString()}` : "/success");
+      // ★ [1][10] 토큰은 sessionStorage(60분)에만 · 주소창에 넣지 않음
+      router.push(handleApplySuccess(data, { screenFeeKRW: bundle.total }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -577,16 +595,57 @@ export default function ApplyClient() {
     const sessionCount = sessions.length;
     let totalDurationMin = 0;
     let rentalSum = 0;
+    let extraHeadcountSum = 0;
+    // [결3] 대관료(초과 인원 가산 포함)는 lib/pricing.ts computeBaseTotalKRW 한 곳에서 계산
+    const hc = isStudioRoom && Number.isFinite(headcountNum) ? headcountNum : undefined;
     for (const s of sessions) {
       const dur = toMinutes(s.endTime) - toMinutes(s.startTime);
       if (!Number.isFinite(dur) || dur <= 0) continue;
       totalDurationMin += dur;
-      if (hourlyFee > 0) rentalSum += Math.round((hourlyFee * dur) / 60);
+      const fee = computeBaseTotalKRW({
+        roomId,
+        date: s.date,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        equipment: { laptop: false, projector: false, audio: false },
+        headcount: hc,
+      });
+      rentalSum += fee.rentalFeeKRW;
+      extraHeadcountSum += fee.extraHeadcountFeeKRW;
     }
     const equipmentSum = equipmentFee * sessionCount;
     const total = rentalSum + equipmentSum;
-    return { sessionCount, totalDurationMin, rentalSum, equipmentSum, total };
-  }, [allSessions, hourlyFee, equipmentFee]);
+    return { sessionCount, totalDurationMin, rentalSum, extraHeadcountSum, baseRentalSum: rentalSum - extraHeadcountSum, equipmentSum, total };
+  }, [allSessions, equipmentFee, roomId, isStudioRoom, headcountNum]);
+
+  /** E-스튜디오 추가 인원(기본 2명 초과분) */
+  const studioBaseHeadcount = roomMeta?.baseHeadcount ?? 2;
+  const studioExtraPersons = isStudioRoom && Number.isFinite(headcountNum) ? Math.max(0, Math.floor(headcountNum) - studioBaseHeadcount) : 0;
+  const totalHoursText = String(Math.round((bundle.totalDurationMin / 60) * 100) / 100);
+
+  /** 빠진 항목 — 제출을 한 번 눌러 오류가 생긴 뒤부터 버튼 위에 보인다 */
+  //   (RHF errors 객체는 같은 참조로 바뀌므로 메모하지 않고 매 렌더 계산한다)
+  const missingFields: MissingField[] =
+    submitCount === 0
+      ? []
+      : FIELD_META.filter((f) => errors[f.key]).map((f) => ({
+          key: f.key,
+          label: f.key === "headcount" && isStudioRoom ? "이용 인원" : f.label,
+          targetId: f.targetId,
+        }));
+
+  /** E-스튜디오 인원 오류 문구(01_spec ③-E) */
+  // 상한 초과는 다른 칸이 비어 있어도 바로 알린다(superRefine은 기본 검사 통과 후에만 돈다)
+  const studioOverCapacity = isStudioRoom && Number.isFinite(headcountNum) && headcountNum > (roomMeta?.capacity ?? 12);
+  const headcountErrorText = studioOverCapacity
+    ? STUDIO_MAX_HEADCOUNT_MESSAGE
+    : errors.headcount
+    ? isStudioRoom
+      ? errors.headcount.message === STUDIO_MAX_HEADCOUNT_MESSAGE
+        ? STUDIO_MAX_HEADCOUNT_MESSAGE
+        : STUDIO_MIN_HEADCOUNT_MESSAGE
+      : errors.headcount.message
+    : null;
 
 
   function addSession() {
@@ -681,7 +740,7 @@ export default function ApplyClient() {
 
           {error && (
             <div className="mt-4">
-              <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">{error}</Notice>
+              <Notice variant="danger" title={errorTitle} pad="md">{error}</Notice>
             </div>
           )}
           {batchError && (
@@ -714,6 +773,14 @@ export default function ApplyClient() {
                     {bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}
                   </span>
                 </div>
+                {confirmRoom?.category === "studio" ? (
+                  <div className="flex justify-between py-2.5">
+                    <span className="text-sm text-slate-500">이용 인원</span>
+                    <span className="text-sm font-semibold text-slate-900">
+                      {confirmData.headcount}명{studioExtraPersons > 0 ? ` (기본 ${studioBaseHeadcount}명 + 추가 ${studioExtraPersons}명)` : ""}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             </Card>
 
@@ -798,8 +865,14 @@ export default function ApplyClient() {
                 <div className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between text-sm text-slate-600">
                     <span>대관료{bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}</span>
-                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.rentalSum.toLocaleString()}원</span>
+                    <span className="font-semibold text-slate-800 tabular-nums">{bundle.baseRentalSum.toLocaleString()}원</span>
                   </div>
+                  {bundle.extraHeadcountSum > 0 ? (
+                    <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                      <span>추가 인원 {studioExtraPersons}명 × 10,000원 × {totalHoursText}시간</span>
+                      <span className="font-semibold text-slate-800 tabular-nums">{bundle.extraHeadcountSum.toLocaleString()}원</span>
+                    </div>
+                  ) : null}
                   <div className="flex items-center justify-between text-sm text-slate-600">
                     <span>장비 사용료</span>
                     <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
@@ -844,17 +917,17 @@ export default function ApplyClient() {
             {isStudioRoom ? (
               <ul className="list-disc space-y-1 pl-5">
                 <li>이용 시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.</li>
-                <li>기본 2인 기준 <b>시간당 20,000원</b>이며, 추가 인원 시 시간당 5,000원이 추가됩니다.</li>
+                <li>기본 2인 기준 <b>시간당 20,000원</b>이며, 3인부터 1인마다 <b>시간당 10,000원</b>이 추가됩니다(최대 12인).</li>
                 <li>촬영장비는 <b>별도 사용료</b>가 적용되며, 대관 이용 기간 중 1일 1회만 과금됩니다.</li>
                 <li>촬영 시 <b>SD카드 또는 외장하드</b>를 반드시 준비해 주세요.</li>
-                <li>신청서 접수 후 담당자 확인을 거쳐 <b>대관료 결제 완료 시 예약이 확정</b>됩니다.</li>
+                <li><PaymentFlowText text={PAYMENT_FLOW_SHORT("예약")} bold={paymentFlowBold("예약", "short")} /></li>
               </ul>
             ) : (
               <ul className="list-disc space-y-1 pl-5">
                 <li>이용 시간은 <b>30분 단위</b>로 선택되며, 최소 1시간~최대 6시간까지 신청 가능합니다.</li>
                 <li>&ldquo;대관 일정 추가하기&rdquo;를 이용하면 <b>여러 날짜/시간</b>을 한 번에 신청할 수 있습니다.</li>
                 <li>기자재(노트북·빔프로젝터·음향) 사용 시 각 <b>10,000원</b>이 추가됩니다.</li>
-                <li>신청서 접수 후 담당자 확인을 거쳐 <b>대관료 결제 완료 시 예약이 확정</b>됩니다.</li>
+                <li><PaymentFlowText text={PAYMENT_FLOW_SHORT("예약")} bold={paymentFlowBold("예약", "short")} /></li>
               </ul>
             )}
           </Notice>
@@ -866,7 +939,7 @@ export default function ApplyClient() {
           <input type="hidden" {...register("date")} />
 
           {error ? (
-            <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">
+            <Notice variant="danger" title={errorTitle} pad="md">
               {error}
             </Notice>
           ) : null}
@@ -923,7 +996,7 @@ export default function ApplyClient() {
                 </Select>
               </div>
 
-              <div>
+              <div id="field-date" tabIndex={-1} className="outline-none">
                 <FieldLabel>날짜 *</FieldLabel>
                 {prefillLocked ? (
                   <Input type="date" value={selectedDate ?? ""} disabled />
@@ -1064,11 +1137,17 @@ export default function ApplyClient() {
                       <span>시간당 요금</span>
                       <span className="font-semibold text-slate-800">{hourlyFee.toLocaleString()}원</span>
                     </div>
+                    {isStudioRoom && studioExtraPersons > 0 ? (
+                      <div className="flex items-center justify-between gap-3 text-sm text-slate-600">
+                        <span>추가 인원 {studioExtraPersons}명 × 10,000원 × {totalHoursText}시간</span>
+                        <span className="font-semibold text-slate-800 tabular-nums">{bundle.extraHeadcountSum.toLocaleString()}원</span>
+                      </div>
+                    ) : null}
                   </div>
                   <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
                     <span className="text-sm font-bold text-slate-900">합계</span>
                     <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">
-                      {(bundle.sessionCount > 1 ? bundle.rentalSum : rentalFee).toLocaleString()}원
+                      {bundle.rentalSum.toLocaleString()}원
                     </span>
                   </div>
                   <p className="mt-2 text-[11px] text-slate-400">
@@ -1196,8 +1275,29 @@ export default function ApplyClient() {
             /* E-스튜디오: 단체/행사 정보 불필요 → 숨김 처리 */
             <>
               <input type="hidden" {...register("orgName")} value="-" />
-              <input type="hidden" {...register("headcount")} value="1" />
               <input type="hidden" {...register("purpose")} value="E-스튜디오 대관" />
+              {/* [결3] 이용 인원(기본 2 · 1~12) — 초과 인원 가산은 예상 대관료에 바로 반영 */}
+              <Card pad="lg">
+                <h3 className={SECTION_TITLE}>이용 인원</h3>
+                <div className="mt-4 max-w-xs">
+                  <FieldLabel htmlFor="headcount">이용 인원 *</FieldLabel>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      id="headcount"
+                      type="number"
+                      inputMode="numeric"
+                      min={1}
+                      max={roomMeta?.capacity ?? 12}
+                      step={1}
+                      className="w-28"
+                      {...register("headcount", { valueAsNumber: true })}
+                    />
+                    <span className="mt-1 text-sm text-slate-700">명</span>
+                  </div>
+                  {headcountErrorText ? <FieldHelp className="text-red-600">{headcountErrorText}</FieldHelp> : null}
+                  <FieldHelp>기본 2명까지 시간당 20,000원입니다. 3명부터 1명마다 시간당 10,000원이 더해집니다. (최대 12명)</FieldHelp>
+                </div>
+              </Card>
             </>
           ) : (
             <Card pad="lg">
@@ -1327,6 +1427,7 @@ export default function ApplyClient() {
                     setPrivacyOpen(true);
                   }
                 }}
+                id="privacyAgreeBox"
                 label="개인정보 수집·이용에 동의합니다. (필수)"
                 error={errors.privacyAgree?.message}
               />
@@ -1349,6 +1450,7 @@ export default function ApplyClient() {
                     setPledgeOpen(true);
                   }
                 }}
+                id="pledgeAgreeBox"
                 label="서약 내용에 동의합니다. (필수)"
                 error={errors.pledgeAgree?.message}
               />
@@ -1381,6 +1483,7 @@ export default function ApplyClient() {
             </div>
           </Card>
 
+          <MissingFieldsSummary items={missingFields} />
           <Button type="submit" variant="primary" disabled={submitting} className="w-full py-3 shadow-sm hover:opacity-90">
             {submitting ? "신청 중..." : "신청하기"}
           </Button>

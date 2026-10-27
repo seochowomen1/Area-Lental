@@ -34,7 +34,7 @@ function toMin(t: string) {
  * - 묶음 신청인 경우 회차 목록 + 묶음 총액/할인/최종금액을 포함
  */
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

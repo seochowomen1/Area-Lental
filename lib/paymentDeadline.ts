@@ -176,19 +176,20 @@ export async function runPaymentDeadline(
       continue;
     }
 
-    // a. 승인 회차만 취소 (반려·취소 회차는 그대로)
+    // a. 승인 회차만 취소 (반려·취소 회차는 그대로) — 묶음당 시트 쓰기 1회 (audit-fix-1 [9])
     try {
-      for (const r of t.approved) {
-        await db.updateRequestStatus({
+      await db.updateRequestsStatusBatch(
+        t.approved.map((r) => ({
           requestId: r.requestId,
-          status: "취소",
+          status: "취소" as const,
           adminMemo: r.adminMemo ?? "",
           rejectReason: autoCancelReason(t.paymentDueDate),
           decidedBy: AUTO_CANCEL_DECIDED_BY,
-        });
-      }
-      // b. 묶음 전 행에 autoCancelledAt
-      await db.updateRequestPayment({ requestId: first.requestId, patch: { autoCancelledAt: ranAt } });
+        })),
+        undefined,
+        // b. 묶음 전 행에 autoCancelledAt — 같은 쓰기 요청에 합침(묶음당 시트 읽기 1·쓰기 1)
+        { requestId: first.requestId, patch: { autoCancelledAt: ranAt } }
+      );
     } catch (e) {
       errors.push({ key: t.key, stage: "status", message: e instanceof Error ? e.message : String(e) });
       continue;

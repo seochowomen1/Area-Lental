@@ -6,7 +6,8 @@ import { ROOMS } from "@/lib/space";
 import { handleApiError } from "@/lib/apiResponse";
 import { toMinutes, todayYmdSeoul } from "@/lib/datetime";
 import type { RentalRequest } from "@/lib/types";
-import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { TOKEN_MESSAGES, verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { bundleKey } from "@/lib/payment";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { sortSessions } from "@/lib/requestUtils";
 
@@ -17,10 +18,6 @@ export const revalidate = 0;
 /** 내 예약 목록: IP당 1분 내 10회 제한 */
 const LIST_MAX_PER_MIN = 10;
 const LIST_WINDOW_MS = 60 * 1000;
-
-/** 이메일 직접 조회 제한: 이메일당 15분 내 5회 */
-const EMAIL_DIRECT_MAX = 5;
-const EMAIL_DIRECT_WINDOW_MS = 15 * 60 * 1000;
 
 function nowMinutesSeoul() {
   const now = new Date();
@@ -50,55 +47,24 @@ export async function GET(req: Request) {
     );
   }
 
+  // ★ audit-fix-1 [1][결2]: 조회는 메일로 받은 링크(토큰)로만. 이메일·생년월일 직접 조회는 폐지.
+  //   - s=email 토큰 → 그 이메일의 신청 전체 / s=req 토큰 → 그 신청(묶음) 1건만
   const { searchParams } = new URL(req.url);
   const token = (searchParams.get("token") ?? "").toString().trim();
-  const emailParam = (searchParams.get("email") ?? "").toString().trim().toLowerCase();
-  const birthParam = (searchParams.get("birth") ?? "").toString().trim();
-
-  let email = "";
-  let requireBirthVerification = false;
-
-  // 토큰 인증 우선, 이메일 직접 조회는 생년월일 2차 인증 + 추가 Rate Limit 적용
-  if (token) {
-    const verified = verifyApplicantLinkToken(token);
-    if (!verified.ok) {
-      return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
-    }
-    email = verified.email;
-  } else if (emailParam && emailParam.includes("@")) {
-    // 이메일 직접 조회: 생년월일 2차 인증 필수
-    if (!birthParam || !/^\d{4}-\d{2}-\d{2}$/.test(birthParam)) {
-      return NextResponse.json(
-        { ok: false, message: "본인 확인을 위해 생년월일을 입력해 주세요." },
-        { status: 400 }
-      );
-    }
-    // 이메일 기반 추가 Rate Limit (열거 공격 방지)
-    const rlEmail = rateLimit("my-list-email", emailParam, EMAIL_DIRECT_MAX, EMAIL_DIRECT_WINDOW_MS);
-    if (!rlEmail.allowed) {
-      // 이메일 존재 여부 노출 방지: 동일 응답 반환
-      return NextResponse.json({ ok: true, email: emailParam, current: [], past: [], cancelled: [] });
-    }
-    email = emailParam;
-    requireBirthVerification = true;
-  } else {
-    return NextResponse.json(
-      { ok: false, message: "토큰 또는 이메일이 필요합니다." },
-      { status: 400 }
-    );
+  if (!token) {
+    return NextResponse.json({ ok: false, code: "LINK_REQUIRED", message: TOKEN_MESSAGES.LINK_REQUIRED }, { status: 400 });
   }
+  const verified = verifyApplicantLinkToken(token);
+  if (!verified.ok) {
+    return NextResponse.json({ ok: false, code: verified.code, message: verified.message }, { status: 403 });
+  }
+  const email = verified.email;
+
   const db = getDatabase();
   const all = await db.getAllRequests();
-  const mine = all.filter((r) => (r.email ?? "").toLowerCase() === email);
-
-  // 이메일 직접 조회 시 생년월일 2차 인증: DB 기록과 일치하는지 확인
-  if (requireBirthVerification) {
-    const hasMatchingBirth = mine.some((r) => (r.birth ?? "") === birthParam);
-    if (!hasMatchingBirth) {
-      // 존재 여부 노출 방지: 빈 결과 반환 (에러 메시지를 다르게 하지 않음)
-      return NextResponse.json({ ok: true, email, current: [], past: [], cancelled: [] });
-    }
-  }
+  const mine = all.filter(
+    (r) => (r.email ?? "").toLowerCase().trim() === email && (verified.scope === "email" || bundleKey(r) === verified.group)
+  );
 
   const map = new Map<string, RentalRequest[]>();
   for (const r of mine) {
@@ -174,7 +140,7 @@ export async function GET(req: Request) {
   const past = groups.filter((g) => g.past && !["취소", "반려"].includes(g.status));
   const cancelled = groups.filter((g) => ["취소", "반려"].includes(g.status));
 
-  return NextResponse.json({ ok: true, email, current, past, cancelled });
+  return NextResponse.json({ ok: true, scope: verified.scope, email, current, past, cancelled });
   } catch (e: unknown) {
     return handleApiError(e, "내 예약 조회");
   }

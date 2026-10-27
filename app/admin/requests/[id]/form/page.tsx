@@ -108,6 +108,8 @@ export default async function AdminRequestFormPage({
 
   /* ── fee ── */
   const feeBasisSessions = isBatch ? pickFeeBasisSessions(sessions) : sessions;
+  // [결3] E-스튜디오 기본 인원(2명) 초과분 — 인쇄 신청서 "추가 인원" 행
+  const studioExtraPersons = Math.max(0, Math.floor(Number(req.headcount ?? 0)) - (getRoom(req.roomId)?.baseHeadcount ?? Number.POSITIVE_INFINITY));
   const feeBasis = isBatch
     ? computeFeesForBundle(feeBasisSessions)
     : computeFeesForRequest(req);
@@ -492,7 +494,7 @@ export default async function AdminRequestFormPage({
                       의사소통 경로 확보
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      성명(대표자 성명), 생년월일, 연락처,
+                      성명(대표자 성명), 연락처,
                       <br />
                       E-mail, 주소, 단체명, 인원 수,
                       <br />
@@ -504,8 +506,22 @@ export default async function AdminRequestFormPage({
                       달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      신청자 확인 및 미성년자 보호자 동의 확인
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      수집일로부터 3년 및 대관목적
+                      <br />
+                      달성 시 지체없이 해당정보 파기
+                    </td>
+                  </tr>
                 </tbody>
               </table>
+              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+                ※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.
+              </p>
               <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
                 ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
                 대관 신청·진행에 일부 제한이 있습니다.
@@ -598,6 +614,10 @@ export default async function AdminRequestFormPage({
                   <td className={TD}>{req.email}</td>
                 </tr>
                 <tr>
+                  <th className={TH} style={{ textAlign: "center" }}>생년월일</th>
+                  <td className={TD} colSpan={3}>{req.birth || "-"}</td>
+                </tr>
+                <tr>
                   <th className={TH} style={{ textAlign: "center" }}>주소</th>
                   <td className={TD} colSpan={3}>{req.address || "-"}</td>
                 </tr>
@@ -621,6 +641,17 @@ export default async function AdminRequestFormPage({
                   <td className={TD_R} style={{ width: "14%" }}>20,000원</td>
                   <td className={`${TD} text-center`} style={{ width: "8%" }}>■</td>
                 </tr>
+                {/* [결3] 추가 인원(기본 인원 초과) — 금액은 lib/pricing.ts 공용 계산 결과 */}
+                {studioExtraPersons > 0 ? (
+                  <tr>
+                    <th className={TH} style={{ textAlign: "center", verticalAlign: "middle" }}>1-1.</th>
+                    <td className={TD} colSpan={2}>
+                      추가 인원 {studioExtraPersons}명 (1인당 1시간 10,000원)
+                    </td>
+                    <td className={TD_R}>{formatKRW(feeBasis.extraHeadcountFeeKRW)}</td>
+                    <td className={`${TD} text-center`}>■</td>
+                  </tr>
+                ) : null}
 
                 {/* 촬영장비 */}
                 {studioEquipmentItems.map((eq, idx) => (
@@ -780,9 +811,20 @@ export default async function AdminRequestFormPage({
                       이름, 연락처, E-mail, 주소
                     </td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
-                      E-스튜디오 이용완료 일 해당
+                      수집일로부터 3년 및 대관목적
                       <br />
-                      1년
+                      달성 시 지체없이 해당정보 파기
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      신청자 확인 및 미성년자 보호자 동의 확인
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      수집일로부터 3년 및 대관목적
+                      <br />
+                      달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
                 </tbody>
@@ -1093,8 +1135,19 @@ export default async function AdminRequestFormPage({
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
                       이름(또는 단체명), 대표자 성명,
                       <br />
-                      연락처, E-mail, 주소, 생년월일
+                      연락처, E-mail, 주소
                     </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      수집일로부터 3년 및 전시 목적
+                      <br />
+                      달성 시 지체없이 해당정보 파기
+                    </td>
+                  </tr>
+                  <tr>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                      신청자 확인 및 미성년자 보호자 동의 확인
+                    </td>
+                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
                     <td className="border border-gray-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 전시 목적
                       <br />
@@ -1103,6 +1156,9 @@ export default async function AdminRequestFormPage({
                   </tr>
                 </tbody>
               </table>
+              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+                ※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.
+              </p>
               <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
                 ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
                 전시 신청·진행에 일부 제한이 있습니다.

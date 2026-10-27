@@ -31,7 +31,7 @@ function hasPaymentRecord(r: { paymentStatus?: string }): boolean {
  * 응답: { ok, expiredCount, expiredIds, cutoffDate }
  */
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }
@@ -79,7 +79,7 @@ export async function GET(req: Request) {
  * - 경과되지 않은 건은 무시 (안전장치)
  */
 export async function DELETE(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

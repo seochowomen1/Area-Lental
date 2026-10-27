@@ -16,12 +16,16 @@ import {
   sendApplicantReceivedEmailBatch
 } from "@/lib/mail";
 import { logger } from "@/lib/logger";
-import { createApplicantLinkToken } from "@/lib/publicLinkToken";
+import { APPLICANT_TOKEN_TTL, createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { assertAdminApiAuth } from "@/lib/adminApiAuth";
-import type { IntakeChannel } from "@/lib/types";
+import type { IntakeChannel, RentalRequest } from "@/lib/types";
 import type { RequestStatus } from "@/lib/types";
-import { REQUEST_LIMITS } from "@/lib/constants";
+import { REQUEST_LIMITS, TIME_CONSTANTS } from "@/lib/constants";
+import { getRoom } from "@/lib/space";
+import { bundleKey } from "@/lib/payment";
+import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
+import { recordAudit } from "@/lib/auditLog";
 
 type SessionInput = { date: string; startTime: string; endTime: string; isPrepDay?: boolean };
 
@@ -49,6 +53,51 @@ function conflictMessage(roomId: string, date: string, startTime: string, endTim
 
 function isYmd(s: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(s);
+}
+
+/** YYYY-MM-DD 모양인데 달력에 없는 날짜(2026-11-31 등) */
+function isNonexistentYmd(s: string): boolean {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
+  const [y, m, d] = s.split("-").map((v) => parseInt(v, 10));
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  return !(dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d);
+}
+
+function nonexistentDateMessage(s: string) {
+  return `존재하지 않는 날짜입니다(${s}). 날짜를 다시 선택해 주세요.`;
+}
+
+const UNKNOWN_ROOM_MESSAGE = "신청할 수 없는 공간입니다. 공간 목록에서 다시 선택해 주세요.";
+/** [2] 동시 신청 중복 자동 취소 */
+const DUPLICATE_DECIDED_BY = "시스템";
+const DUPLICATE_REASON = "동시 신청 중복 — 먼저 접수된 신청이 있어 자동 취소";
+const SLOT_TAKEN_MESSAGE = {
+  time: "방금 다른 분이 같은 시간을 먼저 신청했습니다. 신청은 접수되지 않았습니다. 달력에서 다른 시간을 골라 주세요.",
+  period: "방금 다른 분이 같은 기간을 먼저 신청했습니다. 신청은 접수되지 않았습니다. 달력에서 다른 기간을 골라 주세요.",
+} as const;
+
+/** [6] 강의실·스튜디오 회차 시간 규칙 (RequestInputSchema와 같은 규칙을 회차마다 적용) */
+function sessionRuleIssues(s: { date: string; startTime: string; endTime: string }, maxHours: number): string[] {
+  const label = `${s.date} ${s.startTime}-${s.endTime}`;
+  if (!/^\d{2}:\d{2}$/.test(s.startTime) || !/^\d{2}:\d{2}$/.test(s.endTime)) {
+    return [`${label}: 시작/종료 시간이 올바르지 않습니다.`];
+  }
+  const sMin = toMinutesSafe(s.startTime);
+  const eMin = toMinutesSafe(s.endTime);
+  if (sMin >= eMin) return [`${label}: 종료 시간은 시작 시간보다 늦어야 합니다.`];
+  const out: string[] = [];
+  const step = TIME_CONSTANTS.TIME_SLOT_INTERVAL;
+  if (sMin % step !== 0 || eMin % step !== 0) out.push(`${label}: 시간은 30분 단위로만 선택할 수 있습니다.`);
+  const diff = eMin - sMin;
+  if (diff < TIME_CONSTANTS.MIN_RENTAL_MINUTES) out.push(`${label}: 최소 1시간 이상 선택해야 합니다.`);
+  const limitHours = maxHours > 0 ? maxHours : TIME_CONSTANTS.MAX_RENTAL_MINUTES / 60;
+  if (diff > limitHours * 60) out.push(`${label}: 한 회차는 최대 ${limitHours}시간까지 신청할 수 있습니다.`);
+  return out;
+}
+
+function toMinutesSafe(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map((v) => parseInt(v, 10));
+  return h * 60 + m;
 }
 
 function diffDaysInclusive(startYmd: string, endYmd: string) {
@@ -149,7 +198,7 @@ export async function POST(req: Request) {
     const isOffline = raw.intake === "offline";
     let offlineMeta: { intakeChannel: IntakeChannel; appliedAt: string; intakeNote?: string } | null = null;
     if (isOffline) {
-      const auth = assertAdminApiAuth(req);
+      const auth = await assertAdminApiAuth(req);
       if (!auth.ok) {
         return NextResponse.json(
           { ok: false, code: "UNAUTHORIZED", message: "서면 접수 등록은 관리자만 할 수 있습니다." },
@@ -174,6 +223,18 @@ export async function POST(req: Request) {
       offlineMeta = { intakeChannel: ch as IntakeChannel, appliedAt, intakeNote: intakeNote || undefined };
     }
 
+    // ★ [6] 없는 공간(·"all") 거부 — 0원 행 저장 방지 (북카페는 10/7 결정대로 신청 가능)
+    const roomMeta = getRoom(raw.roomId);
+    if (!roomMeta) {
+      return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: UNKNOWN_ROOM_MESSAGE }, { status: 400 });
+    }
+    // ★ [6] 달력에 없는 날짜(2026-11-31 등) 거부
+    for (const v of [raw.date, raw.startDate, raw.endDate, raw.galleryPrepDate]) {
+      if (v && isNonexistentYmd(v.trim())) {
+        return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: nonexistentDateMessage(v.trim()) }, { status: 400 });
+      }
+    }
+
     const schema = raw.roomId === "gallery" ? GalleryRequestInputSchema : RequestInputSchema;
     const parsed = schema.safeParse(raw);
     if (!parsed.success) {
@@ -188,6 +249,22 @@ export async function POST(req: Request) {
       );
     }
     const input = parsed.data;
+
+    // ★ [6] 정원 초과(강의실·스튜디오) — 갤러리는 관람 인원이라 제외
+    if (input.roomId !== "gallery" && roomMeta.capacity > 0 && input.headcount > roomMeta.capacity) {
+      return NextResponse.json(
+        {
+          ok: false,
+          code: "VALIDATION_ERROR",
+          message: `${roomMeta.name}의 최대 인원은 ${roomMeta.capacity}명입니다. 인원을 줄이거나 더 넓은 공간을 선택해 주세요.`,
+        },
+        { status: 400 }
+      );
+    }
+
+    // ★ [2] 겹침 검증은 캐시를 거치지 않은 최신 목록으로 (한 요청 안에서는 1회만 읽음)
+    let freshAll: RentalRequest[] | null = null;
+    const loadFresh = async () => (freshAll ??= await db.getAllRequestsFresh());
 
 
     // ✅ 여러 회차(날짜별로 시간 다르게) 묶음 신청 지원
@@ -255,7 +332,7 @@ export async function POST(req: Request) {
         );
       }
       // ★ 준비·철거 규정(2026-10-19): 준비일이 앞 전시의 마지막 날이면 17:00(토 11:00) 이후 회차로 생성
-      const occForPrep = buildGalleryOccupancy(await db.getAllRequests(), await db.getBlocks());
+      const occForPrep = buildGalleryOccupancy(await loadFresh(), await db.getBlocks());
       const prepProbe = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam).find((s) => s.isPrepDay)?.date;
       const prepAfterExhibition = prepProbe ? isPrepAfterExhibition(occForPrep, prepProbe) : false;
       sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam, { prepAfterExhibition });
@@ -318,6 +395,28 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
+    const nonexistent = sessions.find((s) => isNonexistentYmd(s.date));
+    if (nonexistent) {
+      return NextResponse.json(
+        { ok: false, code: "VALIDATION_ERROR", message: nonexistentDateMessage(nonexistent.date) },
+        { status: 400 }
+      );
+    }
+    // ★ [6] 회차별 시간 규칙(30분 단위·최소 1시간·공간 최대 시간) — sessions JSON 우회 차단
+    if (input.roomId !== "gallery") {
+      const ruleIssues: Array<{ date: string; startTime: string; endTime: string; code: string; message: string }> = [];
+      for (const s of sessions) {
+        for (const message of sessionRuleIssues(s, roomMeta.durationLimitHours)) {
+          ruleIssues.push({ date: s.date, startTime: s.startTime, endTime: s.endTime, code: "SESSION_INVALID", message });
+        }
+      }
+      if (ruleIssues.length) {
+        return NextResponse.json(
+          { ok: false, code: "SESSION_INVALID", message: ruleIssues[0].message, issues: ruleIssues },
+          { status: 400 }
+        );
+      }
+    }
     // 강의실·E-스튜디오: 오늘 이전 날짜 신청 차단 (갤러리는 위에서 익일 이후로 별도 검증) — 진단 #2
     if (input.roomId !== "gallery") {
       const today = todayYmdSeoul();
@@ -367,8 +466,8 @@ export async function POST(req: Request) {
       })
     );
 
-    // 운영시간/충돌 검증은 회차별로 수행
-    const all = await db.getAllRequests();
+    // 운영시간/충돌 검증은 회차별로 수행 (캐시 우회 최신 목록)
+    const all = await loadFresh();
     const conflictStatuses: RequestStatus[] = ["접수", "승인"];
     const schedules = await db.getClassSchedules();
     const blocks = await db.getBlocks();
@@ -635,6 +734,62 @@ export async function POST(req: Request) {
       savedList = await db.appendRequestsBatch(appendInputs);
     }
 
+    // ★ [2] 저장 직후 재확인 — 시트 행 순서가 나보다 앞선 접수·승인 건과 겹치면 내 행(묶음 전체)을 "취소(시스템)"로 바꾸고 409
+    //   두 요청이 동시에 재확인해도 "행 순서가 앞선 쪽이 이긴다"로 같은 결론이 난다. 행 삭제가 아니라 상태 변경(감사 추적 유지).
+    {
+      const myIds = new Set(savedList.map((r) => r.requestId));
+      const latest = await db.getAllRequestsFresh();
+      const myIdx = latest.findIndex((r) => myIds.has(r.requestId));
+      if (myIdx < 0) {
+        logger.warn("저장 직후 재확인: 방금 저장한 행을 찾지 못함(재확인 생략)", { requestId: savedList[0]?.requestId });
+      } else {
+        const earlier = latest.slice(0, myIdx).filter((r) => !myIds.has(r.requestId) && conflictStatuses.includes(r.status));
+        let taken = false;
+        if (isGallery) {
+          const occEarlier = buildGalleryOccupancy(earlier, []);
+          taken = sessions.some((s) => galleryDateConflicts(occEarlier, s.date, s.isPrepDay ? "prep" : "exhibition", galleryInput?.endDate));
+        } else {
+          taken = sessions.some((s) =>
+            earlier.some((r) => r.roomId === input.roomId && r.date === s.date && overlaps(r.startTime, r.endTime, s.startTime, s.endTime))
+          );
+        }
+        if (taken) {
+          try {
+            await db.updateRequestsStatusBatch(
+              savedList.map((r) => ({
+                requestId: r.requestId,
+                status: "취소" as const,
+                decidedBy: DUPLICATE_DECIDED_BY,
+                rejectReason: DUPLICATE_REASON,
+                adminMemo: r.adminMemo ?? "",
+              }))
+            );
+          } catch (cancelErr) {
+            logger.error("동시 신청 중복 자동 취소 실패 — 관리자 확인 필요", {
+              requestIds: savedList.map((r) => r.requestId),
+              error: cancelErr instanceof Error ? cancelErr.message : String(cancelErr),
+            });
+          }
+          await recordAudit({
+            action: "REQUEST_DUPLICATE_AUTO_CANCEL",
+            ip,
+            actor: DUPLICATE_DECIDED_BY,
+            target: (batchId ?? "").trim() || savedList[0].requestId,
+            summary: [
+              "접수 → 취소(동시 신청 중복)",
+              roomName(input.roomId),
+              isGallery ? `${galleryInput?.startDate}~${galleryInput?.endDate}` : sessions.map((s) => `${s.date} ${s.startTime}-${s.endTime}`).join(", "),
+            ].join(" · "),
+            details: { requestIds: savedList.map((r) => r.requestId), count: savedList.length },
+          });
+          return NextResponse.json(
+            { ok: false, code: "SLOT_TAKEN", message: isGallery ? SLOT_TAKEN_MESSAGE.period : SLOT_TAKEN_MESSAGE.time },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     try {
       if (isOffline) {
         // 서면 접수 등록: 신청자 접수 메일·관리자 알림 메일 모두 발송하지 않음(관리자가 직접 등록한 건)
@@ -662,15 +817,28 @@ export async function POST(req: Request) {
       date: isGallery ? galleryInput?.startDate : (sessions.find((s) => !s.isPrepDay) ?? sessions[0])?.date
     });
 
+    // ★ [1] 응답 토큰은 방금 만든 신청(묶음)에만 유효 · 60분 (이메일 전체 조회는 메일 링크로만)
     let applicantToken = "";
+    let tokenExpiresAt = 0;
     try {
-      if (!isOffline) applicantToken = createApplicantLinkToken({
-        email: input.email,
-        ttlSeconds: 7 * 24 * 60 * 60,
-      });
+      if (!isOffline && savedList[0]) {
+        const t = createApplicantLinkToken({
+          email: input.email,
+          scope: "req",
+          group: bundleKey(savedList[0]),
+          ttlSeconds: APPLICANT_TOKEN_TTL.APPLY,
+        });
+        applicantToken = t.token;
+        tokenExpiresAt = t.exp;
+      }
     } catch {
       // 토큰 발급 실패해도 신청 자체는 성공 처리
     }
+
+    // 서버 공용 계산 금액(갤러리 공휴일·스튜디오 인원 가산 반영) — 화면 금액 검수용
+    const estimatedFeeKRW = savedList.length > 1
+      ? computeFeesForBundle(savedList).totalFeeKRW
+      : savedList[0] ? computeFeesForRequest(savedList[0]).totalFeeKRW : 0;
 
     return NextResponse.json(
       {
@@ -680,6 +848,8 @@ export async function POST(req: Request) {
         count: savedList.length,
         requestIds: savedList.map((r) => r.requestId),
         token: applicantToken,
+        tokenExpiresAt,
+        estimatedFeeKRW,
       },
       { status: 200 }
     );

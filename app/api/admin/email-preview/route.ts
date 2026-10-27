@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
  * 응답: { ok, to, subject, body, status, paymentGuideIncluded, paymentDueDate, paymentLinkUrl } (03_api §8-1)
  */
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { TOKEN_MESSAGES, authorizeApplicantAccess, verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { bundleKey } from "@/lib/payment";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { normalizeEmail, handleApiError } from "@/lib/apiResponse";
 import { recordAudit } from "@/lib/auditLog";
@@ -26,40 +27,39 @@ export async function POST(req: Request) {
     );
   }
 
+  // ★ audit-fix-1 [1]: 취소도 토큰(메일 링크 또는 방금 신청한 묶음 전용)으로만. 이메일 단독 취소 폐지.
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
-  const emailInput = normalizeEmail(body?.email ?? "");
 
+  if (!token) {
+    return NextResponse.json({ ok: false, code: "LINK_REQUIRED", message: TOKEN_MESSAGES.LINK_REQUIRED }, { status: 400 });
+  }
   if (!requestId) {
     return NextResponse.json({ ok: false, message: "신청번호가 필요합니다." }, { status: 400 });
   }
-
-  let email = emailInput;
-  if (token) {
-    const verified = verifyApplicantLinkToken(token);
-    if (!verified.ok) {
-      return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
-    }
-    email = verified.email;
+  const verified = verifyApplicantLinkToken(token);
+  if (!verified.ok) {
+    return NextResponse.json({ ok: false, code: verified.code, message: verified.message }, { status: 403 });
   }
-
-  if (!email || !email.includes("@")) {
-    return NextResponse.json({ ok: false, message: "이메일을 확인해주세요." }, { status: 400 });
-  }
+  const email = verified.email;
 
   const db = getDatabase();
   const found = await db.getRequestById(requestId);
 
+  const access = found ? authorizeApplicantAccess(verified, { email: found.email, bundleKey: bundleKey(found) }) : (verified.scope === "req" ? "scope" : "email");
+  if (access === "scope") {
+    return NextResponse.json({ ok: false, code: "TOKEN_SCOPE", message: TOKEN_MESSAGES.TOKEN_SCOPE }, { status: 403 });
+  }
   // 신청번호 미존재 또는 이메일 불일치 시 동일 메시지 반환 (이메일 열거 방지)
-  if (!found || normalizeEmail(found.email) !== email) {
+  if (!found || access !== "ok") {
     return NextResponse.json(
       { ok: false, message: "신청번호 또는 이메일을 확인해주세요." },
       { status: 400 },
     );
   }
 
-  const all = await db.getAllRequests();
+  const all = await db.getAllRequestsFresh();
   const group = (found.batchId ? all.filter((r) => r.batchId === found.batchId) : [found])
     .filter((r) => normalizeEmail(r.email) === email);
   if (group.length === 0) {
@@ -87,15 +87,16 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, message: "이미 지난 예약은 취소할 수 없습니다." }, { status: 409 });
   }
 
-  for (const r of group) {
-    await db.updateRequestStatus({
+  // ★ [9] 묶음 취소는 시트 쓰기 1회(전부 반영되거나 전부 반영 안 됨)
+  await db.updateRequestsStatusBatch(
+    group.map((r) => ({
       requestId: r.requestId,
-      status: "취소",
+      status: "취소" as const,
       decidedBy: "사용자",
       rejectReason: "사용자 취소",
       adminMemo: r.adminMemo ?? "",
-    });
-  }
+    }))
+  );
 
   const first = group[0];
   await recordAudit({

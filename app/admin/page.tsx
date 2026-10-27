@@ -6,11 +6,13 @@ import { RETENTION_YEARS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { summarizePaymentChips } from "@/lib/payment";
 import { getRoomsByCategory } from "@/lib/space";
+import { assertAdminAuth } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
 export default async function AdminHomePage() {
+  await assertAdminAuth();
   const db = getDatabase();
   const allRequests = await db.getAllRequests();
 

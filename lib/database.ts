@@ -37,6 +37,8 @@ class TtlCache<T> {
 export interface Database {
   // 대관 신청 관련
   getAllRequests(): Promise<RentalRequest[]>;
+  /** 캐시를 거치지 않은 최신 목록 — 겹침 검증·삭제 판정 전용 (audit-fix-1 [2]) */
+  getAllRequestsFresh(): Promise<RentalRequest[]>;
   getRequestById(id: string): Promise<RentalRequest | null>;
   getRequestsByBatchId(batchId: string): Promise<RentalRequest[]>;
   appendRequest(input: Omit<RentalRequest, "requestId" | "createdAt" | "status" | "adminMemo" | "rejectReason" | "decidedAt" | "decidedBy" | "roomName">): Promise<RentalRequest>;
@@ -52,6 +54,16 @@ export interface Database {
     discountAmountKRW?: number;
     discountReason?: string;
   }): Promise<RentalRequest>;
+  /**
+   * 여러 행 상태 일괄 변경 (audit-fix-1 [9]) — 시트 읽기 1·쓰기 1, 실패 시 throw(부분 반영 없음)
+   * adminMemo·rejectReason을 생략하면 기존 값 유지
+   */
+  updateRequestsStatusBatch(
+    updates: Array<{ requestId: string; status: RequestStatus; adminMemo?: string; rejectReason?: string; decidedBy: string }>,
+    discount?: { batchId: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
+    /** 같은 쓰기 요청에 결제 기록 필드도 합침(묶음 전 행 동일 값) */
+    payment?: { requestId: string; patch: PaymentPatch }
+  ): Promise<RentalRequest[]>;
   /** 결제 기록 필드 갱신 — 묶음이면 전 행 동기화. 갱신된 행 전부 반환 (2026-10-26) */
   updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]>;
   /** 반려/취소된 신청건 삭제 */
@@ -84,6 +96,20 @@ class MockDatabase implements Database {
   async getAllRequests() {
     const { mock_getAllRequests } = await this.mockdb;
     return mock_getAllRequests();
+  }
+
+  async getAllRequestsFresh() {
+    const { mock_getAllRequests } = await this.mockdb;
+    return mock_getAllRequests();
+  }
+
+  async updateRequestsStatusBatch(
+    updates: Parameters<Database["updateRequestsStatusBatch"]>[0],
+    discount?: Parameters<Database["updateRequestsStatusBatch"]>[1],
+    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2]
+  ) {
+    const { mock_updateRequestsStatusBatch } = await this.mockdb;
+    return mock_updateRequestsStatusBatch(updates, discount, payment);
   }
 
   async getRequestById(id: string) {
@@ -190,9 +216,31 @@ class SheetsDatabase implements Database {
     return result;
   }
 
+  /** 캐시 우회 읽기 — 읽은 결과로 캐시도 갱신 */
+  async getAllRequestsFresh() {
+    const { getAllRequests } = await this.sheets;
+    const result = await getAllRequests();
+    this.requestsCache.set(result);
+    return result;
+  }
+
   async getRequestById(id: string) {
     const { getRequestById } = await this.sheets;
     return getRequestById(id);
+  }
+
+  async updateRequestsStatusBatch(
+    updates: Parameters<Database["updateRequestsStatusBatch"]>[0],
+    discount?: Parameters<Database["updateRequestsStatusBatch"]>[1],
+    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2]
+  ) {
+    this.requestsCache.invalidate();
+    const { updateRequestsStatusBatch } = await this.sheets;
+    try {
+      return await updateRequestsStatusBatch(updates, discount, payment);
+    } finally {
+      this.requestsCache.invalidate();
+    }
   }
 
   async getRequestsByBatchId(batchId: string) {
@@ -200,22 +248,23 @@ class SheetsDatabase implements Database {
     return all.filter((r) => r.batchId === batchId);
   }
 
+  // ★ 쓰기 메서드는 쓰기 전·후 모두 캐시 무효화 (audit-fix-1 [2] — 쓰기 도중 다른 요청이 옛 값을 캐시에 넣는 경우 방지)
   async appendRequest(input: Parameters<Database["appendRequest"]>[0]) {
     this.requestsCache.invalidate();
     const { appendRequest } = await this.sheets;
-    return appendRequest(input);
+    try { return await appendRequest(input); } finally { this.requestsCache.invalidate(); }
   }
 
   async appendRequestsBatch(inputs: Array<Parameters<Database["appendRequest"]>[0]>) {
     this.requestsCache.invalidate();
     const { appendRequestsBatch } = await this.sheets;
-    return appendRequestsBatch(inputs);
+    try { return await appendRequestsBatch(inputs); } finally { this.requestsCache.invalidate(); }
   }
 
   async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
     this.requestsCache.invalidate();
     const { updateRequestStatus } = await this.sheets;
-    return updateRequestStatus(args);
+    try { return await updateRequestStatus(args); } finally { this.requestsCache.invalidate(); }
   }
 
   async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
@@ -229,7 +278,7 @@ class SheetsDatabase implements Database {
   async deleteRequests(requestIds: string[]) {
     this.requestsCache.invalidate();
     const { deleteRequests } = await this.sheets;
-    return deleteRequests(requestIds);
+    try { return await deleteRequests(requestIds); } finally { this.requestsCache.invalidate(); }
   }
 
   async getClassSchedules() {
@@ -244,25 +293,25 @@ class SheetsDatabase implements Database {
   async addClassSchedule(schedule: Omit<ClassSchedule, "id">) {
     this.schedulesCache.invalidate();
     const { addClassSchedule } = await this.sheets;
-    return addClassSchedule(schedule);
+    try { return await addClassSchedule(schedule); } finally { this.schedulesCache.invalidate(); }
   }
 
   async updateClassSchedule(id: string, updates: Partial<Omit<ClassSchedule, "id">>) {
     this.schedulesCache.invalidate();
     const { updateClassSchedule } = await this.sheets;
-    return updateClassSchedule(id, updates);
+    try { return await updateClassSchedule(id, updates); } finally { this.schedulesCache.invalidate(); }
   }
 
   async deleteClassSchedule(id: string) {
     this.schedulesCache.invalidate();
     const { deleteClassSchedule } = await this.sheets;
-    return deleteClassSchedule(id);
+    try { return await deleteClassSchedule(id); } finally { this.schedulesCache.invalidate(); }
   }
 
   async replaceClassSchedulesBySource(source: string, items: Omit<ClassSchedule, "id">[]) {
     this.schedulesCache.invalidate();
     const { replaceClassSchedulesBySource } = await this.sheets;
-    return replaceClassSchedulesBySource(source, items);
+    try { return await replaceClassSchedulesBySource(source, items); } finally { this.schedulesCache.invalidate(); }
   }
 
   async getBlocks() {
@@ -277,13 +326,13 @@ class SheetsDatabase implements Database {
   async addBlock(block: Omit<BlockedSlot, "id">) {
     this.blocksCache.invalidate();
     const { addBlock } = await this.sheets;
-    return addBlock(block);
+    try { return await addBlock(block); } finally { this.blocksCache.invalidate(); }
   }
 
   async deleteBlock(id: string) {
     this.blocksCache.invalidate();
     const { deleteBlock } = await this.sheets;
-    return deleteBlock(id);
+    try { return await deleteBlock(id); } finally { this.blocksCache.invalidate(); }
   }
 
   async getEmailTemplates() {

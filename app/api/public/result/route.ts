@@ -5,7 +5,7 @@ import { computeFeesForBundle, computeFeesForRequest, getSelectedEquipmentDetail
 import { normalizeRoomCategory } from "@/lib/space";
 import { handleApiError } from "@/lib/apiResponse";
 import type { RentalRequest } from "@/lib/types";
-import { verifyApplicantLinkToken } from "@/lib/publicLinkToken";
+import { TOKEN_MESSAGES, authorizeApplicantAccess, verifyApplicantLinkToken } from "@/lib/publicLinkToken";
 import { ROOMS } from "@/lib/space";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { maskName, maskPhone, maskAddress } from "@/lib/mask";
@@ -13,7 +13,7 @@ import { auditLog } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 import { normalizeEmail } from "@/lib/apiResponse";
 import { todayYmdSeoul } from "@/lib/datetime";
-import { derivePaymentView, publicPaymentText } from "@/lib/payment";
+import { bundleKey, derivePaymentView, publicPaymentText } from "@/lib/payment";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -63,29 +63,32 @@ export async function POST(req: Request) {
     );
   }
 
+  // ★ audit-fix-1 [1]: 조회는 토큰(메일 링크 또는 방금 신청한 묶음 전용)으로만. 신청번호+이메일 "지식"만으로는 조회 불가.
   const body = await req.json().catch(() => null);
   const requestId = (body?.requestId ?? "").toString().trim();
   const token = (body?.token ?? "").toString().trim();
-  const emailInput = (body?.email ?? "").toString().trim();
 
-  let email = normalizeEmail(emailInput);
-  if (token) {
-    const verified = verifyApplicantLinkToken(token);
-    if (!verified.ok) {
-      return NextResponse.json({ ok: false, message: verified.message }, { status: 403 });
-    }
-    email = verified.email;
+  if (!token) {
+    return NextResponse.json({ ok: false, code: "LINK_REQUIRED", message: TOKEN_MESSAGES.LINK_REQUIRED }, { status: 400 });
   }
-
-  if (!requestId || !email) {
+  if (!requestId) {
     return NextResponse.json({ ok: false, message: "신청번호와 이메일을 입력해주세요." }, { status: 400 });
   }
+  const verified = verifyApplicantLinkToken(token);
+  if (!verified.ok) {
+    return NextResponse.json({ ok: false, code: verified.code, message: verified.message }, { status: 403 });
+  }
+  const email = verified.email;
 
   const db = getDatabase();
   const r = await db.getRequestById(requestId);
 
+  const access = r ? authorizeApplicantAccess(verified, { email: r.email, bundleKey: bundleKey(r) }) : (verified.scope === "req" ? "scope" : "email");
+  if (access === "scope") {
+    return NextResponse.json({ ok: false, code: "TOKEN_SCOPE", message: TOKEN_MESSAGES.TOKEN_SCOPE }, { status: 403 });
+  }
   // 신청번호 미존재 또는 이메일 불일치 시 동일 메시지 반환 (이메일 열거 방지)
-  if (!r || normalizeEmail(r.email) !== email) {
+  if (!r || access !== "ok") {
     return NextResponse.json(
       { ok: false, message: "신청번호 또는 이메일을 확인해주세요." },
       { status: 400 },

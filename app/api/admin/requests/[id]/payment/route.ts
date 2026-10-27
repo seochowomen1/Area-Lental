@@ -20,7 +20,7 @@ export const revalidate = 0;
  * body: { paymentMethod, paidAt, paidAmountKRW, paymentNote? }
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
 
   try {

@@ -41,7 +41,7 @@ function buildBatchMaps(all: RentalRequest[]) {
 }
 
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) {
     return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   }

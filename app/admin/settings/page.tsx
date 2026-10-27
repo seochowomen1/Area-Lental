@@ -6,6 +6,7 @@ import DataRetentionPanel from "@/components/admin/DataRetentionPanel";
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
 import { categoryAccent } from "@/lib/requestUtils";
+import { assertAdminAuth } from "@/lib/adminAuth";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,6 +25,7 @@ export default async function AdminSettingsPage({
 }: {
   searchParams?: { category?: string };
 }) {
+  await assertAdminAuth();
   const category = normalizeRoomCategory(searchParams?.category);
   const categoryLabel = getCategoryLabel(category);
   const accent = categoryAccent(category);

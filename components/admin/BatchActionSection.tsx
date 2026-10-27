@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import FormSubmitButton from "@/components/FormSubmitButton";
 
 interface Props {
   approveLabel: string;
@@ -71,16 +72,13 @@ export default function BatchActionSection({
       <input type="hidden" name="actionStatus" value={intent} />
 
       <div className="flex flex-wrap items-center gap-3">
-        <button
-          type="submit"
-          className={`rounded-lg px-5 py-2.5 text-sm font-semibold text-white ${
-            isReject
-              ? "bg-red-600 hover:bg-red-700"
-              : "bg-[rgb(var(--brand-primary))] hover:opacity-90"
-          }`}
-        >
-          {isReject ? rejectLabel : approveLabel}
-        </button>
+        {/* 처리 중 표시 + 이중 클릭 방지(서버 액션 · audit-fix-1) */}
+        <FormSubmitButton
+          idleText={isReject ? rejectLabel : approveLabel}
+          pendingText="처리 중..."
+          variant={isReject ? "danger" : "primary"}
+          className="rounded-lg px-5 py-2.5"
+        />
         {note && <span className="text-xs text-gray-500">{note}</span>}
       </div>
     </>

@@ -1,6 +1,13 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
+import { PRIVACY_POLICY_ANNOUNCED_AT, PRIVACY_POLICY_EFFECTIVE_AT, PRIVACY_POLICY_VERSION } from "@/lib/policy";
+
+/** "2026-11-02" → "2026년 11월 2일" */
+function ymdToKorean(ymd: string): string {
+  const [y, m, d] = ymd.split("-").map((v) => parseInt(v, 10));
+  return `${y}년 ${m}월 ${d}일`;
+}
 
 export const metadata: Metadata = {
   title: "개인정보 처리방침",
@@ -25,7 +32,8 @@ export default function PrivacyPolicyPage() {
             <p>센터는 다음 목적을 위해 개인정보를 처리합니다. 처리한 개인정보는 해당 목적 이외의 용도로 이용하지 않으며, 목적이 변경되는 경우 별도의 동의를 받는 등 필요한 조치를 이행합니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
               <li>시설 대관·갤러리 전시 신청접수 및 처리</li>
-              <li>신청자 본인 확인 및 의사소통 경로 확보</li>
+              <li>의사소통 경로 확보</li>
+              <li>생년월일: 신청자 확인 및 미성년자 보호자 동의 확인(신청 내역 조회 인증에는 쓰지 않음)</li>
               <li>대관료·이용료 안내 및 결제 관련 연락</li>
               <li>시설 이용 관련 통계 작성(개인을 식별할 수 없는 형태)</li>
             </ul>
@@ -135,8 +143,8 @@ export default function PrivacyPolicyPage() {
           <Section number={10} title="개인정보 처리방침의 변경">
             <p>이 개인정보 처리방침은 시행일로부터 적용되며, 변경 사항이 있는 경우 시행 7일 전부터 본 페이지를 통해 공지합니다.</p>
             <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-4 text-sm">
-              <p><strong>공고일:</strong> 2026년 3월 17일</p>
-              <p><strong>시행일:</strong> 2026년 3월 17일</p>
+              <p><strong>공고일:</strong> {ymdToKorean(PRIVACY_POLICY_ANNOUNCED_AT)}</p>
+              <p><strong>시행일:</strong> {ymdToKorean(PRIVACY_POLICY_EFFECTIVE_AT)}</p>
             </div>
 
             <h4 className="mt-4 text-sm font-semibold text-slate-800">변경 이력</h4>
@@ -149,6 +157,11 @@ export default function PrivacyPolicyPage() {
                 </tr>
               </thead>
               <tbody>
+                <tr>
+                  <td className="border border-slate-300 px-3 py-2">{PRIVACY_POLICY_VERSION}</td>
+                  <td className="border border-slate-300 px-3 py-2">{PRIVACY_POLICY_EFFECTIVE_AT.replace(/-/g, ".")}</td>
+                  <td className="border border-slate-300 px-3 py-2">생년월일 수집 목적 명시(신청자 확인 및 미성년자 보호자 동의 확인), 신청 내역 조회 방식을 이메일 조회 링크로 변경</td>
+                </tr>
                 <tr>
                   <td className="border border-slate-300 px-3 py-2">v1.2</td>
                   <td className="border border-slate-300 px-3 py-2">2026.03.17</td>

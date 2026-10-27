@@ -17,7 +17,7 @@ export const revalidate = 0;
  * - fields에 개인정보(전화·이메일·주소·생년월일) 없음 · 개인 이름은 가운데 마스킹
  */
 export async function GET(req: Request, { params }: { params: { id: string } }) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
 
   try {

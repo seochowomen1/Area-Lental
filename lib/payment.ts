@@ -331,3 +331,26 @@ export function publicPaymentText(view: PaymentView): string {
       return "-";
   }
 }
+
+/* ── 목록 삭제 보호 (audit-fix-1 [8]) ── */
+
+export type DeletionBlockReason = "payment" | "homepage";
+
+/** 삭제 차단 사유 표시 문구 (01_spec ③-I) */
+export const DELETION_BLOCK_LABEL: Record<DeletionBlockReason, string> = {
+  payment: "결제·환불 기록",
+  homepage: "홈페이지 마감 전",
+};
+
+/**
+ * 반려·취소 건이라도 목록에서 지우면 안 되는 사유
+ * - payment: 결제완료·환불 상태이거나 결제일·환불일 기록이 있음(결제 증빙)
+ * - homepage: 홈페이지에 게시했는데 마감 기록이 없음
+ * 화면(RequestTable 체크박스 잠금)과 서버(DELETE /api/admin/requests 409)가 같은 함수를 쓴다.
+ */
+export function deletionBlockReason(r: Pick<RentalRequest, "paymentStatus" | "paidAt" | "refundedAt" | "homepagePostedAt" | "homepageClosedAt">): DeletionBlockReason | null {
+  const ps = r.paymentStatus ?? "";
+  if (ps === "결제완료" || ps === "환불" || (r.paidAt ?? "").trim() || (r.refundedAt ?? "").trim()) return "payment";
+  if ((r.homepagePostedAt ?? "").trim() && !(r.homepageClosedAt ?? "").trim()) return "homepage";
+  return null;
+}

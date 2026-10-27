@@ -24,7 +24,7 @@ function is30Min(v: string) {
 }
 
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const db = getDatabase();
@@ -37,7 +37,7 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const body = (await req.json()) as Partial<ClassSchedule>;
@@ -108,7 +108,7 @@ export async function POST(req: Request) {
 }
 
 export async function PATCH(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const body = (await req.json()) as Partial<ClassSchedule> & { id?: string };
@@ -170,7 +170,7 @@ export async function PATCH(req: Request) {
 }
 
 export async function DELETE(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
   try {
     const url = new URL(req.url);

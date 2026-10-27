@@ -82,7 +82,7 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree, varia
                   {isGallery ? "갤러리 전시 신청업무 처리 및" : "시설 대관 신청업무 처리 및"}<br />의사소통 경로 확보
                 </td>
                 <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  성명(대표자 성명), 생년월일, 연락처,<br />E-mail, 주소, 단체명, 인원 수,<br />
+                  성명(대표자 성명), 연락처,<br />E-mail, 주소, 단체명, 인원 수,<br />
                   {isGallery ? (
                     <>사용 목적, 전시명, 전시 목적,<br />장르·내용, 서약자 성명</>
                   ) : (
@@ -93,8 +93,19 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree, varia
                   수집일로부터 3년 및 {isGallery ? "전시 목적" : "대관목적"}<br />달성 시 지체없이 해당정보 파기
                 </td>
               </tr>
+              <tr>
+                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
+                  신청자 확인 및<br />미성년자 보호자 동의 확인
+                </td>
+                <td className="border border-slate-300 px-3 py-2 text-center leading-5">생년월일</td>
+                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
+                  수집일로부터 3년 및 {isGallery ? "전시 목적" : "대관목적"}<br />달성 시 지체없이 해당정보 파기
+                </td>
+              </tr>
             </tbody>
           </table>
+
+          <p className="mt-2 text-xs leading-relaxed text-slate-600">※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.</p>
 
           <p className="mt-3 text-xs text-slate-600 leading-relaxed">
             ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 {isGallery ? "전시 신청·진행" : "대관 신청·진행"}에 일부 제한이 있습니다.

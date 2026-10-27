@@ -18,11 +18,18 @@ import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
 import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
 import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
+import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
+import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
+import { PAYMENT_FLOW_SHORT } from "@/lib/policy";
+import { GALLERY_FEE_KRW } from "@/lib/constants";
+import { availablePrepDates, planGallery } from "@/lib/galleryPlan";
+import { useGalleryMonthData, galleryMonthsForRange, formatExcludedHolidays } from "@/lib/useGalleryMonthData";
+import { handleApplySuccess, parseApplyError } from "@/lib/applySubmit";
 
 // 갤러리 신청(B안): 기간(start/end) 선택 → 회차 자동 생성
-// - 일요일 자동 제외
-// - 준비(세팅)일 1일 무료: 시작일 이전 1일(일요일이면 직전 영업일)
-// - 공휴일 자동 제외 X (Blocks로 처리)
+// - 회차·일수·이용료는 lib/galleryPlan.ts planGallery() 한 곳에서 계산(상세 달력·서버와 같은 함수 · audit-fix-1 [3])
+// - 일요일·공휴일 자동 제외(공휴일은 /api/booked-dates holidays)
+// - 준비(세팅)일 1일 무료: 후보 = availablePrepDates()(일요일·공휴일 제외)
 
 function formatPhoneKR(input: string) {
   const digits = input.replace(/\D/g, "").slice(0, 11);
@@ -97,27 +104,6 @@ function dowLabel(ymd: string): string {
 }
 
 /**
- * 전시 시작일 기준으로 준비일 후보를 반환합니다.
- * 일요일(휴관)은 제외하며, 기본 7개까지 반환합니다.
- */
-function getAvailablePrepDates(startDate: string, count = 7): string[] {
-  if (!isYmd(startDate)) return [];
-  const today = todayYmdSeoul();
-  const dates: string[] = [];
-  let cur = addDays(startDate, -1);
-  let safety = 0;
-  while (dates.length < count && safety++ < 30) {
-    // 과거 날짜는 후보에서 제외
-    if (cur < today) break;
-    if (dayOfWeekLocal(cur) !== 0) {
-      dates.push(cur);
-    }
-    cur = addDays(cur, -1);
-  }
-  return dates;
-}
-
-/**
  * 준비일 후보에서 예약 충돌이 있는 날짜를 만나면 해당 날짜 이후(과거 방향)를 모두 제거합니다.
  * 예: 후보=[2/11, 2/10, 2/9, 2/8, 2/7, 2/6, 2/5], 2/6 충돌
  *   → 결과=[2/11, 2/10, 2/9, 2/8, 2/7] (2/6 이후 전부 잘림)
@@ -160,56 +146,6 @@ function teardownTimeOptions(deadline: string): string[] {
   return out;
 }
 
-type SessionInput = { date: string; startTime: string; endTime: string };
-
-function buildGallerySessions(startDate: string, endDate: string, selectedPrepDate?: string, prepAfterExhibition = false): {
-  prepDate: string | null;
-  sessions: SessionInput[];
-} {
-  if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) {
-    return { prepDate: null, sessions: [] };
-  }
-
-  // 준비일 결정
-  const prepDate = (selectedPrepDate && isYmd(selectedPrepDate)) ? selectedPrepDate : null;
-
-  const sessions: SessionInput[] = [];
-  // 전시 기간(포함)
-  let cur = startDate;
-  const safetyCap = 400;
-  let count = 0;
-  while (cur <= endDate) {
-    if (count++ > safetyCap) break;
-    const dow = dayOfWeekLocal(cur);
-    if (dow === 0) {
-      cur = addDays(cur, 1);
-      continue;
-    }
-    if (dow === 6) sessions.push({ date: cur, startTime: "09:00", endTime: "13:00" });
-    else if (dow === 2) sessions.push({ date: cur, startTime: "09:00", endTime: "20:00" });
-    else sessions.push({ date: cur, startTime: "09:00", endTime: "18:00" });
-    cur = addDays(cur, 1);
-  }
-
-  // 준비일 세션 추가
-  if (prepDate && prepDate < startDate) {
-    const dow = dayOfWeekLocal(prepDate);
-    if (dow !== 0) {
-      // 앞 전시의 마지막 날이면 철거 후(평일 17:00 · 토 11:00) 이후부터
-      const startTime = prepAfterExhibition ? prepAfterStartTime(prepDate) : "09:00";
-      if (dow === 6) sessions.unshift({ date: prepDate, startTime, endTime: "13:00" });
-      else if (dow === 2) sessions.unshift({ date: prepDate, startTime, endTime: "20:00" });
-      else sessions.unshift({ date: prepDate, startTime, endTime: "18:00" });
-    }
-  }
-
-  // de-dup + sort
-  const uniq = new Map<string, SessionInput>();
-  for (const s of sessions) uniq.set(`${s.date}|${s.startTime}|${s.endTime}`, s);
-  const out = Array.from(uniq.values()).sort((a, b) => (a.date + a.startTime).localeCompare(b.date + b.startTime));
-  return { prepDate, sessions: out };
-}
-
 function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string; galleryRemovalTime?: string; galleryPrepDate?: string }) {
   // RequestInputSchema의 purpose(min 5) 충족 + 담당자 확인 편의
   const lines: string[] = [];
@@ -229,6 +165,7 @@ export default function ApplyGalleryClient() {
 
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorTitle, setErrorTitle] = useState("처리 중 오류가 발생했습니다");
   const [batchError, setBatchError] = useState<string | null>(null);
 
   const [privacyOpen, setPrivacyOpen] = useState(false);
@@ -255,7 +192,7 @@ export default function ApplyGalleryClient() {
     watch,
     setValue,
     clearErrors,
-    formState: { errors }
+    formState: { errors, submitCount }
   } = useForm<GalleryApplyValues>({
     resolver: zodResolver(GalleryApplySchema),
     defaultValues: {
@@ -328,49 +265,18 @@ export default function ApplyGalleryClient() {
   const galleryRemovalTime = watch("galleryRemovalTime");
   const galleryPrepDate = watch("galleryPrepDate");
 
-  // 준비일 후보에 대한 예약 충돌 조회
-  const [prepBookedDates, setPrepBookedDates] = useState<Set<string>>(new Set());
-  /** 기존 전시의 마지막 날(철거일) — 철거 후 준비 가능 */
-  const [prepEndDates, setPrepEndDates] = useState<Set<string>>(new Set());
+  // ★ [3] 공휴일·예약 현황 — 준비일 후보 첫날이 속한 달 ~ 종료일이 속한 달(최대 3회 호출)
+  const monthKeys = useMemo(() => galleryMonthsForRange(startDate, endDate), [startDate, endDate]);
+  const monthData = useGalleryMonthData(monthKeys);
+  const holidaySet = monthData.holidaySet;
+  const prepBookedDates = monthData.booked;
+  const prepEndDates = monthData.exhibitionEnds;
+  const holidaysPending = monthData.status === "loading";
 
-  useEffect(() => {
-    if (!isYmd(startDate)) {
-      setPrepBookedDates(new Set());
-      setPrepEndDates(new Set());
-      return;
-    }
-    const candidates = getAvailablePrepDates(startDate);
-    if (!candidates.length) return;
-
-    // 후보가 걸치는 월 목록을 구해서 예약 현황 조회
-    const months = new Set<string>();
-    for (const d of candidates) months.add(d.slice(0, 7));
-
-    const fetches = Array.from(months).map((m) =>
-      fetch(`/api/booked-dates?roomId=gallery&month=${m}`)
-        .then((r) => r.json())
-        .then((data) => ({
-          booked: data.ok && Array.isArray(data.bookedDates) ? (data.bookedDates as string[]) : [],
-          ends: data.ok && Array.isArray(data.exhibitionEndDates) ? (data.exhibitionEndDates as string[]) : [],
-        }))
-        .catch(() => ({ booked: [] as string[], ends: [] as string[] }))
-    );
-    Promise.all(fetches).then((results) => {
-      const all = new Set<string>();
-      const ends = new Set<string>();
-      for (const r of results) {
-        for (const d of r.booked) all.add(d);
-        for (const d of r.ends) ends.add(d);
-      }
-      setPrepBookedDates(all);
-      setPrepEndDates(ends);
-    });
-  }, [startDate]);
-
-  // 충돌 필터링: 충돌 날짜를 만나면 거기서 잘림 (그 날짜 이전은 선택 불가)
+  // 준비일 후보(일요일·공휴일·오늘 이전 제외) → 충돌 날짜를 만나면 거기서 잘림
   const filteredPrepDates = useMemo(
-    () => filterPrepDatesByConflict(getAvailablePrepDates(startDate), prepBookedDates, prepEndDates),
-    [startDate, prepBookedDates, prepEndDates]
+    () => (isYmd(startDate) ? filterPrepDatesByConflict(availablePrepDates(startDate, holidaySet, 7, todayYmdSeoul()), prepBookedDates, prepEndDates) : []),
+    [startDate, holidaySet, prepBookedDates, prepEndDates]
   );
   /** 선택한 준비일이 앞 전시의 마지막 날이면 철거 후(17:00/토 11:00) 이후 준비 */
   const prepAfterExhibition = Boolean(galleryPrepDate && prepBookedDates.has(galleryPrepDate) && prepEndDates.has(galleryPrepDate));
@@ -403,7 +309,12 @@ export default function ApplyGalleryClient() {
     setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
   }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate, setValue]);
 
-  const sessionsBundle = useMemo(() => buildGallerySessions(startDate, endDate, galleryPrepDate, prepAfterExhibition), [startDate, endDate, galleryPrepDate, prepAfterExhibition]);
+  // ★ [3] 회차·일수·이용료 = planGallery() (상세 달력·서버와 같은 함수)
+  const plan = useMemo(
+    () => planGallery({ startDate, endDate, prepDate: galleryPrepDate || null, prepAfterExhibition, holidays: holidaySet }),
+    [startDate, endDate, galleryPrepDate, prepAfterExhibition, holidaySet]
+  );
+  const sessionsBundle = plan;
 
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
   useEffect(() => {
@@ -437,6 +348,7 @@ export default function ApplyGalleryClient() {
 
   async function onSubmit(values: GalleryApplyValues) {
     setError(null);
+    setErrorTitle("처리 중 오류가 발생했습니다");
     setBatchError(null);
     setSubmitting(true);
 
@@ -460,39 +372,22 @@ export default function ApplyGalleryClient() {
         composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate })
       );
 
-      // 회차 자동 생성(서버에서 재생성/검증 단계는 추후 /api/requests에서 확장)
-      fd.set("sessions", JSON.stringify(sessionsBundle.sessions));
+      // 회차(서버는 기간으로 다시 만들고 검증한다)
+      fd.set("sessions", JSON.stringify(plan.sessions.map((s) => ({ date: s.date, startTime: s.startTime, endTime: s.endTime }))));
 
       const res = await fetch("/api/requests", { method: "POST", body: fd });
       if (!res.ok) {
         const data = await res.json().catch(() => null);
-        if (data?.code === "BATCH_CONFLICT" && Array.isArray(data?.issues)) {
-          const lines = data.issues
-            .map((it: any) => `• ${it.date}${it.startTime && it.endTime ? ` ${it.startTime}-${it.endTime}` : ""}: ${it.message}`)
-            .join("\n");
-          setBatchError(lines);
-        }
-        throw new Error(data?.message ?? "신청에 실패했습니다. 잠시 후 다시 시도해 주세요.");
+        // ★ [2][6] 409 BATCH_CONFLICT / SLOT_TAKEN · 400 SESSION_INVALID
+        const v = parseApplyError(data, true);
+        setErrorTitle(v.title);
+        if (v.issueLines.length) setBatchError(v.issueLines.join("\n"));
+        throw new Error(v.message);
       }
 
       const data = await res.json().catch(() => null);
-      const requestId = data?.requestId;
-      const batchId = String(data?.batchId ?? "");
-      const count = Number(data?.count ?? 1);
-      const token = String(data?.token ?? "");
-
-      // localStorage에 토큰 저장 (이메일 인증 없이 내 신청 조회 가능)
-      if (token) {
-        try { localStorage.setItem("applicantToken", token); } catch {}
-      }
-
-      const qp = new URLSearchParams();
-      if (requestId) qp.set("requestId", requestId);
-      if (batchId) qp.set("batchId", batchId);
-      if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
-      if (token) qp.set("token", token);
-      qp.set("category", "gallery");
-      router.push(qp.toString() ? `/success?${qp.toString()}` : "/success");
+      // ★ [1][10] 토큰은 sessionStorage(60분)에만 · 주소창에 넣지 않음
+      router.push(handleApplySuccess(data, { category: "gallery", screenFeeKRW: monthData.status === "ok" ? plan.totalFeeKRW : null }));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
     } finally {
@@ -502,25 +397,37 @@ export default function ApplyGalleryClient() {
 
   const sessionCount = sessionsBundle.sessions.length;
 
-  // 이용료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
-  const feeBreakdown = useMemo(() => {
-    if (!sessionsBundle.sessions.length) return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
-    let weekdays = 0;
-    let saturdays = 0;
-    let prepDays = 0;
-    for (const s of sessionsBundle.sessions) {
-      const isPrepDay = s.date === sessionsBundle.prepDate;
-      if (isPrepDay) {
-        prepDays++;
-        continue;
-      }
-      const dow = dayOfWeekLocal(s.date);
-      if (dow === 6) saturdays++;
-      else weekdays++;
+  // 이용료: planGallery 결과(평일·토 일수 × GALLERY_FEE_KRW · 준비일 무료)
+  const feeBreakdown = {
+    weekdays: plan.weekdayCount,
+    saturdays: plan.saturdayCount,
+    prepDays: plan.prepDate ? 1 : 0,
+    total: plan.totalFeeKRW,
+  };
+  const excludedHolidayText = formatExcludedHolidays(plan.excludedHolidays, monthData.holidayNames);
+
+  /** 빠진 항목 — 버튼이 비활성이거나 제출 뒤 오류가 있으면 버튼 위에 보인다(ux.md Top④) */
+  const missingFields: MissingField[] = (() => {
+    const out: MissingField[] = [];
+    const add = (key: string, label: string, targetId: string) => {
+      if (!out.some((x) => x.key === key)) out.push({ key, label, targetId });
+    };
+    if (sessionCount === 0 || errors.startDate || errors.endDate) add("period", "전시 기간", "startDate");
+    if (!exhibitionTitle || errors.exhibitionTitle) add("exhibitionTitle", "전시명", "exhibitionTitle");
+    if (!galleryRemovalTime || errors.galleryRemovalTime) add("galleryRemovalTime", "철수 시간", isYmd(endDate) ? "galleryRemovalTime" : "endDate");
+    if (submitCount > 0) {
+      if (errors.applicantName) add("applicantName", "성명", "applicantName");
+      if (errors.birth) add("birth", "생년월일", "birthYear");
+      if (errors.address) add("address", "주소", "address");
+      if (errors.phone) add("phone", "연락처", "phone");
+      if (errors.email) add("email", "이메일", "email");
+      if (errors.orgName) add("orgName", "단체명", "orgName");
+      if (errors.privacyAgree) add("privacyAgree", "개인정보 동의", "privacyAgreeBox");
+      if (errors.pledgeAgree) add("pledgeAgree", "서약 동의", "pledgeAgreeBox");
+      if (errors.pledgeName) add("pledgeName", "서약자 성명", "pledgeName");
     }
-    const total = weekdays * 20000 + saturdays * 10000;
-    return { weekdays, saturdays, prepDays, total };
-  }, [sessionsBundle]);
+    return out;
+  })();
 
   const hasSundayInRange = useMemo(() => {
     if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return false;
@@ -547,7 +454,7 @@ export default function ApplyGalleryClient() {
 
           {error && (
             <div className="mt-4">
-              <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">{error}</Notice>
+              <Notice variant="danger" title={errorTitle} pad="md">{error}</Notice>
             </div>
           )}
           {batchError && (
@@ -655,16 +562,17 @@ export default function ApplyGalleryClient() {
                 <div className="px-4 py-3 space-y-2">
                   {feeBreakdown.weekdays > 0 && (
                     <div className="flex items-center justify-between text-sm text-slate-600">
-                      <span>평일 {feeBreakdown.weekdays}일 x 20,000원</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                      <span>평일 {feeBreakdown.weekdays}일 x {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
+                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
                     </div>
                   )}
                   {feeBreakdown.saturdays > 0 && (
                     <div className="flex items-center justify-between text-sm text-slate-600">
-                      <span>토요일 {feeBreakdown.saturdays}일 x 10,000원</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                      <span>토요일 {feeBreakdown.saturdays}일 x {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
+                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
                     </div>
                   )}
+                  {excludedHolidayText ? <p className="text-xs text-slate-500">{excludedHolidayText}</p> : null}
                   {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
                     <div className="flex items-center justify-between text-sm text-emerald-600">
                       <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
@@ -674,7 +582,7 @@ export default function ApplyGalleryClient() {
                 </div>
                 <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
                   <span className="text-sm font-bold text-slate-900">합계</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
                 </div>
               </div>
             </Card>
@@ -684,8 +592,8 @@ export default function ApplyGalleryClient() {
               <Button type="button" variant="outline" className="flex-1 py-3" onClick={() => setConfirmData(null)}>
                 수정하기
               </Button>
-              <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting} onClick={submitConfirmed}>
-                {submitting ? "제출 중..." : "최종 제출"}
+              <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting || holidaysPending} onClick={submitConfirmed}>
+                {submitting ? "제출 중..." : holidaysPending ? "공휴일 확인 중…" : "최종 제출"}
               </Button>
             </div>
           </div>
@@ -710,10 +618,11 @@ export default function ApplyGalleryClient() {
           <Notice title="신청 전 확인" variant="info" pad="md">
             <ul className="list-disc space-y-1 pl-5">
               <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
-              <li>일요일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. (날짜 선택 가능)</li>
+              <li>일요일·공휴일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. (날짜 선택 가능)</li>
               <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
               <li><b>철거</b>: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수입니다.</li>
               <li><b>준비</b>: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 가능합니다.</li>
+              <li><PaymentFlowText text={PAYMENT_FLOW_SHORT("전시")} bold={paymentFlowBold("전시", "short")} /></li>
               <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
             </ul>
           </Notice>
@@ -730,7 +639,7 @@ export default function ApplyGalleryClient() {
           <input type="hidden" value="false" {...register("audio")} />
 
           {error ? (
-            <Notice variant="danger" title="처리 중 오류가 발생했습니다" pad="md">
+            <Notice variant="danger" title={errorTitle} pad="md">
               {error}
             </Notice>
           ) : null}
@@ -796,8 +705,20 @@ export default function ApplyGalleryClient() {
                   {errors.galleryPrepDate?.message ? <FieldHelp className="text-red-600">{errors.galleryPrepDate.message}</FieldHelp> : null}
                 </div>
               )}
-              {hasSundayInRange ? (
-                <p className="mt-2 text-xs text-slate-600">선택한 기간에 일요일이 포함되어 있으면 자동으로 제외됩니다.</p>
+              {excludedHolidayText ? (
+                <p className="mt-2 text-xs text-slate-600">{excludedHolidayText}</p>
+              ) : hasSundayInRange ? (
+                <p className="mt-2 text-xs text-slate-600">선택한 기간의 일요일은 휴관이라 빠집니다.</p>
+              ) : null}
+              {monthData.status === "error" ? (
+                <div className="mt-3">
+                  <Notice variant="warn">
+                    공휴일 정보를 불러오지 못해 예상 이용료가 실제와 다를 수 있습니다.{" "}
+                    <button type="button" onClick={monthData.reload} className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+                      다시 불러오기
+                    </button>
+                  </Notice>
+                </div>
               ) : null}
             </div>
 
@@ -812,14 +733,14 @@ export default function ApplyGalleryClient() {
                   <div className="space-y-2">
                     {feeBreakdown.weekdays > 0 && (
                       <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                        <span>평일 {feeBreakdown.weekdays}일 × {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
+                        <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
                       </div>
                     )}
                     {feeBreakdown.saturdays > 0 && (
                       <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                        <span>토요일 {feeBreakdown.saturdays}일 × {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
+                        <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
                       </div>
                     )}
                     {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
@@ -831,7 +752,7 @@ export default function ApplyGalleryClient() {
                   </div>
                   <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
                     <span className="text-sm font-bold text-slate-900">합계</span>
-                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
                   </div>
                   <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
                 </div>
@@ -839,7 +760,7 @@ export default function ApplyGalleryClient() {
             )}
 
             <FieldHelp className="mt-2">
-              ※ 일요일은 자동 제외되며, 공휴일은 담당자 차단으로 관리됩니다.
+              ※ 일요일·공휴일은 휴관이라 회차와 이용료에서 자동으로 빠집니다.
             </FieldHelp>
 
             {/* 철수시간 설정 */}
@@ -1029,6 +950,7 @@ export default function ApplyGalleryClient() {
                     setPrivacyOpen(true);
                   }
                 }}
+                id="privacyAgreeBox"
                 label="개인정보 수집·이용에 동의합니다. (필수)"
                 error={errors.privacyAgree?.message}
               />
@@ -1049,6 +971,7 @@ export default function ApplyGalleryClient() {
                     setPledgeOpen(true);
                   }
                 }}
+                id="pledgeAgreeBox"
                 label="서약 내용에 동의합니다. (필수)"
                 error={errors.pledgeAgree?.message}
               />
@@ -1085,6 +1008,7 @@ export default function ApplyGalleryClient() {
           {sessionCount === 0 && !startDate && !endDate ? (
             <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
           ) : null}
+          <MissingFieldsSummary items={missingFields} />
           <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0 || !galleryRemovalTime} className="w-full py-3 shadow-sm hover:opacity-90">
             {submitting ? "신청 중..." : "신청하기"}
           </Button>
@@ -1104,6 +1028,7 @@ export default function ApplyGalleryClient() {
         />
 
         <PledgeModal
+          roomId="gallery"
           open={pledgeOpen}
           onClose={() => setPledgeOpen(false)}
           onAgree={() => {

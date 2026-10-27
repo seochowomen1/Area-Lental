@@ -7,7 +7,10 @@ import { GALLERY_FEE_KRW } from "@/lib/constants";
 export type FeeBreakdown = {
   durationHours: number;
   hourlyFeeKRW: number;
+  /** 대관료 — 초과 인원 가산 포함 */
   rentalFeeKRW: number;
+  /** 초과 인원 가산(rentalFeeKRW에 포함 · 표시용) */
+  extraHeadcountFeeKRW: number;
   equipmentFeeKRW: number;
   totalFeeKRW: number;
   discountRatePct: number;
@@ -28,13 +31,40 @@ export function computeDurationHours(startTime: string, endTime: string): number
   return Math.round(hours * 100) / 100;
 }
 
+/**
+ * 초과 인원 1인당 시간당 가산액 (E-스튜디오: round(20,000 × 50%) = 10,000 · 그 외 0)
+ * — 조례 별표1 "기준 인원 초과 시 50% 가산"의 1인당 해석(⑧-1 확정)
+ */
+export function extraPersonHourlyKRW(roomId: string): number {
+  const room = ROOMS_BY_ID[roomId];
+  if (!room || !room.baseHeadcount || !room.extraPersonRatePct) return 0;
+  return Math.round((room.feeKRW * room.extraPersonRatePct) / 100);
+}
+
+/**
+ * 초과 인원 가산 금액 = max(0, 인원 − 기본 인원) × 1인당 시간당 가산액 × 이용시간
+ * - 인원이 없거나(undefined·0) 기본 인원 이하이면 0 → 기존 스튜디오 행(인원 1 저장)은 금액 불변
+ */
+export function computeExtraHeadcountFeeKRW(roomId: string, headcount: number | undefined, durationHours: number): number {
+  const perHour = extraPersonHourlyKRW(roomId);
+  if (!perHour) return 0;
+  const base = ROOMS_BY_ID[roomId]?.baseHeadcount ?? 0;
+  const n = Math.floor(Number(headcount ?? 0));
+  const extra = Number.isFinite(n) ? Math.max(0, n - base) : 0;
+  const hours = Number.isFinite(durationHours) && durationHours > 0 ? durationHours : 0;
+  return Math.round(extra * perHour * hours);
+}
+
 export function computeBaseTotalKRW(
   req: Pick<RentalRequest, "roomId" | "startTime" | "endTime" | "equipment" | "date" | "isPrepDay">
-    & Partial<Pick<RentalRequest, "batchId" | "startDate" | "endDate" | "galleryWeekdayCount" | "gallerySaturdayCount" | "galleryExhibitionDayCount">>
+    & Partial<Pick<RentalRequest, "batchId" | "startDate" | "endDate" | "galleryWeekdayCount" | "gallerySaturdayCount" | "galleryExhibitionDayCount" | "headcount">>
 ): {
   durationHours: number;
   hourlyFeeKRW: number;
+  /** 대관료 — 초과 인원 가산 포함 */
   rentalFeeKRW: number;
+  /** 초과 인원 가산(rentalFeeKRW에 포함) */
+  extraHeadcountFeeKRW: number;
   equipmentFeeKRW: number;
   totalFeeKRW: number;
 } {
@@ -47,7 +77,7 @@ export function computeBaseTotalKRW(
       ((req.galleryWeekdayCount ?? 0) > 0 || (req.gallerySaturdayCount ?? 0) > 0 || (req.galleryExhibitionDayCount ?? 0) > 0)
     ) {
       const rentalFeeKRW = (req.galleryWeekdayCount ?? 0) * GALLERY_FEE_KRW.WEEKDAY + (req.gallerySaturdayCount ?? 0) * GALLERY_FEE_KRW.SATURDAY;
-      return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW: 0, totalFeeKRW: rentalFeeKRW };
+      return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, extraHeadcountFeeKRW: 0, equipmentFeeKRW: 0, totalFeeKRW: rentalFeeKRW };
     }
     // ── 기존 다행(배치) 형식: 개별 일자로 1일분 요금 ──
     const dow = dayOfWeek(req.date);
@@ -56,14 +86,15 @@ export function computeBaseTotalKRW(
     const rentalFeeKRW = req.isPrepDay ? 0 : isSunday ? 0 : isSaturday ? GALLERY_FEE_KRW.SATURDAY : GALLERY_FEE_KRW.WEEKDAY;
     const equipmentFeeKRW = 0;
     const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
-    return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };
+    return { durationHours: 0, hourlyFeeKRW: 0, rentalFeeKRW, extraHeadcountFeeKRW: 0, equipmentFeeKRW, totalFeeKRW };
   }
 
   const room = ROOMS_BY_ID[req.roomId];
   const hourlyFeeKRW = room?.feeKRW ?? 0;
   const durationHours = computeDurationHours(req.startTime, req.endTime);
 
-  const rentalFeeKRW = Math.round(hourlyFeeKRW * durationHours);
+  const extraHeadcountFeeKRW = computeExtraHeadcountFeeKRW(req.roomId, req.headcount, durationHours);
+  const rentalFeeKRW = Math.round(hourlyFeeKRW * durationHours) + extraHeadcountFeeKRW;
 
   const isStudio = room?.category === "studio";
   const equipmentFeeKRW = isStudio
@@ -78,7 +109,7 @@ export function computeBaseTotalKRW(
       (req.equipment?.audio ? EQUIPMENT_FEE_KRW.audio : 0);
 
   const totalFeeKRW = Math.max(0, rentalFeeKRW + equipmentFeeKRW);
-  return { durationHours, hourlyFeeKRW, rentalFeeKRW, equipmentFeeKRW, totalFeeKRW };
+  return { durationHours, hourlyFeeKRW, rentalFeeKRW, extraHeadcountFeeKRW, equipmentFeeKRW, totalFeeKRW };
 }
 
 /**
@@ -186,6 +217,7 @@ export function computeFeesForBundle(reqs: RentalRequest[]): FeeBreakdown {
       durationHours: 0,
       hourlyFeeKRW: 0,
       rentalFeeKRW: 0,
+      extraHeadcountFeeKRW: 0,
       equipmentFeeKRW: 0,
       totalFeeKRW: 0,
       discountRatePct: 0,
@@ -199,6 +231,7 @@ export function computeFeesForBundle(reqs: RentalRequest[]): FeeBreakdown {
   const totalFeeKRW = baseList.reduce((acc, b) => acc + (b.totalFeeKRW ?? 0), 0);
   const rentalFeeKRW = baseList.reduce((acc, b) => acc + (b.rentalFeeKRW ?? 0), 0);
   const equipmentFeeKRW = baseList.reduce((acc, b) => acc + (b.equipmentFeeKRW ?? 0), 0);
+  const extraHeadcountFeeKRW = baseList.reduce((acc, b) => acc + (b.extraHeadcountFeeKRW ?? 0), 0);
   const durationHours = baseList.reduce((acc, b) => acc + (b.durationHours ?? 0), 0);
 
   const first = list[0];
@@ -223,6 +256,7 @@ export function computeFeesForBundle(reqs: RentalRequest[]): FeeBreakdown {
     durationHours: Math.round(durationHours * 100) / 100,
     hourlyFeeKRW: 0,
     rentalFeeKRW: Math.round(rentalFeeKRW),
+    extraHeadcountFeeKRW: Math.round(extraHeadcountFeeKRW),
     equipmentFeeKRW: Math.round(equipmentFeeKRW),
     totalFeeKRW: Math.max(0, Math.round(totalFeeKRW)),
     discountRatePct,

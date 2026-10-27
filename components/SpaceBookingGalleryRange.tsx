@@ -7,7 +7,9 @@ import Button from "@/components/ui/Button";
 import { FieldHelp } from "@/components/ui/Field";
 import { cn } from "@/lib/cn";
 import { CARD_BASE } from "@/components/ui/presets";
-import { GALLERY_RULES } from "@/lib/constants";
+import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
+import { defaultPrepDate as computeDefaultPrepDate, planGallery } from "@/lib/galleryPlan";
+import { formatExcludedHolidays, galleryMonthsForRange, useGalleryMonthData } from "@/lib/useGalleryMonthData";
 
 function isYmd(v: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(v);
@@ -95,21 +97,11 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       .catch(() => {});
   }, [month]);
 
-  // 전시일 수 계산: 일요일·공휴일 제외
-  const days = useMemo(() => {
-    if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return 0;
-    let count = 0;
-    let cur = startDate;
-    let guard = 0;
-    while (cur <= endDate && guard++ < 400) {
-      const dow = dayOfWeekLocal(cur);
-      if (dow !== 0 && !holidayMap.has(cur)) count++;
-      const d = toDateLocal(cur);
-      d.setDate(d.getDate() + 1);
-      cur = dateToYmdLocal(d);
-    }
-    return count;
-  }, [startDate, endDate, holidayMap]);
+  // ★ [3] 선택 기간(준비일 후보 포함)이 걸친 달의 공휴일·예약 현황 — 회차·금액은 planGallery() 한 곳에서 계산
+  const rangeMonths = useMemo(() => galleryMonthsForRange(startDate, endDate), [startDate, endDate]);
+  const rangeData = useGalleryMonthData(rangeMonths);
+  const rangeHolidays = rangeData.holidaySet;
+  const holidaysPending = rangeData.status === "loading";
 
   // 기본 준비일 계산 (준비·철거 규정 2026-10-19)
   // - 시작일 직전 운영일(일요일·공휴일만 건너뜀). 마감일을 피해 더 이전으로 밀지 않는다.
@@ -117,52 +109,32 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
   // - 그날이 지났거나(오늘 포함) 전시 중간·내부 차단이면 준비일 없음
   const prepInfo = useMemo(() => {
     if (!isYmd(startDate)) return { date: "", afterExhibition: false };
-    let prepYmd = startDate;
-    let safety = 0;
-    do {
-      const d = toDateLocal(prepYmd);
-      d.setDate(d.getDate() - 1);
-      prepYmd = dateToYmdLocal(d);
-    } while ((dayOfWeekLocal(prepYmd) === 0 || holidayMap.has(prepYmd)) && safety++ < 14);
+    const prepYmd = computeDefaultPrepDate(startDate, rangeHolidays);
     if (!isYmd(prepYmd) || prepYmd <= dateToYmdLocal(new Date())) return { date: "", afterExhibition: false };
-    if (bookedDates.has(prepYmd)) {
-      if (exhibitionEndDates.has(prepYmd)) return { date: prepYmd, afterExhibition: true };
+    if (rangeData.booked.has(prepYmd)) {
+      if (rangeData.exhibitionEnds.has(prepYmd)) return { date: prepYmd, afterExhibition: true };
       return { date: "", afterExhibition: false };
     }
     return { date: prepYmd, afterExhibition: false };
-  }, [startDate, bookedDates, exhibitionEndDates, holidayMap]);
+  }, [startDate, rangeHolidays, rangeData.booked, rangeData.exhibitionEnds]);
   const defaultPrepDate = prepInfo.date;
   const prepAfterLabel = prepInfo.afterExhibition
     ? `${dayOfWeekLocal(prepInfo.date) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY} 이후`
     : "";
 
-  // 이용료 자동 계산: 평일 20,000원/일, 토요일 10,000원/일, 준비일 무료
-  const feeBreakdown = useMemo(() => {
-    if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) {
-      return { weekdays: 0, saturdays: 0, prepDays: 0, total: 0 };
-    }
-
-    let weekdays = 0;
-    let saturdays = 0;
-    const prepDays = defaultPrepDate ? 1 : 0;
-
-    // 전시 기간 카운트 (일요일·공휴일 제외)
-    let cur = startDate;
-    let guard = 0;
-    while (cur <= endDate && guard++ < 400) {
-      const dow = dayOfWeekLocal(cur);
-      if (dow !== 0 && !holidayMap.has(cur)) {
-        if (dow === 6) saturdays++;
-        else weekdays++;
-      }
-      const d = toDateLocal(cur);
-      d.setDate(d.getDate() + 1);
-      cur = dateToYmdLocal(d);
-    }
-
-    const total = weekdays * 20000 + saturdays * 10000;
-    return { weekdays, saturdays, prepDays, total };
-  }, [startDate, endDate, defaultPrepDate, holidayMap]);
+  // 이용료: planGallery()(평일·토 일수 × GALLERY_FEE_KRW · 준비일 무료) — 신청서·서버와 같은 함수
+  const plan = useMemo(
+    () => planGallery({ startDate, endDate, prepDate: defaultPrepDate || null, prepAfterExhibition: prepInfo.afterExhibition, holidays: rangeHolidays }),
+    [startDate, endDate, defaultPrepDate, prepInfo.afterExhibition, rangeHolidays]
+  );
+  const days = plan.exhibitionDayCount;
+  const feeBreakdown = {
+    weekdays: plan.weekdayCount,
+    saturdays: plan.saturdayCount,
+    prepDays: plan.prepDate ? 1 : 0,
+    total: plan.totalFeeKRW,
+  };
+  const excludedHolidayText = formatExcludedHolidays(plan.excludedHolidays, rangeData.holidayNames);
 
   const canSubmit = Boolean(startDate) && Boolean(endDate) && !error;
 
@@ -500,6 +472,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         {!error && days > 0 ? (
           <div className="space-y-1">
             <FieldHelp>선택 기간: {days}일 (일요일·공휴일 자동 제외)</FieldHelp>
+            {excludedHolidayText ? <FieldHelp>{excludedHolidayText}</FieldHelp> : null}
             {defaultPrepDate ? (
               <FieldHelp>
                 준비일: {defaultPrepDate} ({dowLabel(defaultPrepDate)}){prepAfterLabel ? ` — 앞 전시 철거 후 ${prepAfterLabel} 입장` : ""} — 신청서에서 변경 가능
@@ -510,6 +483,15 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           </div>
         ) : null}
       </div>
+
+      {rangeData.status === "error" ? (
+        <div className="mt-3 rounded-lg border-l-[3px] border-l-amber-500 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
+          공휴일 정보를 불러오지 못해 예상 이용료가 실제와 다를 수 있습니다.{" "}
+          <button type="button" onClick={rangeData.reload} className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+            다시 불러오기
+          </button>
+        </div>
+      ) : null}
 
       {/* 이용료 자동 계산 */}
       {!error && days > 0 && (feeBreakdown.weekdays > 0 || feeBreakdown.saturdays > 0) && (
@@ -522,14 +504,14 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
             <div className="space-y-2">
               {feeBreakdown.weekdays > 0 && (
                 <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>평일 {feeBreakdown.weekdays}일 × 20,000원</span>
-                  <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * 20000).toLocaleString()}원</span>
+                  <span>평일 {feeBreakdown.weekdays}일 × {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
+                  <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
                 </div>
               )}
               {feeBreakdown.saturdays > 0 && (
                 <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>토요일 {feeBreakdown.saturdays}일 × 10,000원</span>
-                  <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * 10000).toLocaleString()}원</span>
+                  <span>토요일 {feeBreakdown.saturdays}일 × {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
+                  <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
                 </div>
               )}
               {feeBreakdown.prepDays > 0 && defaultPrepDate && (
@@ -541,7 +523,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
             </div>
             <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
               <span className="text-sm font-bold text-slate-900">합계</span>
-              <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{feeBreakdown.total.toLocaleString()}원</span>
+              <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
             </div>
             <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
           </div>

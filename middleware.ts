@@ -1,20 +1,7 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
-import { ADMIN_COOKIE_NAME, ADMIN_SIGN_MESSAGE, ADMIN_ACTIVITY_COOKIE, ADMIN_INACTIVITY_TIMEOUT_MS } from "@/lib/adminConstants";
-
-function toHex(buffer: ArrayBuffer) {
-  const bytes = new Uint8Array(buffer);
-  let hex = "";
-  for (const b of bytes) hex += b.toString(16).padStart(2, "0");
-  return hex;
-}
-
-async function tokenFor(adminPassword: string) {
-  const enc = new TextEncoder();
-  const data = enc.encode(`${adminPassword}::${ADMIN_SIGN_MESSAGE}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-  return toHex(digest);
-}
+import { ADMIN_COOKIE_NAME, ADMIN_ACTIVITY_COOKIE, ADMIN_SESSION_MAX_AGE_SEC, ADMIN_UNAUTHORIZED_MESSAGE } from "@/lib/adminConstants";
+import { checkAdminCookies, sessionKeySource, signActivity } from "@/lib/adminSession";
 
 /* ── 페이지뷰 남용 방지용 Edge Rate Limiter ──────────────────────── */
 type RLEntry = { count: number; resetAt: number };
@@ -150,9 +137,8 @@ export async function middleware(req: NextRequest) {
     return withSecurityHeaders(NextResponse.next());
   }
 
-  // ADMIN_PASSWORD_HASH (bcrypt) 또는 ADMIN_PASSWORD (레거시) 지원
-  const tokenSource = process.env.ADMIN_PASSWORD_HASH || process.env.ADMIN_PASSWORD;
-  if (!tokenSource) {
+  // ADMIN_PASSWORD_HASH (bcrypt) 또는 ADMIN_PASSWORD (레거시) — 세션 서명 키 원천이 없으면 로그인 불가
+  if (!sessionKeySource()) {
     const url = req.nextUrl.clone();
     url.pathname = "/admin/login";
     url.searchParams.set("next", pathname);
@@ -160,74 +146,50 @@ export async function middleware(req: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  const cookie = req.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null;
-  const expected = await tokenFor(tokenSource);
+  // ★ v2 서명 세션 + 서명된 활동 쿠키 (audit-fix-1 [7])
+  //   - 세션: 서명·만료(8h) / 활동: 서명·30분 — 활동 쿠키를 빼거나 ts만 바꾸면 거부
+  //   - 로그아웃 폐기 확인은 Edge에서 불가 → Node 가드(assertAdminApiAuth·assertAdminAuth)가 수행
+  const check = await checkAdminCookies(
+    req.cookies.get(ADMIN_COOKIE_NAME)?.value ?? null,
+    req.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value ?? null
+  );
 
-  // 타이밍 공격 방어: 일정한 비교 시간 보장
-  if (cookie) {
-    const enc = new TextEncoder();
-    const a = enc.encode(cookie.padEnd(128, "\0"));
-    const b = enc.encode(expected.padEnd(128, "\0"));
-    let match = a.length === b.length;
-    for (let i = 0; i < a.length && i < b.length; i++) {
-      match = match && a[i] === b[i];
-    }
-    if (match) {
-      // 비활동 타임아웃 체크 (30분)
-      const lastActivityRaw = req.cookies.get(ADMIN_ACTIVITY_COOKIE)?.value;
-      const lastActivityTs = lastActivityRaw ? Number(lastActivityRaw) : NaN;
-
-      if (!isNaN(lastActivityTs)) {
-        const elapsed = Date.now() - lastActivityTs;
-        if (elapsed > ADMIN_INACTIVITY_TIMEOUT_MS) {
-          // 세션 만료 — 쿠키 삭제 후 로그인 리다이렉트
-          if (pathname.startsWith("/api/admin")) {
-            const expiredRes = NextResponse.json(
-              { ok: false, message: "세션이 만료되었습니다. 다시 로그인해 주세요." },
-              { status: 401 }
-            );
-            expiredRes.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
-            expiredRes.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
-            return withSecurityHeaders(expiredRes);
-          }
-          const expiredUrl = req.nextUrl.clone();
-          expiredUrl.pathname = "/admin/login";
-          expiredUrl.searchParams.set("next", pathname);
-          expiredUrl.searchParams.set("err", "session_expired");
-          const redirectRes = NextResponse.redirect(expiredUrl);
-          redirectRes.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
-          redirectRes.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
-          return redirectRes;
-        }
-      }
-      // 활동쿠키 없거나 유효하지 않으면 새로 설정 (기존 세션 호환)
-
-      // 활동 쿠키 갱신
-      const isProduction = process.env.NODE_ENV === "production";
-      const res = NextResponse.next();
-      res.cookies.set(ADMIN_ACTIVITY_COOKIE, String(Date.now()), {
-        httpOnly: true,
-        sameSite: "strict",
-        secure: isProduction,
-        path: "/",
-        maxAge: 8 * 60 * 60,
-      });
-      return withSecurityHeaders(res);
-    }
+  if (check.ok) {
+    const isProduction = process.env.NODE_ENV === "production";
+    const res = NextResponse.next();
+    res.cookies.set(ADMIN_ACTIVITY_COOKIE, await signActivity(check.sid, Date.now()), {
+      httpOnly: true,
+      sameSite: "strict",
+      secure: isProduction,
+      path: "/",
+      maxAge: ADMIN_SESSION_MAX_AGE_SEC,
+    });
+    return withSecurityHeaders(res);
   }
+
+  const hadCookie = check.reason !== "missing";
+  const clearCookies = (res: NextResponse) => {
+    if (hadCookie) {
+      res.cookies.set(ADMIN_COOKIE_NAME, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+      res.cookies.set(ADMIN_ACTIVITY_COOKIE, "", { httpOnly: true, sameSite: "strict", path: "/", maxAge: 0 });
+    }
+    return res;
+  };
 
   // API 라우트는 JSON 401 응답
   if (pathname.startsWith("/api/admin")) {
     return withSecurityHeaders(
-      NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 })
+      clearCookies(NextResponse.json({ ok: false, code: "UNAUTHORIZED", message: ADMIN_UNAUTHORIZED_MESSAGE }, { status: 401 }))
     );
   }
 
-  // 관리자 페이지는 로그인 리다이렉트
+  // 관리자 페이지는 로그인 리다이렉트 (구형 쿠키·비활동 만료는 안내 키를 붙인다)
   const url = req.nextUrl.clone();
   url.pathname = "/admin/login";
   url.searchParams.set("next", pathname);
-  return NextResponse.redirect(url);
+  if (check.reason === "legacy") url.searchParams.set("err", "session_upgraded");
+  else if (check.reason === "activity_expired" || check.reason === "activity_missing") url.searchParams.set("err", "session_expired");
+  return clearCookies(NextResponse.redirect(url));
 }
 
 export const config = {

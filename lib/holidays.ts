@@ -138,6 +138,22 @@ export async function isHoliday(dateYmd: string): Promise<boolean> {
   return holidayDateSet.has(dateYmd);
 }
 
+/**
+ * 지금까지 로딩된 공휴일 집합(읽기 전용 뷰) — lib/galleryPlan.ts 순수 함수에 넘기는 용도
+ * ensureHolidaysLoaded()로 필요한 달을 먼저 로딩할 것.
+ */
+export function loadedHolidaySet(): ReadonlySet<string> {
+  return holidayDateSet;
+}
+
+/** 테스트용: 공휴일을 API 없이 직접 등록 */
+export function _primeHolidaysForTest(items: Array<{ date: string; name: string }>): void {
+  for (const h of items) {
+    holidayDateSet.add(h.date);
+    holidayNameMap.set(h.date, h.name);
+  }
+}
+
 /** 테스트용: 캐시 초기화 */
 export function _clearHolidayCache(): void {
   cache.clear();

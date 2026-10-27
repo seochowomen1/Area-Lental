@@ -25,7 +25,7 @@ function describeError(e: unknown) {
 }
 
 export async function GET(req: Request) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, reason: auth.reason }, { status: auth.status ?? 401 });
   if (isMockMode()) return NextResponse.json({ ok: true, mock: true, steps: [] });
 

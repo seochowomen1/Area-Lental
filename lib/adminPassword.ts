@@ -1,6 +1,5 @@
 import crypto from "crypto";
 import bcrypt from "bcryptjs";
-import { ADMIN_SIGN_MESSAGE } from "@/lib/adminConstants";
 
 /**
  * 관리자 비밀번호 검증 및 세션 토큰 관리
@@ -64,14 +63,7 @@ export async function verifyAdminPassword(input: string): Promise<boolean> {
   return false;
 }
 
-/** 세션 쿠키에 저장할 토큰 생성 */
-export function generateSessionToken(): string {
-  const config = getPasswordConfig();
-  return crypto
-    .createHash("sha256")
-    .update(`${config.tokenSource}::${ADMIN_SIGN_MESSAGE}`)
-    .digest("hex");
-}
+// 세션 토큰은 lib/adminSession.ts(v2 서명 세션)에서 발급한다 (audit-fix-1 [7] — 고정 sha256 토큰 폐지)
 
 /** 비밀번호 설정 여부 */
 export function isAdminPasswordConfigured(): boolean {

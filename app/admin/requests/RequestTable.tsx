@@ -8,6 +8,8 @@ export type TableRowData = {
   key: string;
   requestIds: string[];
   isDeletable: boolean;
+  /** 반려·취소 건인데 삭제가 막힌 이유(lib/payment.ts DELETION_BLOCK_LABEL) — 없으면 null · audit-fix-1 [8] */
+  deleteBlockLabel: string | null;
 
   primaryId: string;
   idLink: string;
@@ -98,7 +100,8 @@ export default function RequestTable({
   );
 
   const deletableRows = visibleRows.filter((r) => r.isDeletable);
-  const hasDeletable = deletableRows.length > 0;
+  // 잠긴(삭제 불가) 행도 체크박스 칸을 보여 준다 — 비활성 체크박스 + 이유
+  const hasDeletable = deletableRows.length > 0 || visibleRows.some((r) => !!r.deleteBlockLabel);
 
   const allDeletableSelected = hasDeletable && deletableRows.every((r) => selected.has(r.key));
 
@@ -138,6 +141,16 @@ export default function RequestTable({
       });
       const data = await res.json();
       if (!data.ok) {
+        // 409 PROTECTED_RECORDS: 결제·환불 기록·홈페이지 마감 전 건이 섞이면 서버가 아무것도 지우지 않는다(01_spec ③-I)
+        if (data.code === "PROTECTED_RECORDS") {
+          const ids: string[] = Array.isArray(data.protected) ? data.protected.map((p: { requestId: string }) => p.requestId) : [];
+          alert(
+            data.message ||
+              `결제·환불 기록이 있거나 홈페이지 마감 전인 신청이 ${ids.length}건 섞여 있어 아무것도 삭제하지 않았습니다: ${ids.join(", ")}. 화면을 새로고침한 뒤 다시 골라 주세요.`
+          );
+          setDeletingKeys(new Set());
+          return;
+        }
         alert(data.message || "삭제에 실패했습니다.");
         setDeletingKeys(new Set());
         return;
@@ -238,6 +251,17 @@ export default function RequestTable({
                         className="h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
                         aria-label={`${r.primaryId} 선택`}
                       />
+                    ) : r.deleteBlockLabel ? (
+                      <input
+                        type="checkbox"
+                        checked={false}
+                        disabled
+                        readOnly
+                        title="결제·환불 기록이나 홈페이지 마감이 남아 있어 삭제할 수 없습니다."
+                        aria-describedby={`del-block-${r.key}`}
+                        className="h-4 w-4 cursor-not-allowed rounded border-gray-300 opacity-50"
+                        aria-label={`${r.primaryId} 선택`}
+                      />
                     ) : null}
                   </td>
                 )}
@@ -250,6 +274,11 @@ export default function RequestTable({
                   </Link>
                   {r.extraCount > 0 && (
                     <div className="mt-0.5 text-xs text-gray-500">외 {r.extraCount}건</div>
+                  )}
+                  {r.deleteBlockLabel && (
+                    <div id={`del-block-${r.key}`} className="mt-0.5 whitespace-nowrap text-xs text-gray-500">
+                      삭제 불가 · {r.deleteBlockLabel}
+                    </div>
                   )}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3">{r.roomName}</td>

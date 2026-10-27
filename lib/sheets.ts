@@ -10,6 +10,9 @@ import {
   mock_appendRequest,
   mock_updateRequestStatus,
   mock_updateRequestPayment,
+  mock_updateRequestsStatusBatch,
+  mock_getRevokedAdminSessions,
+  mock_addRevokedAdminSession,
   mock_getBlocks,
   mock_addBlock,
   mock_deleteBlock,
@@ -98,7 +101,13 @@ function colToLetter(col1: number): string {
   return s;
 }
 
-async function ensureRequestOptionalHeaders(): Promise<string[]> {
+/** 헤더가 완전한 것을 확인한 기록 — allowCached 호출(일괄 상태 변경)만 5분 동안 재사용(시트 읽기 쿼터 절약 · audit-fix-1 [9])
+ *  행 추가(append)는 실제 헤더 순서로 값을 배치하므로 항상 새로 읽는다. */
+let requestHeaderCache: { at: number; header: string[] } | null = null;
+const REQUEST_HEADERS_RECHECK_MS = 5 * 60 * 1000;
+
+async function ensureRequestOptionalHeaders(opts?: { allowCached?: boolean }): Promise<string[]> {
+  if (opts?.allowCached && requestHeaderCache && Date.now() - requestHeaderCache.at < REQUEST_HEADERS_RECHECK_MS) return requestHeaderCache.header;
   const env = requireGoogleEnv();
   const { sheets } = getGoogleClient();
 
@@ -111,7 +120,10 @@ async function ensureRequestOptionalHeaders(): Promise<string[]> {
   if (!header.length) return [];
 
   const missing = REQUEST_OPTIONAL_HEADERS.filter((h) => !header.includes(h));
-  if (!missing.length) return header;
+  if (!missing.length) {
+    requestHeaderCache = { at: Date.now(), header };
+    return header;
+  }
 
   const nextHeader = [...header, ...missing];
   const endCol = colToLetter(nextHeader.length);
@@ -281,19 +293,25 @@ function createHeaderIndex(header: string[], required: string[], sheetName: stri
   };
 }
 
-export async function getAllRequests(): Promise<RentalRequest[]> {
-  if (isMockMode()) return mock_getAllRequests();
-
+/** requests 시트 원본(A:ZZ) 1회 읽기 */
+async function readRequestsSheet(): Promise<string[][]> {
   const env = requireGoogleEnv();
-
   const { sheets } = getGoogleClient();
   // optional 컬럼이 추가될 수 있으므로 충분히 넓게 읽습니다.
   const res = await sheets.spreadsheets.values.get({
     spreadsheetId: env.GOOGLE_SHEET_ID,
     range: `${SHEET_REQUESTS}!A:ZZ`
   });
+  return (res.data.values ?? []) as string[][];
+}
 
-  const rows = (res.data.values ?? []) as string[][];
+export async function getAllRequests(): Promise<RentalRequest[]> {
+  if (isMockMode()) return mock_getAllRequests();
+  return parseRequestRows(await readRequestsSheet());
+}
+
+/** 시트 원본 행 → RentalRequest[] (시트 행 순서 유지 · 빈 행 제외) */
+function parseRequestRows(rows: string[][]): RentalRequest[] {
   if (rows.length <= 1) return [];
   const header = rows[0];
   const idx = createHeaderIndex(
@@ -822,6 +840,212 @@ export async function updateRequestStatus(args: {
   const updated = await getRequestById(args.requestId);
   if (!updated) throw new Error("업데이트 후 데이터를 다시 불러오지 못했습니다.");
   return updated;
+}
+
+export type StatusUpdate = {
+  requestId: string;
+  status: RequestStatus;
+  /** 생략하면 기존 값 유지(단건 updateRequestStatus는 빈칸으로 덮는 것과 다름) */
+  adminMemo?: string;
+  /** 생략하면 기존 값 유지 */
+  rejectReason?: string;
+  decidedBy: string;
+};
+
+export type BatchDiscount = {
+  batchId: string;
+  discountRatePct: number;
+  discountAmountKRW: number;
+  discountReason: string;
+};
+
+/**
+ * 여러 행 상태 일괄 변경 (audit-fix-1 [9])
+ * - 시트 호출: 헤더 확인 get 1 + A:ZZ get 1 + values.batchUpdate 1 (재조회 없음)
+ * - 대상 행을 전부 먼저 확인하고 하나라도 없으면 아무것도 쓰지 않고 throw
+ * - batchUpdate는 한 번의 요청이라 실패(429 등)하면 시트는 바뀌지 않는다(부분 반영 없음)
+ * - discount가 있으면 그 batchId 전 행의 할인 3열도 같은 요청에서 갱신
+ * - decidedAt/decidedBy는 상태가 바뀐 행만 갱신(단건과 같은 규칙)
+ */
+export async function updateRequestsStatusBatch(
+  updates: StatusUpdate[],
+  discount?: BatchDiscount,
+  payment?: { requestId: string; patch: PaymentPatch }
+): Promise<RentalRequest[]> {
+  if (isMockMode()) return mock_updateRequestsStatusBatch(updates, discount, payment);
+  if (!updates.length && !discount && !payment) return [];
+
+  const env = requireGoogleEnv();
+  // 열 위치는 아래 A:ZZ 읽기의 실제 헤더로 찾으므로, 헤더 확인은 최근 확인 기록을 재사용해도 안전
+  await ensureRequestOptionalHeaders({ allowCached: true });
+  const { sheets } = getGoogleClient();
+
+  const rows = await readRequestsSheet();
+  const all = parseRequestRows(rows);
+  const header = (rows[0] ?? []).map((v) => String(v ?? "").trim());
+  const col = new Map<string, number>();
+  header.forEach((h, i) => { if (h && !col.has(h)) col.set(h, i); });
+  const idCol = col.get("requestId");
+  if (idCol === undefined) throw new Error("requests 시트에 'requestId' 헤더가 없습니다.");
+  const rowOf = new Map<string, number>();
+  for (let i = 1; i < rows.length; i++) {
+    const id = String(rows[i]?.[idCol] ?? "").trim();
+    if (id && !rowOf.has(id)) rowOf.set(id, i + 1);
+  }
+  const byId = new Map(all.map((r) => [r.requestId, r]));
+
+  // 1) 전부 확인 먼저 (하나라도 없으면 쓰지 않음)
+  for (const u of updates) {
+    if (!byId.has(u.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${u.requestId}`);
+    if (!rowOf.get(u.requestId)) throw new Error(`시트에서 해당 신청건의 행을 찾지 못했습니다: ${u.requestId}`);
+  }
+  const cellRange = (name: string, rn: number) => {
+    const ci = col.get(name);
+    if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
+    const letter = colToLetter(ci + 1);
+    return `${SHEET_REQUESTS}!${letter}${rn}:${letter}${rn}`;
+  };
+
+  const now = nowIsoSeoul();
+  const data: Array<{ range: string; values: string[][] }> = [];
+  const next = new Map<string, RentalRequest>();
+
+  for (const u of updates) {
+    const current = next.get(u.requestId) ?? byId.get(u.requestId)!;
+    const rn = rowOf.get(u.requestId)!;
+    const statusChanged = current.status !== u.status;
+    const merged: RentalRequest = {
+      ...current,
+      status: u.status,
+      adminMemo: u.adminMemo ?? current.adminMemo ?? "",
+      rejectReason: u.rejectReason ?? current.rejectReason ?? "",
+      decidedAt: statusChanged ? now : (current.decidedAt || ""),
+      decidedBy: statusChanged ? u.decidedBy : (current.decidedBy || ""),
+    };
+    next.set(u.requestId, merged);
+    data.push(
+      { range: cellRange("status", rn), values: [[merged.status]] },
+      { range: cellRange("adminMemo", rn), values: [[merged.adminMemo ?? ""]] },
+      { range: cellRange("rejectReason", rn), values: [[merged.rejectReason ?? ""]] },
+      { range: cellRange("decidedAt", rn), values: [[merged.decidedAt ?? ""]] },
+      { range: cellRange("decidedBy", rn), values: [[merged.decidedBy ?? ""]] },
+    );
+  }
+
+  if (discount && discount.batchId.trim()) {
+    const bid = discount.batchId.trim();
+    for (const r of all.filter((x) => (x.batchId ?? "").trim() === bid)) {
+      const rn = rowOf.get(r.requestId);
+      if (!rn) continue;
+      data.push(
+        { range: cellRange("discountRatePct", rn), values: [[String(discount.discountRatePct)]] },
+        { range: cellRange("discountAmountKRW", rn), values: [[String(discount.discountAmountKRW)]] },
+        { range: cellRange("discountReason", rn), values: [[discount.discountReason]] },
+      );
+      next.set(r.requestId, {
+        ...(next.get(r.requestId) ?? r),
+        discountRatePct: discount.discountRatePct,
+        discountAmountKRW: discount.discountAmountKRW,
+        discountReason: discount.discountReason,
+      });
+    }
+  }
+
+  // 결제 기록 필드(묶음 전 행 동일 값) — updateRequestPayment와 같은 규칙을 같은 요청에 합친다
+  if (payment) {
+    const cur = byId.get(payment.requestId);
+    if (!cur) throw new Error(`해당 신청건을 찾을 수 없습니다: ${payment.requestId}`);
+    const bid = (cur.batchId ?? "").trim();
+    const targets = bid ? all.filter((r) => (r.batchId ?? "").trim() === bid) : [cur];
+    for (const r of targets) {
+      const rn = rowOf.get(r.requestId);
+      if (!rn) continue;
+      const merged: Record<string, unknown> = { ...(next.get(r.requestId) ?? r) };
+      for (const k of PAYMENT_FIELD_KEYS) {
+        if (!(k in payment.patch)) continue;
+        const v = payment.patch[k];
+        if (v === undefined) continue;
+        data.push({ range: cellRange(k, rn), values: [[v === null ? "" : String(v)]] });
+        if (v === null || v === "") delete merged[k];
+        else merged[k] = PAYMENT_NUMERIC_KEYS.has(k) ? Number(v) : v;
+      }
+      next.set(r.requestId, merged as RentalRequest);
+    }
+  }
+
+  if (data.length) {
+    await sheets.spreadsheets.values.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      requestBody: { valueInputOption: "RAW", data },
+    });
+  }
+  return [...next.values()];
+}
+
+/* ── 관리자 세션 폐기 목록 (audit-fix-1 [7]) ──
+ * 시트 admin_sessions: sid · revokedAt(KST ISO) · exp(ISO). 추가만 한다(만료 행은 읽을 때 무시).
+ * IP 등 개인정보는 저장하지 않는다. */
+const SHEET_ADMIN_SESSIONS = "admin_sessions";
+export const ADMIN_SESSION_HEADERS = ["sid", "revokedAt", "exp"] as const;
+let adminSessionSheetReady = false;
+
+async function ensureAdminSessionSheet(): Promise<void> {
+  if (adminSessionSheetReady) return;
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID });
+  const exists = (meta.data.sheets ?? []).some((s) => s.properties?.title === SHEET_ADMIN_SESSIONS);
+  if (!exists) {
+    await sheets.spreadsheets.batchUpdate({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      requestBody: { requests: [{ addSheet: { properties: { title: SHEET_ADMIN_SESSIONS } } }] },
+    });
+    await sheets.spreadsheets.values.update({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_ADMIN_SESSIONS}!A1`,
+      valueInputOption: "RAW",
+      requestBody: { values: [[...ADMIN_SESSION_HEADERS]] },
+    });
+  }
+  adminSessionSheetReady = true;
+}
+
+/** 폐기된 sid 목록 (만료 전 것만). 탭이 없으면 빈 목록 — 읽기 오류는 throw(호출부가 거부 처리) */
+export async function getRevokedAdminSessions(): Promise<Array<{ sid: string; exp: string }>> {
+  if (isMockMode()) return mock_getRevokedAdminSessions();
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  let rows: string[][] = [];
+  try {
+    const res = await sheets.spreadsheets.values.get({
+      spreadsheetId: env.GOOGLE_SHEET_ID,
+      range: `${SHEET_ADMIN_SESSIONS}!A:C`,
+    });
+    rows = (res.data.values ?? []) as string[][];
+  } catch (e) {
+    // 탭이 아직 없음(아무도 로그아웃하지 않음) → 폐기 0건
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/Unable to parse range|not found/i.test(msg)) return [];
+    throw e;
+  }
+  const nowIso = new Date().toISOString();
+  return rows
+    .slice(1)
+    .map((r) => ({ sid: String(r?.[0] ?? "").trim(), exp: String(r?.[2] ?? "").trim() }))
+    .filter((r) => r.sid && (!r.exp || r.exp > nowIso));
+}
+
+export async function addRevokedAdminSession(entry: { sid: string; exp: string }): Promise<void> {
+  if (isMockMode()) return mock_addRevokedAdminSession(entry);
+  await ensureAdminSessionSheet();
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  await sheets.spreadsheets.values.append({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    range: `${SHEET_ADMIN_SESSIONS}!A:C`,
+    valueInputOption: "RAW",
+    requestBody: { values: [[entry.sid, nowIsoSeoul(), entry.exp]] },
+  });
 }
 
 /**

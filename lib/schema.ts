@@ -3,6 +3,7 @@ import { toMinutes, todayYmdSeoul } from "./datetime";
 import { z } from "zod";
 import { UPLOAD } from "@/lib/config";
 import { GALLERY_RULES, TIME_CONSTANTS } from "@/lib/constants";
+import { isUnderMinApplicantAge, MINOR_APPLICANT_MESSAGE } from "@/lib/policy";
 
 /**
  * HTML checkbox(FormData) 값 파싱
@@ -65,6 +66,10 @@ export const RequestInputSchema = z.object({
 }).superRefine((v, ctx) => {
   if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
   if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "대관 규정 서약 동의는 필수입니다." });
+  // 만 14세 미만 직접 신청 차단 (audit-fix-1 ⑧-2)
+  if (isUnderMinApplicantAge(v.birth, todayYmdSeoul())) {
+    ctx.addIssue({ code: "custom", path: ["birth"], message: MINOR_APPLICANT_MESSAGE });
+  }
 
   const sMin = toMinutes(v.startTime);
   const eMin = toMinutes(v.endTime);
@@ -163,6 +168,10 @@ export const GalleryRequestInputSchema = z
   .superRefine((v, ctx) => {
     if (!v.privacyAgree) ctx.addIssue({ code: "custom", path: ["privacyAgree"], message: "개인정보 수집·이용 동의는 필수입니다." });
     if (!v.pledgeAgree) ctx.addIssue({ code: "custom", path: ["pledgeAgree"], message: "전시 운영 규정 서약 동의는 필수입니다." });
+    // 만 14세 미만 직접 신청 차단 (audit-fix-1 ⑧-2)
+    if (isUnderMinApplicantAge(v.birth, todayYmdSeoul())) {
+      ctx.addIssue({ code: "custom", path: ["birth"], message: MINOR_APPLICANT_MESSAGE });
+    }
 
     const today = todayYmdSeoul();
     // 서면 접수 등록(관리자)은 이미 접수된 건을 소급 등록하므로 당일·과거 시작일을 허용

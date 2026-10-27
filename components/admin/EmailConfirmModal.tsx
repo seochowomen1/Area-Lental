@@ -93,10 +93,9 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
     setSending(true);
 
     const form = new FormData();
-    form.set("to", content.to);
     form.set("subject", content.subject);
     form.set("body", content.body);
-    // 감사 target=신청번호 · 본문에 결제 링크가 있으면 paymentNoticeSentAt 기록 (03_api §8-2)
+    // 수신자는 서버가 requestId로 조회 · 감사 target=신청번호 · 본문에 결제 링크가 있으면 paymentNoticeSentAt 기록 (03_api §8-2)
     form.set("requestId", requestId);
 
     try {
@@ -192,11 +191,13 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
             <div className="max-h-[60vh] overflow-y-auto px-6 py-4 space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-gray-500 mb-1">받는 사람</label>
+                {/* 받는 사람 = 신청 시 저장된 이메일(수정 불가 · audit-fix-1 [7]) */}
                 <input
                   type="email"
                   value={content.to}
-                  onChange={(e) => setContent({ ...content, to: e.target.value })}
-                  className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                  readOnly
+                  aria-readonly="true"
+                  className="w-full cursor-default rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm text-gray-700 outline-none"
                 />
               </div>
 

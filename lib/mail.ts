@@ -5,7 +5,8 @@ import { computeFeesForBundle, computeFeesForRequest, formatKRW, getSelectedEqui
 import { ROOMS_BY_ID } from "@/lib/space";
 import { getTemplate, renderTemplate, applyGalleryWording, type TemplateCategory, type TemplateStatus } from "@/lib/emailTemplates";
 import { maskPhone, maskEmail } from "@/lib/mask";
-import { formatDueDateKo, paymentRep } from "@/lib/payment";
+import { bundleKey, formatDueDateKo, paymentRep } from "@/lib/payment";
+import { APPLICANT_TOKEN_TTL, createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { buildProgramName } from "@/lib/welfareCopy";
 
 /* ───────────────── 결제 안내 블록 (2026-10-26 · 01_spec ③-(나)) ───────────────── */
@@ -127,10 +128,33 @@ function formatEquipmentForEmail(r: RentalRequest): string {
   return details.map((eq) => `${eq.label} (${formatKRW(eq.feeKRW)})`).join(", ");
 }
 
+/**
+ * 신청자 메일 속 조회 링크 — 그 신청(묶음) 전용 7일 토큰 포함 (audit-fix-1 ⑤-6)
+ * 메일함은 본인 소유이므로 매직 링크와 같은 수준. 토큰 발급이 실패하면 토큰 없는 링크(신청번호만).
+ */
+function applicantResultUrl(r: RentalRequest): string {
+  const base = getBaseEnv();
+  const url = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(r.requestId)}`;
+  if (!r.email) return url;
+  try {
+    const { token } = createApplicantLinkToken({
+      email: r.email,
+      scope: "req",
+      group: bundleKey(r),
+      ttlSeconds: APPLICANT_TOKEN_TTL.MAIL_RESULT,
+    });
+    return `${url}&token=${encodeURIComponent(token)}`;
+  } catch {
+    return url;
+  }
+}
+
 async function maybeSend(mail: { to: string; subject: string; text: string }) {
   const base = getBaseEnv();
   if (isMockMode()) {
     console.log("\n[MOCK EMAIL]", { to: maskEmail(mail.to), subject: mail.subject });
+    // 로컬 검증용(기본 끔): MOCK_EMAIL_SHOW_BODY=1 이면 본문(조회 링크 포함)을 출력
+    if (process.env.MOCK_EMAIL_SHOW_BODY === "1") console.log(mail.text);
     return;
   }
   const tr = transporter();
@@ -295,8 +319,7 @@ export async function generateDecisionEmailContent(req: RentalRequest): Promise<
   const cat = spaceCategoryLabel(req);
   const catId = getRoomCategory(req) as TemplateCategory;
   const status = req.status as TemplateStatus;
-  const base = getBaseEnv();
-  const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(req.requestId)}`;
+  const resultUrl = applicantResultUrl(req);
 
   const fee = computeFeesForRequest(req);
   const feeBlock =
@@ -377,8 +400,7 @@ export function generateBatchDecisionEmailContent(reqs: RentalRequest[]): Decisi
 
   const subject = `[${displayStatus}] ${cat} ${isGallery(first) ? "전시" : "대관"} 신청 결과 (${first.requestId})`;
 
-  const base = getBaseEnv();
-  const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(first.requestId)}`;
+  const resultUrl = applicantResultUrl(first);
 
   const sessions = list
     .map((r, i) => {
@@ -462,8 +484,7 @@ export async function generateAutoCancelEmailContent(
   if (!first.email) return null;
   const cat = spaceCategoryLabel(first);
   const catId = getRoomCategory(first) as TemplateCategory;
-  const base = getBaseEnv();
-  const resultUrl = `${base.APP_BASE_URL}/result?requestId=${encodeURIComponent(first.requestId)}`;
+  const resultUrl = applicantResultUrl(first);
   const block = buildAutoCancelBlock(dueDate);
 
   const when =

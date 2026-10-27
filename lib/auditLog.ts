@@ -43,7 +43,8 @@ export type AuditAction =
   | "HOMEPAGE_LISTING_CLOSE"
   | "PAYMENT_AUTO_CANCEL_RESTORE"
   | "PAYMENT_DEADLINE_AUTO_CANCEL"
-  | "PAYMENT_REMINDER_SEND";
+  | "PAYMENT_REMINDER_SEND"
+  | "REQUEST_DUPLICATE_AUTO_CANCEL";
 
 /** 시트에 영구 저장할 작업(데이터 변경). 조회성 작업(PI_ACCESS·STATS_VIEW·EXPORT_*)은 로그 폭증 방지를 위해 제외 */
 const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
@@ -73,12 +74,17 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "PAYMENT_AUTO_CANCEL_RESTORE",
   "PAYMENT_DEADLINE_AUTO_CANCEL",
   "PAYMENT_REMINDER_SEND",
+  // audit-fix-1: 로그아웃(세션 폐기)·동시 신청 중복 자동 취소도 시트에 남긴다
+  "ADMIN_LOGOUT",
+  "REQUEST_DUPLICATE_AUTO_CANCEL",
 ]);
 
 /** 감사로그 시트의 작업명 한글 표기 */
 const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   BLOCK_CREATE: "차단 등록",
   BLOCK_DELETE: "차단 삭제",
+  ADMIN_LOGOUT: "로그아웃(세션 폐기)",
+  REQUEST_DUPLICATE_AUTO_CANCEL: "동시 신청 중복 자동 취소",
   SCHEDULE_CREATE: "수업시간 등록",
   SCHEDULE_UPDATE: "수업시간 수정",
   SCHEDULE_DELETE: "수업시간 삭제",

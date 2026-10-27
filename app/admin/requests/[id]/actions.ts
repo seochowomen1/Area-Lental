@@ -6,12 +6,13 @@ import { nowIsoSeoul } from "@/lib/datetime";
 
 import { getDatabase } from "@/lib/database";
 import type { RequestStatus, RentalRequest } from "@/lib/types";
-import { getDefaultDecidedBy } from "@/lib/adminAuth";
+import { assertAdminAuth, getDefaultDecidedBy } from "@/lib/adminAuth";
 import { normalizeDiscount, computeBaseTotalKRW } from "@/lib/pricing";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { ROOMS_BY_ID, normalizeRoomCategory } from "@/lib/space";
 import { recordAudit } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
+import { logger } from "@/lib/logger";
 
 function getIpFromHeaders(): string {
   const h = headers();
@@ -42,8 +43,15 @@ function categoryOf(r: RentalRequest) {
   return normalizeRoomCategory(room?.category);
 }
 
+/** 시트 일괄 저장 실패 → 배너 (01_spec ③-K) */
+function sheetBusyUrl(r: RentalRequest) {
+  return `/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(categoryOf(r))}&formError=sheetBusy`;
+}
+
 /** 단일 처리(승인/반려/취소 등) */
 export async function decideSingleAction(requestId: string, formData: FormData) {
+  // ★ audit-fix-1 [7]: 서버 액션도 첫 줄에서 인증 (미들웨어 matcher가 바뀌어도 안전)
+  await assertAdminAuth();
   const db = getDatabase();
   const current = await db.getRequestById(requestId);
   if (!current) redirect("/admin");
@@ -152,6 +160,7 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
 
 /** 묶음 공통 메타(할인/메모) 저장 */
 export async function saveBundleMetaAction(requestId: string, formData: FormData) {
+  await assertAdminAuth();
   const db = getDatabase();
   const current = await db.getRequestById(requestId);
   if (!current) redirect("/admin");
@@ -184,24 +193,29 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
   const prevReasonB = String(src?.discountReason ?? "");
   const prevMemoB = String(latest[0]?.adminMemo ?? "");
 
-  await Promise.all(
-    latest.map((s, i) =>
-      db.updateRequestStatus({
+  // ★ audit-fix-1 [9]: 묶음 전 회차 메모 + 할인을 시트 쓰기 1회로 (부분 반영 없음)
+  let savedB = true;
+  try {
+    await db.updateRequestsStatusBatch(
+      latest.map((s) => ({
         requestId: s.requestId,
         status: s.status,
         decidedBy: getDefaultDecidedBy(),
         rejectReason: s.rejectReason ?? "",
         adminMemo: bundleMemo || (s.adminMemo ?? ""),
-        ...(i === 0
-          ? {
-              discountRatePct: isGallery ? 0 : normalized.discountRatePct,
-              discountAmountKRW: isGallery ? 0 : normalized.discountAmountKRW,
-              discountReason: isGallery ? "" : discountReason,
-            }
-          : {}),
-      })
-    )
-  );
+      })),
+      {
+        batchId: current.batchId,
+        discountRatePct: isGallery ? 0 : normalized.discountRatePct,
+        discountAmountKRW: isGallery ? 0 : normalized.discountAmountKRW,
+        discountReason: isGallery ? "" : discountReason,
+      }
+    );
+  } catch (e) {
+    savedB = false;
+    logger.error("묶음 메타 일괄 저장 실패", { batchId: current.batchId, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!savedB) redirect(sheetBusyUrl(current));
 
   const discountChangedB = prevAmountB !== nextAmountB || prevReasonB !== nextReasonB;
   const memoChangedB = !!bundleMemo && bundleMemo !== prevMemoB;
@@ -236,6 +250,7 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
 
 /** 묶음: 선택 회차 승인/반려 */
 export async function decideSelectedSessionsAction(requestId: string, formData: FormData) {
+  await assertAdminAuth();
   const db = getDatabase();
   const current = await db.getRequestById(requestId);
   if (!current) redirect("/admin");
@@ -260,24 +275,27 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&formError=rejectReason`);
   }
   const effectiveSelected = selectAll ? latest.map((s) => s.requestId) : selectedIds;
-  if (effectiveSelected.length === 0) redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
+  if (effectiveSelected.length === 0) redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&formError=noSelection`);
 
-  await Promise.all(
-    latest.map((s) => {
-      const isSelected = effectiveSelected.includes(s.requestId);
-      const nextStatus = isSelected ? actionStatus : s.status;
-      const nextRejectReason = isSelected ? (actionStatus === "반려" ? rejectReason : "") : (s.rejectReason ?? "");
-      const nextMemo = isSelected ? (adminMemo || (s.adminMemo ?? "")) : (s.adminMemo ?? "");
-
-      return db.updateRequestStatus({
-        requestId: s.requestId,
-        status: nextStatus,
-        decidedBy: getDefaultDecidedBy(),
-        rejectReason: nextRejectReason,
-        adminMemo: nextMemo,
-      });
-    })
-  );
+  // ★ audit-fix-1 [9]: 선택 회차만 시트 쓰기 1회로 (Promise.all 동시 쓰기 → 쿼터 초과·부분 반영 방지)
+  let savedS = true;
+  try {
+    await db.updateRequestsStatusBatch(
+      latest
+        .filter((s) => effectiveSelected.includes(s.requestId))
+        .map((s) => ({
+          requestId: s.requestId,
+          status: actionStatus,
+          decidedBy: getDefaultDecidedBy(),
+          rejectReason: actionStatus === "반려" ? rejectReason : "",
+          adminMemo: adminMemo || (s.adminMemo ?? ""),
+        }))
+    );
+  } catch (e) {
+    savedS = false;
+    logger.error("묶음 선택 회차 일괄 처리 실패", { batchId: current.batchId, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!savedS) redirect(sheetBusyUrl(current));
 
   const selectedDates = latest.filter((s) => effectiveSelected.includes(s.requestId)).map((s) => s.date);
   await recordAudit({
@@ -305,7 +323,10 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
 
 /** 메일 발송: 관리자가 확인한 내용으로 발송 */
 export async function sendConfirmedEmailAction(requestId: string, formData: FormData) {
-  const to = String(formData.get("to") || "").trim();
+  await assertAdminAuth();
+  // ★ audit-fix-1 [7]: 수신자는 폼 값이 아니라 그 신청의 저장된 이메일로 고정(임의 수신자 발송 차단)
+  const target = await getDatabase().getRequestById(requestId);
+  const to = String(target?.email ?? "").trim();
   const subject = String(formData.get("subject") || "").trim();
   const body = String(formData.get("body") || "").trim();
 

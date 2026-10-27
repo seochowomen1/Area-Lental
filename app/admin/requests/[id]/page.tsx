@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 import { sortSessions, categoryAccent } from "@/lib/requestUtils";
 
 import EmailConfirmModal from "@/components/admin/EmailConfirmModal";
+import FormSubmitButton from "@/components/FormSubmitButton";
 import ExcelDownloadButton from "@/components/admin/ExcelDownloadButton";
 import GianCopyButton from "@/components/admin/GianCopyButton";
 import PaymentSection from "@/components/admin/PaymentSection";
@@ -89,7 +90,11 @@ export default async function AdminRequestDetail({
         ? "반려 시 반려 사유를 입력해야 합니다. 저장되지 않았습니다."
         : searchParams?.formError === "status"
           ? "처리 상태 값이 올바르지 않습니다. 저장되지 않았습니다."
-          : "";
+          : searchParams?.formError === "sheetBusy"
+            ? "시트 저장이 잠시 막혀(요청 한도) 아무것도 바뀌지 않았습니다. 1분 뒤 다시 눌러 주세요."
+            : searchParams?.formError === "noSelection"
+              ? "처리할 회차를 1개 이상 선택하세요."
+              : "";
 
   const db = getDatabase();
   let req: RentalRequest | null = null;
@@ -139,6 +144,8 @@ export default async function AdminRequestDetail({
   const normalizedCategory = normalizeRoomCategory(rawCategory);
   const isGallery = req.roomId === "gallery" || normalizedCategory === "gallery";
   const isStudio = normalizedCategory === "studio";
+  const studioBaseHeadcount = room?.baseHeadcount ?? 2;
+  const studioExtraPersons = isStudio ? Math.max(0, Math.floor(Number(req.headcount ?? 0)) - studioBaseHeadcount) : 0;
   const backToListHref = `/admin/requests?category=${encodeURIComponent(normalizedCategory)}`;
 
   /* ── 묶음(배치) ── */
@@ -412,6 +419,13 @@ export default async function AdminRequestDetail({
             )}
             {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}
             {!isStudio && req.headcount && <InfoRow label="인원">{req.headcount}명</InfoRow>}
+            {/* [결3] E-스튜디오도 이용 인원 표시(기본 2명 초과분 표기) */}
+            {isStudio && req.headcount ? (
+              <InfoRow label="인원">
+                {req.headcount}명
+                {studioExtraPersons > 0 ? ` (기본 ${studioBaseHeadcount}명 + 추가 ${studioExtraPersons}명)` : ""}
+              </InfoRow>
+            ) : null}
           </dl>
         </Section>
 
@@ -689,12 +703,11 @@ export default async function AdminRequestDetail({
                   />
                 </div>
 
-                <button
-                  type="submit"
-                  className="rounded-lg bg-gray-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black"
-                >
-                  {isGallery ? "메모 저장" : "할인/메모 저장"}
-                </button>
+                <FormSubmitButton
+                  idleText={isGallery ? "메모 저장" : "할인/메모 저장"}
+                  pendingText="저장 중..."
+                  className="rounded-lg !bg-gray-900 px-5 py-2.5 hover:!bg-black"
+                />
                 <p className="text-xs text-gray-500">
                   * 회차별 승인/반려 상태는 변경하지 않습니다.
                 </p>
@@ -795,9 +808,11 @@ export default async function AdminRequestDetail({
                 />
               </div>
 
-              <button type="submit" className="w-full rounded-lg bg-gray-900 px-4 py-3 text-sm font-semibold text-white hover:bg-black">
-                저장
-              </button>
+              <FormSubmitButton
+                idleText="저장"
+                pendingText="저장 중..."
+                className="w-full rounded-lg !bg-gray-900 px-4 py-3 hover:!bg-black"
+              />
               <p className="text-xs text-gray-500 mt-2">
                 * 저장 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
               </p>

@@ -1,6 +1,14 @@
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
-import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
-import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
+import { isHolidayCached, getHolidayNameCached, loadedHolidaySet } from "@/lib/holidays";
+import {
+  availablePrepDates,
+  defaultPrepDate,
+  galleryOperatingWindowFor,
+  galleryPrepStartAfterExhibitionFor,
+  galleryPrepWindowFor,
+  planGallery,
+} from "@/lib/galleryPlan";
+import { GALLERY_RULES } from "@/lib/constants";
 import type { BlockTime, RentalRequest, RequestStatus } from "@/lib/types";
 
 export type GalleryOperatingWindow = { startTime: string; endTime: string };
@@ -16,14 +24,10 @@ export type GallerySessionInput = {
 // - 화요일: 09:00~18:00 + 야간 18:00~20:00 → 통합 09:00~20:00
 // - 토요일: 09:00~13:00
 // - 일요일: 휴관
+// ★ 회차·요금 규칙의 단일 출처는 lib/galleryPlan.ts(순수 함수 · 클라이언트 공용). 여기는 서버 공휴일 캐시를 넘기는 래퍼.
 export function galleryOperatingWindow(dateYmd: string): GalleryOperatingWindow | null {
-  const dow = dayOfWeek(dateYmd); // 0 Sun ... 6 Sat
-  if (dow === 0) return null;
   // 공휴일 체크 (ensureHolidaysLoaded() 선행 필요)
-  if (isHolidayCached(dateYmd)) return null;
-  if (dow === 2) return { startTime: "09:00", endTime: "20:00" };
-  if (dow === 6) return { startTime: "09:00", endTime: "13:00" };
-  return { startTime: "09:00", endTime: "18:00" };
+  return galleryOperatingWindowFor(dateYmd, loadedHolidaySet());
 }
 
 export function validateGalleryOperatingHours(dateYmd: string, startTime: string, endTime: string) {
@@ -61,28 +65,14 @@ function addDaysYmd(dateYmd: string, deltaDays: number): string {
  * 일요일(휴관)·공휴일은 제외하며, 기본 7개까지 반환합니다.
  */
 export function getAvailablePrepDates(startDate: string, count = 7): string[] {
-  const dates: string[] = [];
-  let cur = addDaysYmd(startDate, -1);
-  let safety = 0;
-  while (dates.length < count && safety++ < 30) {
-    if (dayOfWeek(cur) !== 0 && !isHolidayCached(cur)) {
-      dates.push(cur);
-    }
-    cur = addDaysYmd(cur, -1);
-  }
-  return dates;
+  return availablePrepDates(startDate, loadedHolidaySet(), count);
 }
 
 /**
  * 기본(자동) 준비일을 계산합니다: 시작일 이전 1일, 일요일·공휴일이면 더 이전
  */
 export function getDefaultPrepDate(startDate: string): string {
-  let prep = addDaysYmd(startDate, -1);
-  let safety = 0;
-  while ((dayOfWeek(prep) === 0 || isHolidayCached(prep)) && safety++ < 30) {
-    prep = addDaysYmd(prep, -1);
-  }
-  return prep;
+  return defaultPrepDate(startDate, loadedHolidaySet());
 }
 
 // ─── 준비·철거 규정 (2026-10-19) ───
@@ -96,7 +86,7 @@ export function galleryTeardownDeadline(dateYmd: string): string | null {
 
 /** 직전 운영일에 전시가 있을 때 준비 가능 시작 시각 (평일 17:00 · 토요일 11:00) */
 export function galleryPrepStartAfterExhibition(dateYmd: string): string {
-  return dayOfWeek(dateYmd) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY;
+  return galleryPrepStartAfterExhibitionFor(dateYmd);
 }
 
 /**
@@ -105,12 +95,7 @@ export function galleryPrepStartAfterExhibition(dateYmd: string): string {
  * - 전시가 있으면(앞 전시 철거 후) 평일 17:00~ / 토 11:00~ 운영 종료까지
  */
 export function galleryPrepWindow(dateYmd: string, afterExhibition: boolean): GalleryOperatingWindow | null {
-  const w = galleryOperatingWindow(dateYmd);
-  if (!w) return null;
-  if (!afterExhibition) return w;
-  const start = galleryPrepStartAfterExhibition(dateYmd);
-  if (toMinutes(start) >= toMinutes(w.endTime)) return w; // 안전장치(설정 오류 시 운영시간 유지)
-  return { startTime: start, endTime: w.endTime };
+  return galleryPrepWindowFor(dateYmd, afterExhibition, loadedHolidaySet());
 }
 
 /** 기존 신청(접수·승인)들이 점유한 갤러리 날짜 집합 */
@@ -209,44 +194,14 @@ export function buildGallerySessionsFromPeriod(
   customPrepDate?: string | null,
   options?: { prepAfterExhibition?: boolean }
 ): GallerySessionInput[] {
-  const sessions: GallerySessionInput[] = [];
-
-  // 준비(세팅)일 결정
-  let prep: string | null = null;
-  if (customPrepDate === undefined) {
-    // 미지정 시 자동 계산 (하위 호환)
-    prep = getDefaultPrepDate(startDate);
-  } else if (customPrepDate) {
-    // 사용자 선택
-    prep = customPrepDate;
-  }
-  // customPrepDate === "" 또는 null → 준비일 없음
-
-  if (prep) {
-    const prepWin = galleryPrepWindow(prep, Boolean(options?.prepAfterExhibition));
-    if (prepWin) {
-      sessions.push({ date: prep, startTime: prepWin.startTime, endTime: prepWin.endTime, isPrepDay: true });
-    }
-  }
-
-  // 전시 기간
-  let cur = startDate;
-  let safety = 0;
-  while (cur <= endDate) {
-    const win = galleryOperatingWindow(cur);
-    if (win) {
-      sessions.push({ date: cur, startTime: win.startTime, endTime: win.endTime });
-    }
-    cur = addDaysYmd(cur, 1);
-    safety += 1;
-    if (safety > 5000) break; // 기술 안전장치
-  }
-
-  // 전시일이 없는 케이스 방지(준비일만 남는 케이스)
-  const hasExhibitionDay = sessions.some((s) => !s.isPrepDay);
-  if (!hasExhibitionDay) return [];
-
-  return sessions;
+  // customPrepDate: undefined = 자동 계산(하위 호환) · ""/null = 준비일 없음 · 문자열 = 사용자 선택
+  return planGallery({
+    startDate,
+    endDate,
+    prepDate: customPrepDate,
+    prepAfterExhibition: Boolean(options?.prepAfterExhibition),
+    holidays: loadedHolidaySet(),
+  }).sessions;
 }
 
 /**
@@ -261,25 +216,18 @@ export function computeGalleryStats(startDate: string, endDate: string, customPr
   exhibitionDayCount: number;
   totalFeeKRW: number;
 } {
-  const sessions = buildGallerySessionsFromPeriod(startDate, endDate, customPrepDate, options);
-  const prep = sessions.find((s) => s.isPrepDay);
-  const exhibition = sessions.filter((s) => !s.isPrepDay);
-
-  let weekdayCount = 0;
-  let saturdayCount = 0;
-  for (const s of exhibition) {
-    const dow = dayOfWeek(s.date);
-    if (dow === 6) saturdayCount++;
-    else if (dow >= 1 && dow <= 5) weekdayCount++;
-  }
-
-  const totalFeeKRW = weekdayCount * GALLERY_FEE_KRW.WEEKDAY + saturdayCount * GALLERY_FEE_KRW.SATURDAY;
-
+  const plan = planGallery({
+    startDate,
+    endDate,
+    prepDate: customPrepDate,
+    prepAfterExhibition: Boolean(options?.prepAfterExhibition),
+    holidays: loadedHolidaySet(),
+  });
   return {
-    prepDate: prep?.date ?? null,
-    weekdayCount,
-    saturdayCount,
-    exhibitionDayCount: exhibition.length,
-    totalFeeKRW,
+    prepDate: plan.prepDate,
+    weekdayCount: plan.weekdayCount,
+    saturdayCount: plan.saturdayCount,
+    exhibitionDayCount: plan.exhibitionDayCount,
+    totalFeeKRW: plan.totalFeeKRW,
   };
 }

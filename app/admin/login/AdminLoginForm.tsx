@@ -9,16 +9,24 @@ export default function AdminLoginForm() {
   const sp = useSearchParams();
   const next = sp.get("next") ?? "/admin";
   const errParam = sp.get("err");
+  const loggedOut = sp.get("out") === "1";
   const [pw, setPw] = useState("");
+  // 01_spec ③-J — 세션 안내 문구
   const [err, setErr] = useState<string | null>(
-    errParam === "session_expired" ? "장시간 미사용으로 세션이 만료되었습니다. 다시 로그인해 주세요." : null
+    errParam === "session_upgraded"
+      ? "보안 강화로 다시 로그인해야 합니다. 비밀번호를 입력해 주세요."
+      : errParam === "session_expired"
+        ? "30분 동안 사용하지 않아 로그아웃되었습니다. 다시 로그인해 주세요."
+        : null
   );
+  const [showOut, setShowOut] = useState(loggedOut && !errParam);
   const [loading, setLoading] = useState(false);
 
   async function onLogin(e: FormEvent) {
     e.preventDefault();
     setLoading(true);
     setErr(null);
+    setShowOut(false);
 
     const res = await fetch("/api/admin/login", {
       method: "POST",
@@ -51,7 +59,12 @@ export default function AdminLoginForm() {
           placeholder="관리자 비밀번호"
           required
         />
-        {err && <div className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</div>}
+        {showOut ? (
+          <div role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">
+            로그아웃했습니다. 이 기기의 관리자 접속이 끊겼습니다.
+          </div>
+        ) : null}
+        {err && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{err}</div>}
         <Button type="submit" variant="primary" disabled={loading} className="w-full py-2">{loading ? "로그인 중..." : "로그인"}</Button>
       </form>
     </Card>

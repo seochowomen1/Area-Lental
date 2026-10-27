@@ -6,6 +6,7 @@ import SpaceBookingGalleryRange from "@/components/SpaceBookingGalleryRange";
 import { cn } from "@/lib/cn";
 import { CARD_BASE, BUTTON_BASE, BUTTON_VARIANT } from "@/components/ui/presets";
 import { getRoom } from "@/lib/space";
+import { PAYMENT_FLOW_TEXT } from "@/lib/policy";
 
 type TabId = "status" | "info" | "rule";
 
@@ -165,7 +166,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
             <li>이 화면에서 전시 기간을 선택하고 전시 신청서(전시 목적, 장르, 내용 등)를 온라인으로 작성합니다.</li>
             <li>같은 기간은 먼저 신청한 분이 우선이며, 이미 신청된 날짜는 달력에서 선택할 수 없습니다.</li>
             <li>센터는 3일 이내에 검토 후 승인/반려 결과를 이메일로 안내합니다.</li>
-            <li>승인 후 센터 방문(현장 결제)으로 이용료를 결제하면 전시가 확정됩니다. 현장답사·상담도 함께 가능합니다.</li>
+            <li>{PAYMENT_FLOW_TEXT("전시")} 현장답사·상담이 필요하면 담당자에게 전화로 문의해 주세요.</li>
           </ol>
         </div>
 
@@ -293,6 +294,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
             <li>원하는 공간·일시를 선택하여 온라인으로 대관 신청합니다.</li>
             <li>센터는 신청 내용을 바탕으로 일정·안전·운영 적정성 등을 검토합니다.</li>
             <li>승인(또는 반려) 결과는 신청 시 입력한 연락처/이메일 등으로 안내됩니다.</li>
+            <li>{PAYMENT_FLOW_TEXT("예약")}</li>
             <li>승인된 예약은 이용 당일 안내된 시간에 따라 입·퇴실을 진행합니다.</li>
           </ol>
         </div>

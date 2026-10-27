@@ -17,6 +17,8 @@ type MockDB = {
   schedules: ClassSchedule[];
   blocks: BlockTime[];
   emailTemplates?: EmailTemplateRow[];
+  /** 로그아웃으로 폐기된 관리자 세션 (audit-fix-1 [7]) */
+  revokedSessions?: Array<{ sid: string; revokedAt: string; exp: string }>;
 };
 
 // Vercel 서버리스에서는 process.cwd()가 읽기 전용이므로 /tmp 사용
@@ -46,7 +48,10 @@ function ensureDb(): MockDB {
     const db: MockDB = {
       requests: Array.isArray(data.requests) ? data.requests : [],
       schedules: Array.isArray(data.schedules) ? data.schedules : [],
-      blocks: Array.isArray(data.blocks) ? data.blocks : []
+      blocks: Array.isArray(data.blocks) ? data.blocks : [],
+      // 재시작 시 이메일 템플릿·폐기 세션이 사라지지 않도록 보존
+      ...(Array.isArray(data.emailTemplates) ? { emailTemplates: data.emailTemplates } : {}),
+      ...(Array.isArray(data.revokedSessions) ? { revokedSessions: data.revokedSessions } : {}),
     };
     memCache = db;
     return db;
@@ -300,6 +305,87 @@ export async function mock_updateRequestStatus(args: {
 
   saveDb(db);
   return db.requests[idx];
+}
+
+/**
+ * 여러 행 상태 일괄 변경 (Mock) — sheets.updateRequestsStatusBatch와 같은 규칙
+ * 전부 확인 후 한 번에 반영 · 파일 저장 1회
+ */
+export async function mock_updateRequestsStatusBatch(
+  updates: Array<{ requestId: string; status: RequestStatus; adminMemo?: string; rejectReason?: string; decidedBy: string }>,
+  discount?: { batchId: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
+  payment?: { requestId: string; patch: PaymentPatch }
+): Promise<RentalRequest[]> {
+  const db = ensureDb();
+  const idxOf = new Map(db.requests.map((r, i) => [r.requestId, i]));
+  for (const u of updates) {
+    if (!idxOf.has(u.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${u.requestId}`);
+  }
+  if (payment && !idxOf.has(payment.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${payment.requestId}`);
+  const now = nowIsoSeoul();
+  const next = db.requests.slice();
+  const touched = new Set<number>();
+  for (const u of updates) {
+    const i = idxOf.get(u.requestId)!;
+    const cur = next[i];
+    const changed = cur.status !== u.status;
+    next[i] = {
+      ...cur,
+      status: u.status,
+      adminMemo: u.adminMemo ?? cur.adminMemo ?? "",
+      rejectReason: u.rejectReason ?? cur.rejectReason ?? "",
+      decidedAt: changed ? now : (cur.decidedAt ?? ""),
+      decidedBy: changed ? u.decidedBy : (cur.decidedBy ?? ""),
+    };
+    touched.add(i);
+  }
+  if (discount && discount.batchId.trim()) {
+    const bid = discount.batchId.trim();
+    next.forEach((r, i) => {
+      if ((r.batchId ?? "").trim() !== bid) return;
+      next[i] = { ...r, discountRatePct: discount.discountRatePct, discountAmountKRW: discount.discountAmountKRW, discountReason: discount.discountReason };
+      touched.add(i);
+    });
+  }
+  if (payment) {
+    const cur = next[idxOf.get(payment.requestId)!];
+    const bid = (cur.batchId ?? "").trim();
+    next.forEach((r, i) => {
+      if (bid ? (r.batchId ?? "").trim() !== bid : r.requestId !== cur.requestId) return;
+      const merged: Record<string, unknown> = { ...r };
+      for (const k of PAYMENT_FIELD_KEYS) {
+        if (!(k in payment.patch)) continue;
+        const v = payment.patch[k];
+        if (v === undefined) continue;
+        if (v === null || v === "") delete merged[k];
+        else merged[k] = PAYMENT_NUMERIC_KEYS.has(k) ? Number(v) : v;
+      }
+      next[i] = merged as RentalRequest;
+      touched.add(i);
+    });
+  }
+  db.requests = next;
+  saveDb(db);
+  return [...touched].sort((a, b) => a - b).map((i) => db.requests[i]);
+}
+
+/* ── 관리자 세션 폐기 목록 (Mock) ── */
+
+export async function mock_getRevokedAdminSessions(): Promise<Array<{ sid: string; exp: string }>> {
+  const nowIso = new Date().toISOString();
+  return (ensureDb().revokedSessions ?? [])
+    .filter((r) => r.sid && (!r.exp || r.exp > nowIso))
+    .map((r) => ({ sid: r.sid, exp: r.exp }));
+}
+
+export async function mock_addRevokedAdminSession(entry: { sid: string; exp: string }): Promise<void> {
+  const db = ensureDb();
+  const nowIso = new Date().toISOString();
+  // 만료된 행은 이때 정리
+  const kept = (db.revokedSessions ?? []).filter((r) => !r.exp || r.exp > nowIso);
+  kept.push({ sid: entry.sid, revokedAt: nowIsoSeoul(), exp: entry.exp });
+  db.revokedSessions = kept;
+  saveDb(db);
 }
 
 /**

@@ -18,7 +18,7 @@ export const revalidate = 0;
  * - 게시 기록이 없으면 409 — 단 자동 취소 건은 허용(복지종합시스템 쪽 정리 확인용)
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
-  const auth = assertAdminApiAuth(req);
+  const auth = await assertAdminApiAuth(req);
   if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
 
   try {

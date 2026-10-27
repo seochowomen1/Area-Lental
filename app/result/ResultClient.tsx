@@ -9,6 +9,12 @@ import Notice from "@/components/ui/Notice";
 import { FieldLabel, Input } from "@/components/ui/Field";
 import { formatKRW } from "@/lib/pricing";
 import { cn } from "@/lib/cn";
+import {
+  adoptTokenFromUrl,
+  clearApplicantAccess,
+  purgeLegacyApplicantToken,
+  readApplicantAccess,
+} from "@/lib/applicantAccess";
 
 type SessionInfo = {
   requestId: string;
@@ -95,77 +101,147 @@ type ResultPayload =
     }
   | { ok: false; message: string };
 
+const FALLBACK_ERROR = "조회 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.";
+const LINK_EXPIRED_TEXT = "조회 링크 유효 시간이 지났습니다. 신청번호와 이메일을 넣고 [조회 링크 받기]를 다시 눌러 주세요.";
+const LINK_SCOPE_TEXT = "이 링크로는 해당 신청을 볼 수 없습니다. 신청번호와 이메일을 넣고 [조회 링크 받기]를 눌러 주세요.";
+
+/** 조회·취소 API 실패 → 화면 문구 (01_spec ③-C) */
+class ResultFetchError extends Error {
+  code: string;
+  status: number;
+  constructor(message: string, code: string, status: number) {
+    super(message);
+    this.code = code;
+    this.status = status;
+  }
+}
+
+function messageForError(err: unknown, fallback: string): { text: string; needLink: boolean; clearAccess: boolean } {
+  if (err instanceof ResultFetchError) {
+    if (err.code === "TOKEN_EXPIRED" || err.code === "TOKEN_INVALID") return { text: LINK_EXPIRED_TEXT, needLink: true, clearAccess: true };
+    if (err.code === "TOKEN_SCOPE") return { text: LINK_SCOPE_TEXT, needLink: true, clearAccess: false };
+    if (err.code === "LINK_REQUIRED") return { text: err.message || fallback, needLink: true, clearAccess: false };
+    return { text: err.message || fallback, needLink: false, clearAccess: false };
+  }
+  return { text: fallback, needLink: false, clearAccess: false };
+}
+
 export default function ResultClient() {
   const sp = useSearchParams();
   const prefillRequestId = sp.get("requestId") ?? "";
-  const prefillEmail = sp.get("email") ?? "";
-  const token = sp.get("token") ?? "";
 
   const [requestId, setRequestId] = useState(prefillRequestId);
-  const [email, setEmail] = useState(prefillEmail);
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [data, setData] = useState<ResultPayload | null>(null);
 
+  // ★ [1][10] 조회 권한(토큰)은 sessionStorage에서만 읽는다. 메일 링크의 ?token= 은 옮긴 뒤 주소에서 뺀다.
+  const [token, setToken] = useState("");
+  const [accessChecked, setAccessChecked] = useState(false);
+  /** 토큰이 있어도 이 신청에는 쓸 수 없을 때(만료·범위 밖) 링크 받기 폼을 보인다 */
+  const [needLink, setNeedLink] = useState(false);
+  const [clearedNotice, setClearedNotice] = useState(false);
+
+  // 조회 링크 받기
+  const [sending, setSending] = useState(false);
+  const [sentTo, setSentTo] = useState<string | null>(null);
+
   const didAutoFetch = useRef(false);
 
-  const canSubmit = useMemo(() => {
-    return requestId.trim().length > 2 && (!!token || email.trim().includes("@"));
-  }, [requestId, email, token]);
+  useEffect(() => {
+    purgeLegacyApplicantToken();
+    adoptTokenFromUrl();
+    const access = readApplicantAccess();
+    setToken(access?.token ?? "");
+    setAccessChecked(true);
+  }, []);
 
-  async function fetchResult() {
-    const reqId = requestId.trim();
-    const em = email.trim();
+  const showLinkForm = accessChecked && (!token || needLink);
 
+  const canSend = useMemo(() => {
+    return requestId.trim().length > 2 && email.trim().includes("@");
+  }, [requestId, email]);
+
+  async function fetchResult(reqId: string, tk: string) {
     const res = await fetch("/api/public/result", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ requestId: reqId, email: em, token: token || undefined }),
+      body: JSON.stringify({ requestId: reqId, token: tk }),
     });
-    const json = (await res.json()) as ResultPayload;
-    if (!res.ok || !json.ok) {
-      const msg = !json.ok ? json.message : "조회에 실패했습니다.";
-      throw new Error(msg);
+    const json = (await res.json().catch(() => null)) as (ResultPayload & { code?: string }) | null;
+    if (!res.ok || !json || !json.ok) {
+      const msg = json && !json.ok ? json.message : "";
+      throw new ResultFetchError(msg, String(json?.code ?? ""), res.status);
     }
     return json;
   }
 
-  async function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
-    setData(null);
-    try {
-      const json = await fetchResult();
-      setData(json);
-    } catch {
-      setError("조회 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
-    } finally {
-      setLoading(false);
+  function applyError(err: unknown, fallback: string) {
+    const m = messageForError(err, fallback);
+    setError(m.text);
+    if (m.needLink) setNeedLink(true);
+    if (m.clearAccess) {
+      clearApplicantAccess();
+      setToken("");
     }
   }
 
+  // 토큰 + 신청번호가 있으면 1회 자동 조회
   useEffect(() => {
+    if (!accessChecked) return;
     if (didAutoFetch.current) return;
-    if (!prefillRequestId) return;
-    if (!token && !prefillEmail) return;
-    // URL로 바로 들어온 경우 1회 자동 조회
+    if (!prefillRequestId || !token) return;
     didAutoFetch.current = true;
     (async () => {
       setError(null);
       setLoading(true);
       setData(null);
       try {
-        const json = await fetchResult();
+        const json = await fetchResult(prefillRequestId, token);
         setData(json);
       } catch (err: unknown) {
-        setError(err instanceof Error ? err.message : "조회에 실패했습니다.");
+        applyError(err, FALLBACK_ERROR);
       } finally {
         setLoading(false);
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prefillRequestId, prefillEmail, token]);
+  }, [accessChecked, prefillRequestId, token]);
+
+  async function onSendLink(e: FormEvent) {
+    e.preventDefault();
+    if (!canSend) return;
+    setError(null);
+    setSentTo(null);
+    setSending(true);
+    try {
+      const res = await fetch("/api/public/my/send-link", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ email: email.trim(), requestId: requestId.trim() }),
+      });
+      const json = await res.json().catch(() => null);
+      if (!res.ok || !json?.ok) {
+        setError(String(json?.message ?? FALLBACK_ERROR));
+        return;
+      }
+      setSentTo(email.trim());
+    } catch {
+      setError(FALLBACK_ERROR);
+    } finally {
+      setSending(false);
+    }
+  }
+
+  function clearDeviceRecord() {
+    clearApplicantAccess();
+    setToken("");
+    setData(null);
+    setError(null);
+    setNeedLink(false);
+    setClearedNotice(true);
+  }
 
   const [cancelLoading, setCancelLoading] = useState(false);
 
@@ -191,21 +267,17 @@ export default function ResultClient() {
       const res = await fetch("/api/public/cancel", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          requestId: data.requestId,
-          email: token ? undefined : email.trim(),
-          token: token || undefined,
-        }),
+        body: JSON.stringify({ requestId: data.requestId, token }),
       });
-      const json = await res.json();
+      const json = await res.json().catch(() => null);
       if (!res.ok || !json?.ok) {
-        throw new Error(json?.message ?? "취소에 실패했습니다.");
+        throw new ResultFetchError(String(json?.message ?? "취소에 실패했습니다."), String(json?.code ?? ""), res.status);
       }
       // 취소 후 최신 상태 재조회
-      const refreshed = await fetchResult();
+      const refreshed = await fetchResult(data.requestId, token);
       setData(refreshed);
     } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "취소 중 오류가 발생했습니다.");
+      applyError(err, "취소 중 오류가 발생했습니다.");
     } finally {
       setCancelLoading(false);
     }
@@ -254,38 +326,59 @@ export default function ResultClient() {
 
       <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
         <Card pad="lg" className="space-y-5">
-          <div>
-            <h2 className="text-2xl font-semibold">신청 결과 조회</h2>
-            <p className="mt-2 text-sm text-gray-700">
-              신청번호와 신청 시 입력한 이메일로 승인 결과 및 최종금액을 확인할 수 있습니다.
-            </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">신청 결과 조회</h2>
+              {showLinkForm ? (
+                <p className="mt-2 text-sm text-gray-700">
+                  신청번호와 신청할 때 입력한 이메일을 넣으면 이 신청의 조회 링크를 메일로 보내 드립니다.
+                </p>
+              ) : null}
+            </div>
+            {token ? (
+              <button
+                type="button"
+                onClick={clearDeviceRecord}
+                className="shrink-0 self-end text-sm font-semibold text-[rgb(var(--brand-primary))] underline-offset-2 hover:underline sm:self-start"
+              >
+                이 기기에서 조회 기록 지우기
+              </button>
+            ) : null}
           </div>
 
-          <form onSubmit={onSubmit} className="grid grid-cols-1 gap-4 md:grid-cols-12">
-            <div className="md:col-span-5">
-              <FieldLabel htmlFor="requestId">신청번호</FieldLabel>
-              <Input id="requestId" value={requestId} onChange={(e) => setRequestId(e.target.value)} placeholder="예: R-2026XXXX" />
-            </div>
-            {!token ? (
-              <div className="md:col-span-5">
-                <FieldLabel htmlFor="email">이메일</FieldLabel>
-                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="신청서에 입력한 이메일" />
-              </div>
-            ) : (
-              <div className="md:col-span-5 flex items-end">
-                <Notice title="인증 완료" variant="success" className="w-full">
-                  매직링크로 인증되었습니다. (이메일 입력 없이 조회 가능)
-                </Notice>
-              </div>
-            )}
-            <div className="md:col-span-2 flex items-end">
-              <Button type="submit" disabled={!canSubmit || loading} className="w-full">
-                {loading ? "조회 중" : "조회"}
-              </Button>
-            </div>
-          </form>
+          {clearedNotice ? <Notice variant="success">이 기기에 저장된 조회 기록을 지웠습니다.</Notice> : null}
 
-          {error && <Notice variant="danger">{error}</Notice>}
+          {!accessChecked ? <div className="text-sm text-slate-600" role="status">확인 중...</div> : null}
+
+          {accessChecked && token && !needLink ? (
+            <Notice variant="success">메일 링크로 확인된 조회 화면입니다.</Notice>
+          ) : null}
+
+          {showLinkForm ? (
+            <form onSubmit={onSendLink} className="grid grid-cols-1 gap-4 md:grid-cols-12">
+              <div className="md:col-span-5">
+                <FieldLabel htmlFor="requestId">신청번호</FieldLabel>
+                <Input id="requestId" value={requestId} onChange={(e) => setRequestId(e.target.value)} placeholder="예: REQ-20261026-XXXXXXXX" />
+              </div>
+              <div className="md:col-span-4">
+                <FieldLabel htmlFor="email">이메일</FieldLabel>
+                <Input id="email" type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="신청서에 입력한 이메일" autoComplete="email" />
+              </div>
+              <div className="flex items-end md:col-span-3">
+                <Button type="submit" disabled={!canSend || sending} className="w-full">
+                  {sending ? "보내는 중…" : "조회 링크 받기"}
+                </Button>
+              </div>
+            </form>
+          ) : null}
+
+          {sentTo ? (
+            <Notice variant="info">신청번호와 이메일이 맞으면 {sentTo}로 조회 링크를 보냈습니다. 메일 속 링크를 눌러 주세요.</Notice>
+          ) : null}
+
+          {loading ? <div className="text-sm text-slate-600" role="status">조회 중...</div> : null}
+
+          {error && <Notice variant={needLink ? "warn" : "danger"}>{error}</Notice>}
 
           {data && data.ok && (
             <div className="space-y-10">
