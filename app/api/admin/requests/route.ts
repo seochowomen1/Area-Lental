@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { getDatabase } from "@/lib/database";
 import { getClientIp } from "@/lib/rateLimit";
 import { recordAudit } from "@/lib/auditLog";
@@ -17,9 +17,7 @@ export const dynamic = "force-dynamic";
  */
 export async function DELETE(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return jsonError("Unauthorized", auth.status ?? 401, "UNAUTHORIZED");
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const body = (await req.json()) as { requestIds?: string[] };

@@ -40,7 +40,7 @@ export default function GianCopyButton({ payload }: { payload: Record<string, un
     <button
       type="button"
       onClick={handleCopy}
-      className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
       title="그룹웨어 기안 작성용 데이터를 JSON으로 복사합니다"
     >
       {copied === "ok" ? "✓ 복사됨" : copied === "fail" ? "복사 실패" : "기안 데이터 복사"}

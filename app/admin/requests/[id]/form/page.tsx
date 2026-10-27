@@ -51,9 +51,9 @@ function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
 
 /* ── Shared table cell styles (compact for A4) ── */
 const TH =
-  "border border-gray-400 bg-gray-50 px-2 py-1 text-left text-[11px] font-bold text-gray-900 whitespace-nowrap print:px-1.5 print:py-0.5 print:text-[9px]";
+  "border border-slate-700 bg-slate-100 px-2 py-1 text-left text-[12px] font-bold text-slate-900 whitespace-nowrap print:px-1.5 print:py-0.5 ";
 const TD =
-  "border border-gray-400 px-2 py-1 text-xs text-gray-900 print:px-1.5 print:py-0.5 print:text-[9px]";
+  "border border-slate-700 px-2 py-1 text-[12px] text-slate-900 print:px-1.5 print:py-0.5 ";
 const TD_R = `${TD} text-right tabular-nums`;
 
 export default async function AdminRequestFormPage({
@@ -76,7 +76,7 @@ export default async function AdminRequestFormPage({
   if (!req) {
     return (
       <main className="mx-auto max-w-3xl p-10 text-center">
-        <p className="text-gray-600">
+        <p className="text-slate-600">
           신청번호 <b>{params.id}</b>에 해당하는 데이터가 없습니다.
         </p>
       </main>
@@ -209,10 +209,10 @@ export default async function AdminRequestFormPage({
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
-              <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
+              <h1 className="mt-1 text-[13px] font-bold text-slate-900">
                 서초여성가족플라자 서초센터
               </h1>
-              <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+              <h2 className="mt-0.5 text-[21px] font-extrabold text-slate-900">
                 &lsquo;센터 {categoryLabel}&rsquo; 대관 신청서
               </h2>
             </div>
@@ -369,7 +369,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH}>대관일시</th>
                   <td className={TD} colSpan={3}>
                     {isBatch ? (
-                      <span className="print:text-[8px]">
+                      <span className="text-[12px]">
                         {sessions.map((s, i) => (
                           <span key={s.requestId}>
                             {i > 0 && " / "}
@@ -390,7 +390,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH}>
                     대관비용
                     <br />
-                    <span className="font-normal text-gray-500 print:text-[7px]">
+                    <span className="font-normal text-slate-500 text-xs print:text-[11px]">
                       (※담당자 기재)
                     </span>
                   </th>
@@ -404,14 +404,14 @@ export default async function AdminRequestFormPage({
                         <span className="font-extrabold">
                           {formatKRW(feeBasis.finalFeeKRW)}
                         </span>
-                        <span className="text-[10px] text-gray-600 print:text-[8px]">
+                        <span className="text-xs print:text-[11px] text-slate-600">
                           {" "}
                           ({discountStr})
                         </span>
                       </>
                     )}
                     {feeBasis.discountReason && (
-                      <span className="ml-2 text-[10px] text-gray-600 print:text-[8px]">
+                      <span className="ml-2 text-xs print:text-[11px] text-slate-600">
                         사유: {feeBasis.discountReason}
                       </span>
                     )}
@@ -468,50 +468,50 @@ export default async function AdminRequestFormPage({
             )}
 
             {/* ── 5. 개인정보 수집·이용 안내 ── */}
-            <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
-              <h3 className="text-center text-[11px] font-bold text-gray-900 print:text-[9px]">
+            <div className="mt-2 rounded border border-slate-700 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
+              <h3 className="text-center text-[13px] font-bold text-slate-900">
                 개인정보 수집 · 이용에 관한 안내 (* 필수항목)
               </h3>
-              <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
+              <table className="mt-1.5 w-full border-collapse text-[12px]">
                 <thead>
                   <tr>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보 수집 · 이용 목적
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       수집하려는 개인정보 항목
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보의 보유 및 이용 기간
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       시설 대관 신청업무 처리 및
                       <br />
                       의사소통 경로 확보
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       성명(대표자 성명), 연락처,
                       <br />
                       E-mail, 주소, 단체명, 인원 수,
                       <br />
                       사용 목적, 서약자 성명
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 대관목적
                       <br />
                       달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       신청자 확인 및 미성년자 보호자 동의 확인
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">생년월일</td>
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 대관목적
                       <br />
                       달성 시 지체없이 해당정보 파기
@@ -519,15 +519,15 @@ export default async function AdminRequestFormPage({
                   </tr>
                 </tbody>
               </table>
-              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+              <p className="mt-1 text-xs print:text-[11px] text-slate-600 leading-tight">
                 ※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.
               </p>
-              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+              <p className="mt-1 text-xs print:text-[11px] text-slate-600 leading-tight">
                 ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
                 대관 신청·진행에 일부 제한이 있습니다.
               </p>
-              <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
-                <span className="font-bold text-gray-900">[필수]</span>
+              <div className="mt-1.5 flex items-center gap-3 text-[13px]">
+                <span className="font-bold text-slate-900">[필수]</span>
                 <span>
                   위와 같이 개인정보의 수집 및 이용에 동의합니까?
                 </span>
@@ -539,17 +539,17 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 6. 전자 동의 확인 ── */}
-            <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
-              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+            <div className="mt-2 rounded border border-slate-300 bg-slate-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[13px] font-bold text-slate-700">
                 {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
-              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[12px] text-slate-800">
                 <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
+              <p className="mt-0.5 text-xs print:text-[11px] text-slate-500">
                 {isOffline
                   ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
                   : "본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
@@ -557,7 +557,7 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 서명란 ── */}
-            <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+            <div className="mt-3 text-center text-[13px] text-slate-900 print:mt-2">
               <p>
                 위와 같이 서초여성가족플라자 서초센터 {categoryLabel} 대관을
                 신청합니다.
@@ -569,9 +569,9 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 푸터 ── */}
-            <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
+            <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
-                <p className="mt-0.5 text-gray-400">
+                <p className="mt-0.5 text-slate-500">
                   신청번호: {req.requestId} | 출력일: {printDate}
                 </p>
               )}
@@ -586,10 +586,10 @@ export default async function AdminRequestFormPage({
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
-              <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
+              <h1 className="mt-1 text-[13px] font-bold text-slate-900">
                 서초여성가족플라자 서초센터
               </h1>
-              <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+              <h2 className="mt-0.5 text-[21px] font-extrabold text-slate-900">
                 E-스튜디오 대관 신청서
               </h2>
             </div>
@@ -601,7 +601,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH} rowSpan={2} style={{ width: "14%", textAlign: "center", verticalAlign: "middle" }}>
                     신청지방
                     <br />
-                    <span className="font-normal text-gray-500 print:text-[7px]">(입금지방)</span>
+                    <span className="font-normal text-slate-500 text-xs print:text-[11px]">(입금지방)</span>
                   </th>
                   <td className={TD} rowSpan={2} style={{ width: "36%", verticalAlign: "middle" }}>
                     {req.applicantName}
@@ -625,7 +625,7 @@ export default async function AdminRequestFormPage({
             </table>
 
             {/* ── 신청내역 헤더 ── */}
-            <div className="mt-2 border border-gray-400 bg-blue-50 px-3 py-1 text-center text-[11px] font-bold text-blue-900 print:mt-1.5 print:text-[9px]">
+            <div className="mt-2 border border-slate-700 bg-slate-100 px-3 py-1 text-center text-[13px] font-bold text-slate-900 print:mt-1.5">
               신청내역
             </div>
 
@@ -677,7 +677,7 @@ export default async function AdminRequestFormPage({
             </table>
 
             {/* ── 2-1. 장비 사용 동의 ── */}
-            <div className="border border-t-0 border-gray-400 px-3 py-1.5 text-[10px] leading-snug text-gray-800 print:text-[8px]">
+            <div className="border border-t-0 border-slate-700 px-3 py-1.5 text-xs print:text-[11px] leading-snug text-slate-800">
               <b>2-1.</b> E-스튜디오 장비 및 시설 사용목록(별지 제2호 서식) 내용을 확인하였으며
               이용규칙을 준수하여 시설 내 장비를 사용할 것을 동의합니다.
             </div>
@@ -689,7 +689,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH} style={{ width: "18%" }}>
                     이용목적
                     <br />
-                    <span className="font-normal text-gray-500 print:text-[7px]">(촬영내용)</span>
+                    <span className="font-normal text-slate-500 text-xs print:text-[11px]">(촬영내용)</span>
                   </th>
                   <td className={TD} colSpan={3}>
                     {req.purpose || "-"}
@@ -703,11 +703,11 @@ export default async function AdminRequestFormPage({
                   <th className={TH}>
                     대관일시
                     <br />
-                    <span className="font-normal text-gray-500 print:text-[7px]">(일자/시간)</span>
+                    <span className="font-normal text-slate-500 text-xs print:text-[11px]">(일자/시간)</span>
                   </th>
                   <td className={TD} colSpan={3}>
                     {isBatch ? (
-                      <span className="print:text-[8px]">
+                      <span className="text-[12px]">
                         {sessions.map((s, i) => (
                           <span key={s.requestId}>
                             {i > 0 && " / "}
@@ -736,7 +736,7 @@ export default async function AdminRequestFormPage({
                         <span className="font-extrabold">
                           {formatKRW(feeBasis.finalFeeKRW)}
                         </span>
-                        <span className="text-[10px] text-gray-600 print:text-[8px]">
+                        <span className="text-xs print:text-[11px] text-slate-600">
                           {" "}({discountStr})
                         </span>
                       </>
@@ -780,48 +780,48 @@ export default async function AdminRequestFormPage({
             )}
 
             {/* ── 5. 개인정보 수집·이용 안내 (E-스튜디오) ── */}
-            <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
-              <h3 className="text-center text-[11px] font-bold text-blue-900 print:text-[9px]">
+            <div className="mt-2 rounded border border-slate-700 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
+              <h3 className="text-center text-[13px] font-bold text-slate-900">
                 개인정보 수집 · 이용에 관한 안내
               </h3>
-              <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
+              <table className="mt-1.5 w-full border-collapse text-[12px]">
                 <thead>
                   <tr>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보의 수집이용 목적
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       수집이용하려는 개인정보 항목
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보 이용기간 및 보유기간
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       E-스튜디오 대관 신청업무 처리 및
                       <br />
                       본인 식별, 의사소통, 수수료 등
                       <br />
                       관련 업무
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       이름, 연락처, E-mail, 주소
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 대관목적
                       <br />
                       달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       신청자 확인 및 미성년자 보호자 동의 확인
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">생년월일</td>
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 대관목적
                       <br />
                       달성 시 지체없이 해당정보 파기
@@ -829,12 +829,12 @@ export default async function AdminRequestFormPage({
                   </tr>
                 </tbody>
               </table>
-              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+              <p className="mt-1 text-xs print:text-[11px] text-slate-600 leading-tight">
                 ※ 위의 개인정보 수집·이용에 대한 동의를 거부할 권리가 있습니다.
                 다만 위 제공사항은 이용신청에 반드시 필요한 사항으로 거부하실 경우 이용에 일부 제한이 있습니다.
               </p>
-              <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
-                <span className="font-bold text-gray-900">[필수]</span>
+              <div className="mt-1.5 flex items-center gap-3 text-[13px]">
+                <span className="font-bold text-slate-900">[필수]</span>
                 <span>
                   위와 같이 개인정보의 수집 및 이용에 동의합니까?
                 </span>
@@ -846,15 +846,15 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 6. 전자 동의 확인 ── */}
-            <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
-              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+            <div className="mt-2 rounded border border-slate-300 bg-slate-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[13px] font-bold text-slate-700">
                 {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
-              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[12px] text-slate-800">
                 <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}</span>
               </div>
-              <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
+              <p className="mt-0.5 text-xs print:text-[11px] text-slate-500">
                 {isOffline
                   ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
                   : "본 신청서는 온라인 대관 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
@@ -862,7 +862,7 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 서명란 ── */}
-            <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+            <div className="mt-3 text-center text-[13px] text-slate-900 print:mt-2">
               <p>
                 위와 같이 서초여성가족플라자 서초센터 E-스튜디오 대관을 신청합니다.
               </p>
@@ -873,9 +873,9 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 푸터 ── */}
-            <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
+            <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
-                <p className="mt-0.5 text-gray-400">
+                <p className="mt-0.5 text-slate-500">
                   신청번호: {req.requestId} | 출력일: {printDate}
                 </p>
               )}
@@ -890,10 +890,10 @@ export default async function AdminRequestFormPage({
           <div className="page-section">
             {/* ── 문서 헤더 ── */}
             <div className="text-center">
-              <h1 className="mt-1 text-sm font-bold text-gray-900 print:text-xs">
+              <h1 className="mt-1 text-[13px] font-bold text-slate-900">
                 서초여성가족플라자 서초센터
               </h1>
-              <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+              <h2 className="mt-0.5 text-[21px] font-extrabold text-slate-900">
                 우리동네 갤러리 전시 신청서
               </h2>
             </div>
@@ -1049,7 +1049,7 @@ export default async function AdminRequestFormPage({
                     <th className={TH} style={{ width: "18%" }}>
                       이용료
                       <br />
-                      <span className="font-normal text-gray-500 print:text-[7px]">
+                      <span className="font-normal text-slate-500 text-xs print:text-[11px]">
                         (※담당자 기재)
                       </span>
                     </th>
@@ -1058,12 +1058,12 @@ export default async function AdminRequestFormPage({
                         {formatKRW(baseFeeKRW)}
                       </span>
                       {(req.galleryWeekdayCount ?? 0) > 0 && (
-                        <span className="ml-2 text-[10px] text-gray-600 print:text-[8px]">
+                        <span className="ml-2 text-xs print:text-[11px] text-slate-600">
                           평일 {req.galleryWeekdayCount}일 × 20,000원
                         </span>
                       )}
                       {(req.gallerySaturdayCount ?? 0) > 0 && (
-                        <span className="ml-2 text-[10px] text-gray-600 print:text-[8px]">
+                        <span className="ml-2 text-xs print:text-[11px] text-slate-600">
                           토요일 {req.gallerySaturdayCount}일 × 10,000원
                         </span>
                       )}
@@ -1074,81 +1074,81 @@ export default async function AdminRequestFormPage({
             )}
 
             {/* ── 4. 이용료 안내 ── */}
-            <div className="mt-2 rounded border border-gray-400 px-3 py-1.5 print:mt-1.5 print:px-2 print:py-1">
-              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+            <div className="mt-2 rounded border border-slate-700 px-3 py-1.5 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[13px] font-bold text-slate-700">
                 이용료 안내
               </h4>
-              <table className="mt-1 w-full border-collapse text-[10px] print:text-[8px]">
+              <table className="mt-1 w-full border-collapse text-[12px]">
                 <thead>
                   <tr>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">구분</th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">1일 이용료</th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-0.5 text-center font-bold">비고</th>
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-center font-bold">구분</th>
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-center font-bold">1일 이용료</th>
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-0.5 text-center font-bold">비고</th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">평일</td>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">20,000원</td>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center" rowSpan={3}>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">평일</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">20,000원</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center" rowSpan={3}>
                       준비(세팅)일 1일 무료
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">토요일</td>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">10,000원</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">토요일</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">10,000원</td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">일요일 · 공휴일</td>
-                    <td className="border border-gray-300 px-1.5 py-0.5 text-center">휴관</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">일요일 · 공휴일</td>
+                    <td className="border border-slate-300 px-1.5 py-0.5 text-center">휴관</td>
                   </tr>
                 </tbody>
               </table>
             </div>
 
             {/* ── 5. 개인정보 수집·이용 안내 ── */}
-            <div className="mt-2 rounded border border-gray-400 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
-              <h3 className="text-center text-[11px] font-bold text-gray-900 print:text-[9px]">
+            <div className="mt-2 rounded border border-slate-700 px-3 py-2 print:mt-1.5 print:px-2 print:py-1.5">
+              <h3 className="text-center text-[13px] font-bold text-slate-900">
                 개인정보 수집 · 이용에 관한 안내 (* 필수항목)
               </h3>
-              <table className="mt-1.5 w-full border-collapse text-[10px] print:text-[8px]">
+              <table className="mt-1.5 w-full border-collapse text-[12px]">
                 <thead>
                   <tr>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보 수집 · 이용 목적
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       수집하려는 개인정보 항목
                     </th>
-                    <th className="border border-gray-300 bg-gray-50 px-1.5 py-1 text-center font-bold">
+                    <th className="border border-slate-300 bg-slate-50 px-1.5 py-1 text-center font-bold">
                       개인정보의 보유 및 이용 기간
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       갤러리 전시 신청업무 처리 및
                       <br />
                       의사소통 경로 확보
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       이름(또는 단체명), 대표자 성명,
                       <br />
                       연락처, E-mail, 주소
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 전시 목적
                       <br />
                       달성 시 지체없이 해당정보 파기
                     </td>
                   </tr>
                   <tr>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       신청자 확인 및 미성년자 보호자 동의 확인
                     </td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">생년월일</td>
-                    <td className="border border-gray-300 px-1.5 py-1 text-center">
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">생년월일</td>
+                    <td className="border border-slate-300 px-1.5 py-1 text-center">
                       수집일로부터 3년 및 전시 목적
                       <br />
                       달성 시 지체없이 해당정보 파기
@@ -1156,15 +1156,15 @@ export default async function AdminRequestFormPage({
                   </tr>
                 </tbody>
               </table>
-              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+              <p className="mt-1 text-xs print:text-[11px] text-slate-600 leading-tight">
                 ※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.
               </p>
-              <p className="mt-1 text-[9px] text-gray-600 leading-tight print:text-[7px]">
+              <p className="mt-1 text-xs print:text-[11px] text-slate-600 leading-tight">
                 ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시
                 전시 신청·진행에 일부 제한이 있습니다.
               </p>
-              <div className="mt-1.5 flex items-center gap-3 text-[11px] print:text-[9px]">
-                <span className="font-bold text-gray-900">[필수]</span>
+              <div className="mt-1.5 flex items-center gap-3 text-[13px]">
+                <span className="font-bold text-slate-900">[필수]</span>
                 <span>
                   위와 같이 개인정보의 수집 및 이용에 동의합니까?
                 </span>
@@ -1176,17 +1176,17 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 6. 전자 동의 확인 ── */}
-            <div className="mt-2 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
-              <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+            <div className="mt-2 rounded border border-slate-300 bg-slate-50 px-3 py-2 print:mt-1.5 print:px-2 print:py-1">
+              <h4 className="text-[13px] font-bold text-slate-700">
                 {isOffline ? "[서면 접수 확인]" : "[전자 동의 확인]"}
               </h4>
-              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[11px] text-gray-800 print:text-[8px]">
+              <div className="mt-1 flex flex-wrap gap-x-6 gap-y-0.5 text-[12px] text-slate-800">
                 <span>{isOffline ? intakeLine : `신청 일시: ${consentDate}`}</span>
                 <span>
                   개인정보 동의: {req.privacyAgree ? "동의" : "미동의"}
                 </span>
               </div>
-              <p className="mt-0.5 text-[9px] text-gray-500 print:text-[7px]">
+              <p className="mt-0.5 text-xs print:text-[11px] text-slate-500">
                 {isOffline
                   ? "본 신청서는 서면으로 접수된 신청서를 관리자가 등록한 것이며, 신청자가 서명한 원본 신청서·서약서를 센터에서 보관합니다."
                   : "본 신청서는 온라인 전시 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다."}
@@ -1194,7 +1194,7 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 서명란 ── */}
-            <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+            <div className="mt-3 text-center text-[13px] text-slate-900 print:mt-2">
               <p>
                 위와 같이 서초여성가족플라자 서초센터 우리동네 갤러리 전시를
                 신청합니다.
@@ -1206,9 +1206,9 @@ export default async function AdminRequestFormPage({
             </div>
 
             {/* ── 푸터 ── */}
-            <div className="mt-4 border-t border-gray-300 pt-2 text-[10px] text-gray-600 print:mt-2 print:pt-1 print:text-[8px]">
+            <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
-                <p className="mt-0.5 text-gray-400">
+                <p className="mt-0.5 text-slate-500">
                   신청번호: {req.requestId} | 출력일: {printDate}
                 </p>
               )}
@@ -1221,22 +1221,22 @@ export default async function AdminRequestFormPage({
         {/* ════════════════════════════════════════════ */}
         <div className="page-section mt-10 print:mt-0">
           {/* 화면에서 신청서와 서약서 사이 구분선 (인쇄 시 숨김) */}
-          <div className="no-print mb-6 border-t-4 border-dashed border-gray-300 pt-4 text-center text-xs text-gray-400">
+          <div className="no-print mb-6 border-t-4 border-dashed border-slate-300 pt-4 text-center text-xs text-slate-500">
             ─── 서약서 (인쇄 시 2페이지) ───
           </div>
 
           {/* ── 문서 헤더 ── */}
           <div className="text-center">
-            <h1 className="text-sm font-bold text-gray-900 print:text-xs">
+            <h1 className="text-[13px] font-bold text-slate-900">
               서초여성가족플라자 서초센터
             </h1>
-            <h2 className="mt-0.5 text-base font-extrabold text-gray-900 print:text-sm">
+            <h2 className="mt-0.5 text-[21px] font-extrabold text-slate-900">
               {pledgeTitle}
             </h2>
           </div>
 
           {/* ── 서약 서문 ── */}
-          <p className="mt-3 text-xs leading-relaxed text-gray-900 print:mt-2 print:text-[9px] print:leading-snug">
+          <p className="mt-3 text-[13px] leading-relaxed text-slate-900 print:mt-2 print:leading-snug">
             {pledgeIntro}
           </p>
 
@@ -1244,10 +1244,10 @@ export default async function AdminRequestFormPage({
           <div className="mt-2.5 space-y-1.5 print:mt-1.5 print:space-y-1">
             {pledgeSections.map((sec) => (
               <div key={sec.title}>
-                <h4 className="text-xs font-bold text-gray-900 print:text-[9px]">
+                <h4 className="text-[13px] font-bold text-slate-900">
                   {sec.title}
                 </h4>
-                <ul className="mt-0.5 list-disc space-y-0 pl-4 text-[11px] leading-snug text-gray-800 print:pl-3 print:text-[8.5px] print:leading-tight">
+                <ul className="mt-0.5 list-disc space-y-0 pl-4 text-[13px] leading-snug text-slate-800 print:pl-3 print:leading-tight">
                   {sec.bullets.map((b, idx) => (
                     <li key={idx}>{b}</li>
                   ))}
@@ -1258,10 +1258,10 @@ export default async function AdminRequestFormPage({
 
           {/* ── 운영시간 안내 ── */}
           <div className="mt-3 print:mt-2">
-            <h4 className="text-xs font-bold text-gray-900 print:text-[9px]">
+            <h4 className="text-[13px] font-bold text-slate-900">
               ※ {categoryLabel} 운영시간 안내
             </h4>
-            <table className="mt-1 w-full border-collapse text-[11px] print:text-[9px]">
+            <table className="mt-1 w-full border-collapse text-[12px]">
               <thead>
                 <tr>
                   <th className={TH} style={{ width: "25%" }}>
@@ -1285,22 +1285,22 @@ export default async function AdminRequestFormPage({
                 </tr>
               </tbody>
             </table>
-            <p className="mt-0.5 text-[10px] text-gray-500 print:text-[8px]">
+            <p className="mt-0.5 text-xs print:text-[11px] text-slate-500">
               ※ 기관 휴관 상황 시 운영 불가
             </p>
           </div>
 
           {/* ── 서약 푸터 ── */}
-          <p className="mt-3 text-xs font-semibold text-gray-900 print:mt-2 print:text-[9px]">
+          <p className="mt-3 text-[13px] font-semibold text-slate-900 print:mt-2">
             {PLEDGE_FOOTER}
           </p>
 
           {/* ── 전자 서약 확인란 ── */}
-          <div className="mt-3 rounded border border-gray-300 bg-gray-50 px-3 py-2 print:mt-2 print:px-2 print:py-1.5">
-            <h4 className="text-[10px] font-bold text-gray-700 print:text-[8px]">
+          <div className="mt-3 rounded border border-slate-300 bg-slate-50 px-3 py-2 print:mt-2 print:px-2 print:py-1.5">
+            <h4 className="text-[13px] font-bold text-slate-700">
               {isOffline ? "[서면 서약 확인]" : "[전자 서약 확인]"}
             </h4>
-            <table className="mt-1 w-full border-collapse text-[11px] print:text-[9px]">
+            <table className="mt-1 w-full border-collapse text-[12px]">
               <tbody>
                 <tr>
                   <th className={TH} style={{ width: "18%" }}>
@@ -1325,7 +1325,7 @@ export default async function AdminRequestFormPage({
                 </tr>
               </tbody>
             </table>
-            <p className="mt-1 text-[9px] text-gray-500 print:text-[7px]">
+            <p className="mt-1 text-xs print:text-[11px] text-slate-500">
               {isOffline
                 ? "본 서약은 신청자가 서면 서약서에 서명하여 제출한 내용이며, 서명 원본을 센터에서 보관합니다."
                 : `본 서약은 온라인 ${isGallery ? "전시" : "대관"} 신청 시 전자적 방식으로 동의한 내용이며, 신청자의 성명·연락처·동의 일시를 기반으로 서명을 대체합니다.`}
@@ -1333,7 +1333,7 @@ export default async function AdminRequestFormPage({
           </div>
 
           {/* ── 서명란 ── */}
-          <div className="mt-3 text-center text-xs text-gray-900 print:mt-2 print:text-[10px]">
+          <div className="mt-3 text-center text-[13px] text-slate-900 print:mt-2">
             <p>{pledgeSignDate}</p>
             <p className="mt-2">
               서약자: <b>{req.applicantName}</b> &nbsp;&nbsp; {isOffline ? "(서면 서명 · 원본 보관)" : "(전자 동의 완료)"}
@@ -1341,13 +1341,13 @@ export default async function AdminRequestFormPage({
           </div>
 
           {/* ── 푸터 ── */}
-          <div className="mt-4 border-t border-gray-300 pt-2 text-center text-xs font-bold text-gray-900 print:mt-2 print:pt-1 print:text-[10px]">
+          <div className="mt-4 border-t border-slate-300 pt-2 text-center text-[13px] font-bold text-slate-900 print:mt-2 print:pt-1">
             서초여성가족플라자 서초센터장 귀하
           </div>
 
-          <div className="mt-2 text-[10px] text-gray-500 print:text-[8px]">
+          <div className="mt-2 text-xs print:text-[11px] text-slate-500">
             {req.requestId && (
-              <p className="mt-0.5 text-gray-400">
+              <p className="mt-0.5 text-slate-500">
                 신청번호: {req.requestId} | 출력일: {printDate}
               </p>
             )}

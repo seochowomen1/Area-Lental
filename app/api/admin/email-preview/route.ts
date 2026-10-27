@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { generateDecisionEmailContent, generateBatchDecisionEmailContent, type DecisionEmailContent } from "@/lib/mail";
 import { analyzeBundle } from "@/lib/bundle";
 import { derivePaymentView } from "@/lib/payment";
@@ -14,9 +14,7 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   const { searchParams } = new URL(req.url);
   const requestId = searchParams.get("requestId") ?? "";

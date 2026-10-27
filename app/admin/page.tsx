@@ -59,8 +59,8 @@ export default async function AdminHomePage() {
       )}
 
       <div className="rounded-xl bg-white p-5 shadow">
-        <h1 className="text-lg font-semibold text-gray-900">공간별 대관 · 전시 신청 관리</h1>
-        <p className="mt-1 text-sm text-gray-600">
+        <h1 className="text-lg font-semibold text-slate-900">공간별 대관 · 전시 신청 관리</h1>
+        <p className="mt-1 text-sm text-slate-600">
           공간을 선택하여 신청 현황을 목록 또는 캘린더로 확인하세요.
         </p>
       </div>
@@ -84,7 +84,7 @@ export default async function AdminHomePage() {
           badgeLabel="대관"
           ctaLabel="조회하기"
           pendingCount={lecturePending}
-          accentColor="blue"
+          accentColor="lecture"
         />
 
         <HomeCategoryCard
@@ -95,7 +95,7 @@ export default async function AdminHomePage() {
           badgeLabel="대관"
           ctaLabel="조회하기"
           pendingCount={studioPending}
-          accentColor="violet"
+          accentColor="studio"
         />
 
         <HomeCategoryCard
@@ -106,7 +106,7 @@ export default async function AdminHomePage() {
           badgeLabel="전시"
           ctaLabel="조회하기"
           pendingCount={galleryPending}
-          accentColor="emerald"
+          accentColor="gallery"
         />
       </div>
     </div>

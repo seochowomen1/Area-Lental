@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { sendCustomDecisionEmail } from "@/lib/mail";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
@@ -20,9 +20,7 @@ export const dynamic = "force-dynamic";
  */
 export async function POST(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const form = await req.formData();

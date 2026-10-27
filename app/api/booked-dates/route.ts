@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { dayOfWeek, overlaps, inRangeYmd } from "@/lib/datetime";
+import { dayOfWeek, overlaps, inRangeYmd, todayYmdSeoul } from "@/lib/datetime";
 import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
+import { countGallerySelectableDays } from "@/lib/galleryCalendar";
 import { buildHourSlotsForDate } from "@/lib/operating";
 import { handleApiError } from "@/lib/apiResponse";
 import type { RequestStatus } from "@/lib/types";
@@ -16,7 +17,10 @@ export const revalidate = 0;
  * 사용자 캘린더에서 선택 불가 표시에 사용됩니다.
  *
  * GET /api/booked-dates?roomId=xxx&month=YYYY-MM
- * → { ok, bookedDates: string[], exhibitionEndDates: string[], prepOnlyDates: string[], holidays }
+ * → { ok, bookedDates: string[], exhibitionEndDates: string[], prepOnlyDates: string[], holidays, holidayStatus, today, availableDayCount? }
+ *   - holidayStatus: ok | stale | fallback | unavailable (audit-fix-2 R2 — 키·오류 원문은 내보내지 않는다)
+ *   - today: 오늘(KST) YYYY-MM-DD — 달력의 "지난 날짜" 판정 기준
+ *   - availableDayCount: 갤러리만 — 이번 달 신청 가능한 날 수(lib/galleryCalendar.ts와 같은 규칙)
  */
 export async function GET(req: Request) {
   try {
@@ -33,8 +37,8 @@ export async function GET(req: Request) {
     const m = parseInt(monthStr, 10);
     const lastDay = new Date(Date.UTC(year, m, 0)).getUTCDate();
 
-    // 공휴일 데이터 사전 로딩
-    await ensureHolidaysLoaded(year, m);
+    // 공휴일 데이터 사전 로딩 (상태는 화면 경고 F-1용)
+    const holidayStatus = await ensureHolidaysLoaded(year, m);
     const holidays = await getHolidays(year, m);
 
     const db = getDatabase();
@@ -103,6 +107,15 @@ export async function GET(req: Request) {
       }
     }
 
+    const today = todayYmdSeoul();
+    const availableDayCount = galleryOcc
+      ? countGallerySelectableDays(month, {
+          today,
+          booked: new Set(bookedDates),
+          holidays: new Set(holidays.map((h) => h.date)),
+        })
+      : undefined;
+
     return NextResponse.json({
       ok: true,
       bookedDates,
@@ -111,6 +124,9 @@ export async function GET(req: Request) {
       /** 갤러리: 다른 신청의 준비일만 잡힌 날 — 앞 전시의 마지막 날(종료일)로만 선택 가능 */
       prepOnlyDates,
       holidays: holidays.map((h) => ({ date: h.date, name: h.name })),
+      holidayStatus,
+      today,
+      ...(availableDayCount !== undefined ? { availableDayCount } : {}),
     });
   } catch (e: unknown) {
     return handleApiError(e, "예약 현황 조회");

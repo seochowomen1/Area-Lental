@@ -26,7 +26,7 @@ export function toPaymentViewDTO(view: PaymentView): PaymentViewDTO {
 export type BadgeTone = "gray" | "amber" | "red" | "green";
 
 export const BADGE_TONE_CLASS: Record<BadgeTone, string> = {
-  gray: "border-gray-200 bg-gray-50 text-gray-700",
+  gray: "border-slate-200 bg-slate-50 text-slate-700",
   green: "border-emerald-200 bg-emerald-50 text-emerald-800",
   red: "border-red-200 bg-red-50 text-red-800",
   amber: "border-amber-200 bg-amber-50 text-amber-800",

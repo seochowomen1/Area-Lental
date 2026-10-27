@@ -244,7 +244,7 @@ export default function MyClient() {
               <button
                 type="button"
                 onClick={clearDeviceRecord}
-                className="shrink-0 self-end text-sm font-semibold text-[rgb(var(--brand-primary))] underline-offset-2 hover:underline sm:self-start sm:pt-3"
+                className="shrink-0 self-end text-sm font-semibold text-brand underline-offset-2 hover:underline sm:self-start sm:pt-3"
               >
                 이 기기에서 조회 기록 지우기
               </button>
@@ -286,7 +286,7 @@ export default function MyClient() {
                         <td className="px-4 py-3 text-center"><StatusBadge status={g.status} /></td>
                         <td className="whitespace-nowrap px-4 py-3 text-right tabular-nums text-slate-900">
                           {(g.payableFeeKRW ?? 0).toLocaleString()}원
-                          {g.feeIsEstimated && <div className="text-xs text-slate-400">(예상)</div>}
+                          {g.feeIsEstimated && <div className="text-xs text-slate-500">(예상)</div>}
                         </td>
                         <td className="px-4 py-3 text-center">
                           <button
@@ -322,7 +322,7 @@ export default function MyClient() {
                     <div className="mt-2 flex items-center justify-between text-sm">
                       <span className="text-xs text-slate-500">신청 {fmtCreatedAt(g.createdAt)}</span>
                       <span className="font-semibold tabular-nums text-slate-900">
-                        {(g.payableFeeKRW ?? 0).toLocaleString()}원{g.feeIsEstimated ? <span className="ml-1 text-xs font-normal text-slate-400">(예상)</span> : null}
+                        {(g.payableFeeKRW ?? 0).toLocaleString()}원{g.feeIsEstimated ? <span className="ml-1 text-xs font-normal text-slate-500">(예상)</span> : null}
                       </span>
                     </div>
                     <button
@@ -356,7 +356,7 @@ export default function MyClient() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="example@domain.com"
                     autoComplete="email"
-                    className="w-full flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-[rgb(var(--brand-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-primary)/0.15)]"
+                    className="w-full flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/[0.15]"
                   />
                   <button
                     type="submit"

@@ -9,7 +9,7 @@ export const revalidate = 0;
 
 export default function Home() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <SiteHeader title="대관 · 전시 신청" />
 
       <main id="main-content" className="relative mx-auto w-full max-w-7xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -44,7 +44,7 @@ export default function Home() {
 
         <div className="mt-6 text-center text-sm text-slate-600">
           요금, 운영시간, 신청 방법, 환불 규정은{" "}
-          <Link href="/guide" className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+          <Link href="/guide" className="font-semibold text-brand underline underline-offset-2">
             대관 · 전시 이용 안내
           </Link>
           에서 확인할 수 있습니다.
@@ -68,7 +68,7 @@ export default function Home() {
             </Link>
             <Link
               href="/admin"
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              className="text-xs text-slate-500 hover:text-slate-600 transition-colors"
             >
               관리자
             </Link>

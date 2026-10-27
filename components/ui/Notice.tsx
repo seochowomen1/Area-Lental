@@ -26,7 +26,7 @@ export default function Notice({
     <div className={cn(NOTICE_BASE, NOTICE_VARIANT[variant], CARD_PAD[pad], className)}>
       <div className="flex items-start gap-3">
         {icon ? (
-          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[rgb(var(--brand-primary)/0.08)]">
+          <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-brand/[0.08]">
             {icon}
           </div>
         ) : null}

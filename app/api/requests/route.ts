@@ -4,7 +4,7 @@ import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput
 import { UPLOAD, ROOMS, validateFileMagicBytes } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
-import { ensureHolidaysLoaded } from "@/lib/holidays";
+import { ensureHolidaysLoaded, ensureHolidaysForRange, type HolidayStatus } from "@/lib/holidays";
 import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
 import { buildGallerySessionsFromPeriod, buildGalleryOccupancy, galleryDateConflicts, isPrepAfterExhibition, validateGalleryOperatingHours } from "@/lib/gallery";
 import { getDriveUploadClient, ensureUploadFolderId } from "@/lib/google";
@@ -18,7 +18,7 @@ import {
 import { logger } from "@/lib/logger";
 import { APPLICANT_TOKEN_TTL, createApplicantLinkToken } from "@/lib/publicLinkToken";
 import { rateLimit, getClientIp } from "@/lib/rateLimit";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import type { IntakeChannel, RentalRequest } from "@/lib/types";
 import type { RequestStatus } from "@/lib/types";
 import { REQUEST_LIMITS, TIME_CONSTANTS } from "@/lib/constants";
@@ -199,12 +199,7 @@ export async function POST(req: Request) {
     let offlineMeta: { intakeChannel: IntakeChannel; appliedAt: string; intakeNote?: string } | null = null;
     if (isOffline) {
       const auth = await assertAdminApiAuth(req);
-      if (!auth.ok) {
-        return NextResponse.json(
-          { ok: false, code: "UNAUTHORIZED", message: "서면 접수 등록은 관리자만 할 수 있습니다." },
-          { status: auth.status ?? 401 }
-        );
-      }
+      if (!auth.ok) return adminApiAuthFailure(auth, { unauthorizedMessage: "서면 접수 등록은 관리자만 할 수 있습니다." });
       if (raw.roomId !== "gallery") {
         return NextResponse.json(
           { ok: false, code: "VALIDATION_ERROR", message: "서면 접수 등록은 현재 우리동네 갤러리만 지원합니다." },
@@ -271,6 +266,8 @@ export async function POST(req: Request) {
     const isYmd = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
 
     let sessions: SessionInput[] = [];
+    /** 갤러리: 전시 기간에 걸친 달의 공휴일 조회 상태(가장 나쁜 값) — galleryAuditJson·응답에 기록 (audit-fix-2 R2) */
+    let galleryHolidayCheck: { status: HolidayStatus; months: string[] } | null = null;
 
     // 갤러리 입력일 경우 타입 안전하게 접근
     const galleryInput = input.roomId === "gallery" ? (input as GalleryRequestInput) : null;
@@ -330,6 +327,8 @@ export async function POST(req: Request) {
         await Promise.all(
           Array.from(months).map((ym) => ensureHolidaysLoaded(parseInt(ym.slice(0, 4), 10), parseInt(ym.slice(5, 7), 10)))
         );
+        // 금액(전시일 수)에 영향을 주는 달 = 시작월~종료월 (위에서 이미 로딩 → 캐시)
+        galleryHolidayCheck = await ensureHolidaysForRange(startDate, endDate);
       }
       // ★ 준비·철거 규정(2026-10-19): 준비일이 앞 전시의 마지막 날이면 17:00(토 11:00) 이후 회차로 생성
       const occForPrep = buildGalleryOccupancy(await loadFresh(), await db.getBlocks());
@@ -649,7 +648,10 @@ export async function POST(req: Request) {
           saturdayCount: gallerySaturdayCount ?? 0,
           exhibitionDayCount: galleryExhibitionDayCount ?? 0,
           generatedAt: galleryGeneratedAt,
-          version: galleryGenerationVersion
+          version: galleryGenerationVersion,
+          // audit-fix-2 R2: 신청 당시 공휴일 조회 상태(ok|stale|fallback|unavailable) — 관리자 상세 배너·다시 계산 판단
+          holidayCheck: galleryHolidayCheck?.status ?? "unavailable",
+          holidayMonths: galleryHolidayCheck?.months ?? [],
         })
       : undefined;
 
@@ -850,6 +852,8 @@ export async function POST(req: Request) {
         token: applicantToken,
         tokenExpiresAt,
         estimatedFeeKRW,
+        // 갤러리만: 신청 당시 공휴일 조회 상태 — unavailable이면 완료 화면 금액 옆 "(공휴일 미확인 · 승인 때 확정)"
+        ...(isGallery ? { holidayCheck: galleryHolidayCheck?.status ?? "unavailable" } : {}),
       },
       { status: 200 }
     );

@@ -55,7 +55,7 @@ export default function PrivacyModal({ open, onClose, onAgree, onDisagree, varia
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+            className="rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
             aria-label="모달 닫기"
           >
             닫기

@@ -51,25 +51,25 @@ export default function BatchSessionSelector({ sessions }: { sessions: BatchSess
         <button
           type="button"
           onClick={allSelected ? clearAll : selectAll}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
         >
           {allSelected ? "전체 해제" : "전체 선택"}
         </button>
         <button
           type="button"
           onClick={selectPending}
-          className="rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm hover:bg-gray-50"
+          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
         >
           대기만 선택
         </button>
-        <span className="text-xs text-gray-600">
+        <span className="text-xs text-slate-600">
           * 체크된 회차만 아래 “선택 승인/반려”가 적용됩니다.
         </span>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-gray-200">
+      <div className="overflow-x-auto rounded-xl border border-slate-200">
         <table className="w-full text-sm">
-          <thead className="bg-gray-50 text-left text-gray-700">
+          <thead className="bg-slate-50 text-left text-slate-700">
             <tr>
               <th className="p-2">선택</th>
               <th className="p-2">회차</th>
@@ -97,7 +97,7 @@ export default function BatchSessionSelector({ sessions }: { sessions: BatchSess
                   <td className="p-2">{s.seq}</td>
                   <td className="p-2">
                     {s.date} {s.startTime}-{s.endTime}
-                    {s.isPrepDay ? <span className="ml-2 text-xs text-gray-500">(준비일)</span> : null}
+                    {s.isPrepDay ? <span className="ml-2 text-xs text-slate-500">(준비일)</span> : null}
                   </td>
                   <td className="p-2">{s.status}</td>
                   <td className="p-2">{s.status === "반려" ? (s.rejectReason || "-") : "-"}</td>

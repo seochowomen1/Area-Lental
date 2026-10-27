@@ -13,6 +13,7 @@ import { ROOMS_BY_ID, normalizeRoomCategory } from "@/lib/space";
 import { recordAudit } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 import { logger } from "@/lib/logger";
+import { getGalleryRecalcView, parseGalleryAudit } from "@/lib/galleryRecalc";
 
 function getIpFromHeaders(): string {
   const h = headers();
@@ -345,4 +346,78 @@ export async function sendConfirmedEmailAction(requestId: string, formData: Form
   });
 
   redirect(`/admin/requests/${encodeURIComponent(requestId)}?mailed=1`);
+}
+
+/**
+ * 갤러리 이용료 다시 계산 (audit-fix-2 R2 · 01_spec 5-3 · ⑧ Q7)
+ * - 사용: `<form action={recalcGalleryFeeAction.bind(null, requestId)}>` (다른 액션과 같은 시그니처)
+ * - 이 1건만: 일수 3열 + galleryAuditJson(holidayCheck:"ok" · recalculatedAt · recalcFrom · recalcHolidayStatus) 갱신 + 감사 로그 1건
+ * - 결과 redirect: 성공 `saved=recalc` · 조건 밖 `formError=recalcNotAllowed` · 공휴일 여전히 조회 불가 `formError=holidayUnavailable`
+ *   · 바뀔 것 없음 `formError=recalcNoChange` · 시트 쓰기 실패 `formError=sheetBusy`
+ */
+export async function recalcGalleryFeeAction(requestId: string, _formData?: FormData) {
+  void _formData;
+  await assertAdminAuth();
+  const db = getDatabase();
+  const current = await db.getRequestById(requestId);
+  if (!current) redirect("/admin");
+  const backUrl = `/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(categoryOf(current))}`;
+
+
+  const view = await getGalleryRecalcView(current);
+  if (!view || !view.showBanner || !view.statusAllowed) redirect(`${backUrl}&formError=recalcNotAllowed`);
+  if (!view.after) redirect(`${backUrl}&formError=holidayUnavailable`);
+  if (view.blockReason === "noChange") redirect(`${backUrl}&formError=recalcNoChange`);
+  const after = view.after;
+  const before = view.before;
+
+  const recalculatedAt = nowIsoSeoul();
+  const audit = parseGalleryAudit(current.galleryAuditJson);
+  const nextAudit = {
+    ...audit,
+    weekdayCount: after.weekdayCount,
+    saturdayCount: after.saturdayCount,
+    exhibitionDayCount: after.exhibitionDayCount,
+    holidayCheck: "ok",
+    recalcHolidayStatus: view.nowStatus,
+    recalculatedAt,
+    recalcFrom: { weekdayCount: before.weekdayCount, saturdayCount: before.saturdayCount, feeKRW: before.feeKRW },
+  };
+
+  let saved = false;
+  try {
+    await db.updateGalleryFee({
+      requestId: current.requestId,
+      weekdayCount: after.weekdayCount,
+      saturdayCount: after.saturdayCount,
+      exhibitionDayCount: after.exhibitionDayCount,
+      galleryAuditJson: JSON.stringify(nextAudit),
+    });
+    saved = true;
+  } catch (e) {
+    logger.error("갤러리 이용료 다시 계산 저장 실패", { requestId: current.requestId, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!saved) redirect(sheetBusyUrl(current));
+
+  await recordAudit({
+    action: "GALLERY_FEE_RECALC",
+    ip: getIpFromHeaders(),
+    actor: getDefaultDecidedBy(),
+    target: current.requestId,
+    summary: [
+      `이용료 ${before.feeKRW.toLocaleString()}원 → ${after.feeKRW.toLocaleString()}원`,
+      `평일 ${before.weekdayCount}→${after.weekdayCount}일 · 토요일 ${before.saturdayCount}→${after.saturdayCount}일`,
+      `${view.startDate}~${view.endDate}`,
+      view.periodHolidays.length ? `공휴일 ${view.periodHolidays.map((h) => h.label).join(", ")}` : "",
+    ].filter(Boolean).join(" · "),
+    details: {
+      before,
+      after,
+      holidayCheckAtApply: view.holidayCheck,
+      holidayStatusNow: view.nowStatus,
+      recalculatedAt,
+    },
+  });
+
+  redirect(`${backUrl}&saved=recalc`);
 }

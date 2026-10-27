@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import SpaceDetailTabs from "@/components/SpaceDetailTabs";
+import Modal from "@/components/ui/Modal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import type { SpaceRoom } from "@/lib/space";
 import { STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
@@ -140,12 +141,12 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
         <section className="mt-6 grid grid-cols-1 gap-8 lg:grid-cols-[360px_minmax(0,1fr)]">
         {/* LEFT: 이미지 + 요약 패널 */}
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-[0_1px_0_rgba(0,0,0,0.02)]">
-          <div className="aspect-[4/3] w-full bg-gray-100">
+          <div className="aspect-[4/3] w-full bg-slate-100">
             {room.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={room.image} alt={room.name} className="h-full w-full object-cover" />
+              <img src={room.image} alt={room.name} width={800} height={600} loading="lazy" decoding="async" className="h-full w-full object-cover" />
             ) : (
-              <div className="flex h-full items-center justify-center text-xs text-gray-500">이미지 준비중</div>
+              <div className="flex h-full items-center justify-center text-xs text-slate-500">이미지 준비중</div>
             )}
           </div>
 
@@ -160,7 +161,7 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
                 aria-expanded={openEquip}
               >
                 <div className="flex items-center gap-2">
-                  <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--brand-accent))]" />
+                  <span className="inline-block h-2 w-2 rounded-full bg-accent" />
                   <h3 className="text-sm font-bold text-slate-900">비치물품</h3>
                 </div>
                 <span className="text-xs font-semibold text-slate-500 lg:hidden">{openEquip ? "접기" : "펼치기"}</span>
@@ -175,7 +176,7 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
                         className="inline-flex items-center gap-1 rounded-full border bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700"
                         title={it}
                       >
-                        <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--brand-primary))]" />
+                        <span className="inline-block h-2 w-2 rounded-full bg-brand" />
                         {it}
                       </span>
                     ))}
@@ -196,13 +197,13 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
                     <div className="flex items-center gap-2">
                       <span className="inline-block h-2 w-2 rounded-full bg-orange-400" />
                       <span className="text-xs font-bold text-orange-800">촬영장비</span>
-                      <span className="rounded bg-orange-200 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700">유료</span>
+                      <span className="rounded bg-orange-200 px-1.5 py-0.5 text-xs font-semibold text-orange-700">유료</span>
                     </div>
-                    <span className="text-[11px] font-semibold text-orange-600">상세보기 &rsaquo;</span>
+                    <span className="text-xs font-semibold text-orange-600">상세보기 &rsaquo;</span>
                   </button>
                 )}
 
-                <p className="mt-3 text-[11px] text-slate-500">
+                <p className="mt-3 text-[13px] text-slate-500">
                   ※ 비치물품 및 제공 설비는 현장 운영 상황에 따라 변동될 수 있습니다.
                 </p>
               </div>
@@ -219,25 +220,25 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
         <div>
           <h1 className="text-2xl font-bold">{room.name}</h1>
 
-          <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-gray-700 sm:grid-cols-2">
+          <div className="mt-4 grid grid-cols-1 gap-2 text-sm text-slate-700 sm:grid-cols-2">
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="shrink-0 text-gray-500">{room.id === "gallery" ? "전시 작품 수" : "수용인원"}</span>
+              <span className="shrink-0 text-slate-500">{room.id === "gallery" ? "전시 작품 수" : "수용인원"}</span>
               <span className="font-medium text-right">
                 {room.id === "gallery"
-                  ? <>액자형태 최대 15점<span className="block text-[11px] font-normal text-gray-400">(가로 60cm 기준)</span></>
+                  ? <>액자형태 최대 15점<span className="block text-xs font-normal text-slate-500">(가로 60cm 기준)</span></>
                   : `최대 ${room.capacity}명`}
               </span>
             </div>
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">이용시간</span>
+              <span className="text-slate-500">이용시간</span>
               <span className="font-medium">{room.id === "gallery" ? "일 단위" : "최소 1시간"}</span>
             </div>
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">{room.id === "gallery" ? "이용료" : "대관료"}</span>
+              <span className="text-slate-500">{room.id === "gallery" ? "이용료" : "대관료"}</span>
               <span className="font-medium">{room.id === "gallery" ? "평일 20,000원 / 토요일 10,000원" : room.feeKRW > 0 ? `${room.feeKRW.toLocaleString()}원/시간` : "별도 협의"}</span>
             </div>
             <div className="flex justify-between rounded-md border bg-white px-3 py-2">
-              <span className="text-gray-500">위치</span>
+              <span className="text-slate-500">위치</span>
               <span className="font-medium">{room.floor}층</span>
             </div>
           </div>
@@ -258,72 +259,44 @@ export default function SpaceDetailShell({ room }: { room: SpaceRoom }) {
         </section>
       </div>
       {/* ── E-스튜디오 촬영장비(유료) 팝업 ── */}
-      {showStudioEquipPopup && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
-          onClick={() => setShowStudioEquipPopup(false)}
-        >
-          <div
-            className="w-full max-w-md rounded-2xl bg-white shadow-xl"
-            onClick={(e) => e.stopPropagation()}
+      <Modal
+        open={showStudioEquipPopup}
+        onClose={() => setShowStudioEquipPopup(false)}
+        title={<span className="flex items-center gap-2">촬영장비 안내<span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">유료</span></span>}
+        footer={
+          <button
+            type="button"
+            data-modal-cancel
+            onClick={() => setShowStudioEquipPopup(false)}
+            className="inline-flex min-h-[44px] w-full items-center justify-center rounded-xl bg-brand px-4 py-2 text-[15px] font-semibold text-white hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
           >
-            {/* 헤더 */}
-            <div className="flex items-center justify-between border-b px-5 py-4">
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold text-slate-900">촬영장비 안내</h3>
-                <span className="rounded bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700">유료</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowStudioEquipPopup(false)}
-                className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                aria-label="닫기"
-              >
-                <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-              </button>
-            </div>
-
-            {/* 장비 목록 테이블 */}
-            <div className="px-5 py-4">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-slate-200">
-                    <th className="pb-2 text-left text-xs font-semibold text-slate-500">장비명</th>
-                    <th className="pb-2 text-right text-xs font-semibold text-slate-500">사용료</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
-                    <tr key={key}>
-                      <td className="py-2.5 pr-3 text-[13px] leading-snug text-slate-800">{STUDIO_EQUIPMENT_LABELS[key]}</td>
-                      <td className="whitespace-nowrap py-2.5 text-right text-[13px] font-semibold tabular-nums text-slate-900">
-                        {STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            {/* 안내 문구 */}
-            <div className="border-t bg-slate-50 px-5 py-3 text-[11px] leading-relaxed text-slate-500">
-              <p>※ 촬영장비는 대관 이용시간 중 1일 1회 과금됩니다.</p>
-              <p>※ 대관 신청 시 필요한 장비를 선택할 수 있습니다.</p>
-            </div>
-
-            {/* 닫기 버튼 */}
-            <div className="border-t px-5 py-3">
-              <button
-                type="button"
-                onClick={() => setShowStudioEquipPopup(false)}
-                className="w-full rounded-lg bg-slate-900 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-slate-800"
-              >
-                확인
-              </button>
-            </div>
-          </div>
+            확인
+          </button>
+        }
+      >
+        <table className="w-full">
+          <thead>
+            <tr className="border-b border-slate-200">
+              <th className="pb-2 text-left text-sm font-semibold text-slate-500">장비명</th>
+              <th className="pb-2 text-right text-sm font-semibold text-slate-500">사용료</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {(Object.keys(STUDIO_EQUIPMENT_FEE_KRW) as Array<keyof typeof STUDIO_EQUIPMENT_FEE_KRW>).map((key) => (
+              <tr key={key}>
+                <td className="py-2.5 pr-3 text-[15px] leading-snug text-slate-800">{STUDIO_EQUIPMENT_LABELS[key]}</td>
+                <td className="whitespace-nowrap py-2.5 text-right text-[15px] font-semibold tabular-nums text-slate-900">
+                  {STUDIO_EQUIPMENT_FEE_KRW[key].toLocaleString()}원
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="mt-3 rounded-lg bg-slate-50 px-3 py-2 text-[13px] leading-relaxed text-slate-600">
+          <p>※ 촬영장비는 대관 이용시간 중 1일 1회 과금됩니다.</p>
+          <p>※ 대관 신청 시 필요한 장비를 선택할 수 있습니다.</p>
         </div>
-      )}
+      </Modal>
     </main>
   );
 }

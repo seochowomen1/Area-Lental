@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useMemo, useRef, useState } from "react";
+import Modal, { MODAL_BTN_PRIMARY, MODAL_BTN_SECONDARY } from "@/components/ui/Modal";
 import { cn } from "@/lib/cn";
 import type { ClassSchedule, Room } from "@/lib/types";
 
@@ -337,11 +338,11 @@ export default function ScheduleGrid({
         title={`${sched.title} (${sched.startTime}~${sched.endTime})${roomName ? `\n${roomName}` : ""}\n클릭하여 수정`}
       >
         {roomName && slots >= 2 && (
-          <div className="truncate text-[8px] font-bold leading-tight opacity-70">{roomName}</div>
+          <div className="truncate text-xs font-bold leading-tight opacity-70">{roomName}</div>
         )}
-        <div className="truncate text-[10px] font-bold leading-tight">{sched.source === "classroom" ? "⟳ " : ""}{sched.title}</div>
+        <div className="truncate text-xs font-bold leading-tight">{sched.source === "classroom" ? "⟳ " : ""}{sched.title}</div>
         {slots >= 2 && (
-          <div className="truncate text-[9px] opacity-70 leading-tight">
+          <div className="truncate text-xs opacity-70 leading-tight">
             {sched.startTime}~{sched.endTime}
           </div>
         )}
@@ -361,7 +362,7 @@ export default function ScheduleGrid({
             className={cn(
               "rounded-full px-4 py-1.5 text-sm font-semibold transition",
               selectedRoom === r.id
-                ? "bg-slate-900 text-white"
+                ? "bg-brand text-white"
                 : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50",
             )}
           >
@@ -380,7 +381,7 @@ export default function ScheduleGrid({
             onChange={(e) => setEffectiveFrom(e.target.value)}
             className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm"
           />
-          <span className="text-slate-400">~</span>
+          <span className="text-slate-500">~</span>
           <input
             type="date"
             value={effectiveTo}
@@ -469,7 +470,7 @@ export default function ScheduleGrid({
           </colgroup>
           <thead>
             <tr className="bg-slate-50">
-              <th className="border-r border-b border-slate-200 py-2 text-[11px] font-semibold text-slate-400">
+              <th className="border-r border-b border-slate-200 py-2 text-xs font-semibold text-slate-500">
                 시간
               </th>
               {DAYS.map((d) => (
@@ -487,7 +488,7 @@ export default function ScheduleGrid({
               <tr key={slot.m}>
                 {/* 시간 라벨 */}
                 <td
-                  className="select-none border-r border-b border-slate-100 pr-2 text-right text-[10px] tabular-nums text-slate-400"
+                  className="select-none border-r border-b border-slate-100 pr-2 text-right text-xs tabular-nums text-slate-500"
                   style={{ height: SLOT_H }}
                 >
                   {slot.m % 60 === 0 ? slot.label : ""}
@@ -553,19 +554,17 @@ export default function ScheduleGrid({
           등록된 수업
         </span>
         {periodReady && !isAllView && (
-          <span className="text-slate-400">* 빈 셀을 드래그하여 수업 추가, 블록 클릭으로 수정</span>
+          <span className="text-slate-500">* 빈 셀을 드래그하여 수업 추가, 블록 클릭으로 수정</span>
         )}
         {isAllView && (
-          <span className="text-slate-400">* 블록 클릭으로 수정/삭제 가능</span>
+          <span className="text-slate-500">* 블록 클릭으로 수정/삭제 가능</span>
         )}
       </div>
 
       {/* ── 추가 다이얼로그 ── */}
-      {addDialog && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setAddDialog(null)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">수업시간 추가</h3>
-            <div className="space-y-2.5 text-sm">
+      <Modal open={!!addDialog} onClose={() => setAddDialog(null)} busy={isSubmitting} size="sm" title="수업시간 추가" showClose={false}>
+        {addDialog && (<>
+            <div className="space-y-2.5 text-[15px]">
               <div className="flex gap-3">
                 <span className="w-16 shrink-0 font-semibold text-slate-500">{spaceLabel}</span>
                 <span className="font-medium text-slate-900">
@@ -593,30 +592,26 @@ export default function ScheduleGrid({
                   value={addTitle}
                   onChange={(e) => setAddTitle(e.target.value)}
                   placeholder="예: 정규강좌"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                  autoFocus
+                  className="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-brand focus:ring-2 focus:ring-sky sm:text-[15px]"
                   onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
                 />
               </div>
             </div>
             <div className="mt-5 flex gap-3">
-              <button type="button" onClick={() => setAddDialog(null)} className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+              <button type="button" onClick={() => setAddDialog(null)} disabled={isSubmitting} data-modal-cancel className={`${MODAL_BTN_SECONDARY} flex-1`}>
                 취소
               </button>
-              <button type="button" onClick={handleAdd} disabled={isSubmitting} className="flex-1 rounded-lg bg-[rgb(var(--brand-primary))] py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50">
-                {isSubmitting ? "등록 중..." : "추가"}
+              <button type="button" onClick={handleAdd} disabled={isSubmitting} className={`${MODAL_BTN_PRIMARY} flex-1`}>
+                {isSubmitting ? "등록 중…" : "추가"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>)}
+      </Modal>
 
       {/* ── 수정/삭제 다이얼로그 ── */}
-      {editSchedule && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => setEditSchedule(null)}>
-          <div className="w-full max-w-sm rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-900 mb-4">수업시간 수정</h3>
-            <div className="space-y-2.5 text-sm">
+      <Modal open={!!editSchedule} onClose={() => setEditSchedule(null)} busy={isSubmitting} size="sm" title="수업시간 수정" showClose={false}>
+        {editSchedule && (<>
+            <div className="space-y-2.5 text-[15px]">
               <div className="flex gap-3">
                 <span className="w-16 shrink-0 font-semibold text-slate-500">{spaceLabel}</span>
                 <span className="font-medium text-slate-900">
@@ -640,8 +635,7 @@ export default function ScheduleGrid({
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   placeholder="예: 정규강좌"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                  autoFocus
+                  className="min-h-[44px] w-full rounded-lg border border-slate-300 px-3 py-2 text-base outline-none focus:border-brand focus:ring-2 focus:ring-sky sm:text-[15px]"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3 pt-1">
@@ -683,27 +677,23 @@ export default function ScheduleGrid({
                 type="button"
                 onClick={handleEditDelete}
                 disabled={isSubmitting}
-                className="rounded-lg border border-rose-200 px-4 py-2.5 text-sm font-semibold text-rose-600 hover:bg-rose-50 disabled:opacity-50"
+                className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-xl border border-red-300 bg-white px-4 py-2 text-[15px] font-semibold text-red-700 hover:bg-red-50 disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500"
               >
                 삭제
               </button>
               <div className="flex-1" />
-              <button type="button" onClick={() => setEditSchedule(null)} className="rounded-lg border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50">
+              <button type="button" onClick={() => setEditSchedule(null)} disabled={isSubmitting} data-modal-cancel className={MODAL_BTN_SECONDARY}>
                 취소
               </button>
-              <button type="button" onClick={handleUpdate} disabled={isSubmitting} className="rounded-lg bg-[rgb(var(--brand-primary))] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50">
-                {isSubmitting ? "저장 중..." : "저장"}
+              <button type="button" onClick={handleUpdate} disabled={isSubmitting} className={MODAL_BTN_PRIMARY}>
+                {isSubmitting ? "저장 중…" : "저장"}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+        </>)}
+      </Modal>
 
       {/* ── 분기 복사 다이얼로그 ── */}
-      {copyOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" onClick={() => { if (!copyProgress) setCopyOpen(false); }}>
-          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
-            <h3 className="text-lg font-bold text-slate-900 mb-2">분기 시간표 복사</h3>
+      <Modal open={copyOpen} onClose={() => setCopyOpen(false)} busy={!!copyProgress} title="분기 시간표 복사" showClose={false}>
             <p className="text-sm text-slate-500 mb-4">
               현재 적용기간의 수업 <b className="text-slate-800">{quarterSchedules.length}건</b>을 선택한 분기로 복사합니다.
             </p>
@@ -734,12 +724,12 @@ export default function ScheduleGrid({
               <div className="mt-4">
                 <div className="h-2 rounded-full bg-slate-100 overflow-hidden">
                   <div
-                    className="h-full bg-[rgb(var(--brand-primary))] transition-all rounded-full"
+                    className="h-full bg-brand transition-all rounded-full"
                     style={{ width: `${(copyProgress.done / copyProgress.total) * 100}%` }}
                   />
                 </div>
-                <p className="mt-1.5 text-xs text-slate-500 text-center">
-                  {copyProgress.done} / {copyProgress.total} 복사 중...
+                <p className="mt-1.5 text-center text-[13px] text-slate-500">
+                  전체 {copyProgress.total}건 중 {copyProgress.done}건 복사 중…
                 </p>
               </div>
             )}
@@ -749,7 +739,8 @@ export default function ScheduleGrid({
                 type="button"
                 onClick={() => setCopyOpen(false)}
                 disabled={!!copyProgress}
-                className="flex-1 rounded-lg border border-slate-200 py-2.5 text-sm font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                data-modal-cancel
+                className={`${MODAL_BTN_SECONDARY} flex-1`}
               >
                 취소
               </button>
@@ -757,14 +748,12 @@ export default function ScheduleGrid({
                 type="button"
                 onClick={handleCopy}
                 disabled={!copyTarget || !!copyProgress || quarterSchedules.length === 0}
-                className="flex-1 rounded-lg bg-[rgb(var(--brand-primary))] py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-50"
+                className={`${MODAL_BTN_PRIMARY} flex-1`}
               >
-                {copyProgress ? "복사 중..." : `${quarterSchedules.length}건 복사`}
+                {copyProgress ? "복사 중…" : `${quarterSchedules.length}건 복사`}
               </button>
             </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }

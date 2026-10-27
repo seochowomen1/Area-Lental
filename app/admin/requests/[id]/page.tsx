@@ -33,7 +33,10 @@ import {
   decideSingleAction,
   saveBundleMetaAction,
   decideSelectedSessionsAction,
+  recalcGalleryFeeAction,
 } from "./actions";
+import GalleryHolidayBanner from "@/components/admin/GalleryHolidayBanner";
+import { getGalleryRecalcView } from "@/lib/galleryRecalc";
 
 export const runtime = "nodejs";
 
@@ -55,8 +58,8 @@ function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
 function InfoRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div className="flex gap-3 py-1.5">
-      <dt className="w-20 shrink-0 text-xs font-semibold text-gray-500">{label}</dt>
-      <dd className="text-sm text-gray-900">{children}</dd>
+      <dt className="w-20 shrink-0 text-xs font-semibold text-slate-500">{label}</dt>
+      <dd className="text-sm text-slate-900">{children}</dd>
     </div>
   );
 }
@@ -64,9 +67,9 @@ function InfoRow({ label, children }: { label: string; children: React.ReactNode
 /* 섹션 카드 */
 function Section({ title, children, className }: { title: string; children: React.ReactNode; className?: string }) {
   return (
-    <section className={`rounded-xl border border-gray-200 bg-white shadow-sm ${className ?? ""}`}>
-      <div className="border-b border-gray-100 px-5 py-3">
-        <h2 className="text-sm font-bold text-gray-900">{title}</h2>
+    <section className={`rounded-xl border border-slate-200 bg-white shadow-sm ${className ?? ""}`}>
+      <div className="border-b border-slate-100 px-5 py-3">
+        <h2 className="text-sm font-bold text-slate-900">{title}</h2>
       </div>
       <div className="px-5 py-4">{children}</div>
     </section>
@@ -80,7 +83,7 @@ export default async function AdminRequestDetail({
   searchParams,
 }: {
   params: { id: string };
-  searchParams?: { category?: string; formError?: string };
+  searchParams?: { category?: string; formError?: string; saved?: string };
 }) {
   await assertAdminAuth();
   const formErrorMessage =
@@ -94,7 +97,13 @@ export default async function AdminRequestDetail({
             ? "시트 저장이 잠시 막혀(요청 한도) 아무것도 바뀌지 않았습니다. 1분 뒤 다시 눌러 주세요."
             : searchParams?.formError === "noSelection"
               ? "처리할 회차를 1개 이상 선택하세요."
-              : "";
+              : searchParams?.formError === "recalcNotAllowed"
+                ? "결제 안내가 이미 나갔으므로 자동으로 바꾸지 않습니다. 차액은 할인·환불 기록으로 처리해 주세요."
+                : searchParams?.formError === "holidayUnavailable"
+                  ? "지금도 공휴일 정보를 불러오지 못했습니다. 기간에 공휴일이 있는지 달력에서 직접 확인해 주세요."
+                  : searchParams?.formError === "recalcNoChange"
+                    ? "기간에 공휴일이 없어 바꿀 금액이 없습니다."
+                    : "";
 
   const db = getDatabase();
   let req: RentalRequest | null = null;
@@ -110,21 +119,21 @@ export default async function AdminRequestDetail({
       <main className="mx-auto max-w-5xl p-6">
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-8 text-center">
           <div className="text-4xl text-amber-400">!</div>
-          <h1 className="mt-3 text-lg font-bold text-gray-900">신청 정보를 찾을 수 없습니다</h1>
-          <p className="mt-2 text-sm text-gray-600">
+          <h1 className="mt-3 text-lg font-bold text-slate-900">신청 정보를 찾을 수 없습니다</h1>
+          <p className="mt-2 text-sm text-slate-600">
             신청번호 <b>{params.id}</b>에 해당하는 데이터가 없습니다.<br />
             Mock 모드에서는 서버 재시작 시 데이터가 초기화될 수 있습니다.
           </p>
           <div className="mt-6 flex items-center justify-center gap-3">
             <Link
               href={`/admin/requests?category=${encodeURIComponent(cat)}`}
-              className="rounded-full bg-[rgb(var(--brand-primary))] px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+              className="rounded-full bg-brand px-6 py-2.5 text-sm font-semibold text-white shadow-sm hover:opacity-95"
             >
               목록으로 돌아가기
             </Link>
             <Link
               href={`/admin/calendar?category=${encodeURIComponent(cat)}`}
-              className="rounded-full border border-gray-200 bg-white px-6 py-2.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              className="rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             >
               캘린더 보기
             </Link>
@@ -143,6 +152,15 @@ export default async function AdminRequestDetail({
   }
   const normalizedCategory = normalizeRoomCategory(rawCategory);
   const isGallery = req.roomId === "gallery" || normalizedCategory === "gallery";
+  /** 갤러리 공휴일 미확인 배너·다시 계산 보기(서버 전용 · 갤러리가 아니면 null) */
+  let recalcView: Awaited<ReturnType<typeof getGalleryRecalcView>> = null;
+  if (isGallery) {
+    try {
+      recalcView = await getGalleryRecalcView(req);
+    } catch (e) {
+      logger.warn("갤러리 공휴일 배너 계산 실패", { requestId: req.requestId, error: e instanceof Error ? e.message : String(e) });
+    }
+  }
   const isStudio = normalizedCategory === "studio";
   const studioBaseHeadcount = room?.baseHeadcount ?? 2;
   const studioExtraPersons = isStudio ? Math.max(0, Math.floor(Number(req.headcount ?? 0)) - studioBaseHeadcount) : 0;
@@ -279,6 +297,12 @@ export default async function AdminRequestDetail({
   return (
     <main className="mx-auto max-w-5xl space-y-5 p-6">
 
+      {searchParams?.saved === "recalc" && isGallery && (
+        <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-[15px] font-semibold text-emerald-700">
+          이용료를 다시 계산했습니다: {formatKRW(feeBasis.totalFeeKRW)}
+        </div>
+      )}
+
       {formErrorMessage && (
         <div role="alert" className="rounded-xl border border-rose-200 bg-rose-50 px-5 py-3 text-sm font-semibold text-rose-700">
           {formErrorMessage}
@@ -289,23 +313,23 @@ export default async function AdminRequestDetail({
       <div className={`rounded-xl border ${accent.border} ${accent.bg} px-5 py-4`}>
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <span className={`inline-flex h-2.5 w-2.5 rounded-full ${accent.dot}`} />
+            <span className={`inline-block h-5 w-1 shrink-0 rounded-full ${accent.bar}`} aria-hidden="true" />
             <div>
-              <span className={`text-xs font-semibold ${accent.text}`}>{categoryLabel}</span>
-              <h1 className="text-lg font-bold text-gray-900">
+              <span className={`text-sm font-semibold ${accent.text}`}>{categoryLabel}</span>
+              <h1 className="text-lg font-bold text-slate-900">
                 {REQUEST_ID_LABEL} {req.requestId}
                 {isGallery && !isBatch && galleryExhibitionDayCount > 0 && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
+                  <span className="ml-2 text-sm font-normal text-slate-500">
                     전시 {galleryExhibitionDayCount}일
                   </span>
                 )}
                 {isBatch && !isGallery && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
+                  <span className="ml-2 text-sm font-normal text-slate-500">
                     묶음 · {sessions.length}회
                   </span>
                 )}
                 {isBatch && isGallery && (
-                  <span className="ml-2 text-sm font-normal text-gray-500">
+                  <span className="ml-2 text-sm font-normal text-slate-500">
                     묶음 · {sessions.length}일
                   </span>
                 )}
@@ -314,14 +338,14 @@ export default async function AdminRequestDetail({
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Link href={backToListHref} className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50">
+            <Link href={backToListHref} className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50">
               ← 목록
             </Link>
             {(normalizedCategory === "lecture" || normalizedCategory === "studio") && (
               <Link
                 href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
                 target="_blank"
-                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+                className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
                 신청서 · 서약서
               </Link>
@@ -330,7 +354,7 @@ export default async function AdminRequestDetail({
               <Link
                 href={`/admin/requests/${encodeURIComponent(req.requestId)}/form?category=${encodeURIComponent(normalizedCategory)}`}
                 target="_blank"
-                className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
+                className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm hover:opacity-95"
               >
                 신청서 · 서약서
               </Link>
@@ -338,7 +362,7 @@ export default async function AdminRequestDetail({
             <ExcelDownloadButton
               href={`/api/admin/export/form?requestId=${encodeURIComponent(req.requestId)}`}
               label="Excel"
-              className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50"
+              className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
             />
             <GianCopyButton payload={gianPayload} />
             <WelfareCopyButton requestId={req.requestId} />
@@ -346,12 +370,31 @@ export default async function AdminRequestDetail({
         </div>
       </div>
 
+      {/* ═══ 1-1. 갤러리 공휴일 미확인 배너(③-F-3) — 헤더 바로 아래, 다른 모든 섹션 위 ═══ */}
+      {recalcView?.showBanner && recalcView.bannerLevel ? (
+        <GalleryHolidayBanner
+          view={{
+            bannerLevel: recalcView.bannerLevel,
+            nowUnavailable: recalcView.nowStatus === "unavailable",
+            periodHolidayLabels: recalcView.periodHolidays.map((h) => h.label),
+            statusAllowed: recalcView.statusAllowed,
+            canRecalc: recalcView.canRecalc,
+            before: recalcView.before,
+            after: recalcView.after,
+            startDate: recalcView.startDate,
+            endDate: recalcView.endDate,
+            recalculatedAt: recalcView.recalculatedAt,
+          }}
+          action={recalcGalleryFeeAction.bind(null, req.requestId)}
+        />
+      ) : null}
+
       {/* ═══ 2. 상태 요약 스트립 ═══ */}
-      <div className="rounded-xl border border-gray-200 bg-white px-5 py-4 shadow-sm">
+      <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-col items-start gap-2 md:flex-row md:flex-wrap md:items-center md:gap-4">
             <div className="flex items-center gap-2">
-              <span className="text-sm font-semibold text-gray-600">처리 상태</span>
+              <span className="text-sm font-semibold text-slate-600">처리 상태</span>
               <StatusBadge status={statusForFilter} />
               {isBatch && displayStatus === "부분처리" && (
                 <span className="rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">부분처리</span>
@@ -359,7 +402,7 @@ export default async function AdminRequestDetail({
             </div>
 
             {isBatch && (
-              <div className="flex items-center gap-3 text-sm text-gray-600 md:border-l md:border-gray-200 md:pl-4">
+              <div className="flex items-center gap-3 text-sm text-slate-600 md:border-l md:border-slate-200 md:pl-4">
                 <span>승인 <b className="text-emerald-700">{bundle!.approvedCount}</b></span>
                 <span>반려 <b className="text-rose-700">{bundle!.rejectedCount}</b></span>
                 <span>대기 <b className="text-amber-700">{bundle!.pendingCount}</b></span>
@@ -369,8 +412,8 @@ export default async function AdminRequestDetail({
             {/* 결제·홈페이지 배지 — 승인 회차가 있거나 자동 취소된 건만 (01_spec ③-(가)-2) */}
             {payBadges.length > 0 && (
               <>
-                <div className="flex flex-wrap items-center gap-2 md:border-l md:border-gray-200 md:pl-4">
-                  <span className="text-sm font-semibold text-gray-600">결제</span>
+                <div className="flex flex-wrap items-center gap-2 md:border-l md:border-slate-200 md:pl-4">
+                  <span className="text-sm font-semibold text-slate-600">결제</span>
                   {payBadges.map((b) => (
                     <span
                       key={b.text}
@@ -381,8 +424,8 @@ export default async function AdminRequestDetail({
                     </span>
                   ))}
                 </div>
-                <div className="flex items-center gap-2 md:border-l md:border-gray-200 md:pl-4">
-                  <span className="text-sm font-semibold text-gray-600">홈페이지</span>
+                <div className="flex items-center gap-2 md:border-l md:border-slate-200 md:pl-4">
+                  <span className="text-sm font-semibold text-slate-600">홈페이지</span>
                   <span className={`inline-flex items-center whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-semibold ${BADGE_TONE_CLASS[hpBadge.tone]}`}>
                     {hpBadge.text}
                   </span>
@@ -392,10 +435,10 @@ export default async function AdminRequestDetail({
           </div>
 
           <div className="text-right">
-            <div className="text-xs text-gray-500">최종 결제금액</div>
-            <div className="text-xl font-extrabold text-gray-900">{formatKRW(feeBasis.finalFeeKRW)}</div>
+            <div className="text-xs text-slate-500">최종 결제금액</div>
+            <div className="text-xl font-extrabold text-slate-900">{formatKRW(feeBasis.finalFeeKRW)}</div>
             {usingApprovedBasis && (
-              <div className="text-xs text-gray-500">승인 {approvedSessions.length}/{sessions.length}회 기준</div>
+              <div className="text-xs text-slate-500">승인 {approvedSessions.length}/{sessions.length}회 기준</div>
             )}
           </div>
         </div>
@@ -413,8 +456,8 @@ export default async function AdminRequestDetail({
               <InfoRow label="접수 경로">
                 <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-800">서면</span>
                 <span className="ml-2">{intakeChannelLabel(req.intakeChannel)}</span>
-                {req.appliedAt ? <span className="ml-2 text-gray-600">신청일 {req.appliedAt}</span> : null}
-                {req.intakeNote ? <span className="ml-2 text-gray-500">· {req.intakeNote}</span> : null}
+                {req.appliedAt ? <span className="ml-2 text-slate-600">신청일 {req.appliedAt}</span> : null}
+                {req.intakeNote ? <span className="ml-2 text-slate-500">· {req.intakeNote}</span> : null}
               </InfoRow>
             )}
             {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}
@@ -443,7 +486,7 @@ export default async function AdminRequestDetail({
                 <InfoRow label="준비일">
                   {galleryPrepDate
                     ? <span className="font-medium text-emerald-700">{galleryPrepDate} (무료)</span>
-                    : <span className="text-gray-400">없음</span>}
+                    : <span className="text-slate-500">없음</span>}
                 </InfoRow>
                 <InfoRow label="전시일수">
                   평일 {galleryWeekdayCount}일 · 토 {gallerySaturdayCount}일 (총 {galleryExhibitionDayCount}일)
@@ -454,7 +497,7 @@ export default async function AdminRequestDetail({
                     const removalTime = resolveGalleryRemovalTime(req);
                     return removalTime
                       ? <span className="ml-1 font-medium text-orange-700">{removalTime}까지 철수</span>
-                      : <span className="ml-1 text-gray-400">철수 시간 미지정</span>;
+                      : <span className="ml-1 text-slate-500">철수 시간 미지정</span>;
                   })()}
                 </InfoRow>
               </>
@@ -480,60 +523,60 @@ export default async function AdminRequestDetail({
 
             {/* 갤러리 전시 상세 / 강의실·스튜디오 장비 — 동일한 서브섹션 스타일 */}
             {isGallery ? (
-              <div className="mt-3 border-t border-gray-100 pt-3">
-                <div className="text-xs font-semibold text-gray-500 mb-2">전시 상세</div>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="text-xs font-semibold text-slate-500 mb-2">전시 상세</div>
                 <div className="space-y-1.5 text-sm">
                   {req.exhibitionPurpose && (
                     <div className="flex gap-3">
-                      <span className="w-16 shrink-0 text-xs text-gray-500">전시 목적</span>
-                      <span className="text-gray-700">{req.exhibitionPurpose}</span>
+                      <span className="w-16 shrink-0 text-xs text-slate-500">전시 목적</span>
+                      <span className="text-slate-700">{req.exhibitionPurpose}</span>
                     </div>
                   )}
                   {req.genreContent && (
                     <div className="flex gap-3">
-                      <span className="w-16 shrink-0 text-xs text-gray-500">장르·내용</span>
-                      <span className="text-gray-700">{req.genreContent}</span>
+                      <span className="w-16 shrink-0 text-xs text-slate-500">장르·내용</span>
+                      <span className="text-slate-700">{req.genreContent}</span>
                     </div>
                   )}
                   {req.awarenessPath && (
                     <div className="flex gap-3">
-                      <span className="w-16 shrink-0 text-xs text-gray-500">인지 경로</span>
-                      <span className="text-gray-700">{req.awarenessPath}</span>
+                      <span className="w-16 shrink-0 text-xs text-slate-500">인지 경로</span>
+                      <span className="text-slate-700">{req.awarenessPath}</span>
                     </div>
                   )}
                   {req.specialNotes && (
                     <div className="flex gap-3">
-                      <span className="w-16 shrink-0 text-xs text-gray-500">특이사항</span>
-                      <span className="text-gray-700">{req.specialNotes}</span>
+                      <span className="w-16 shrink-0 text-xs text-slate-500">특이사항</span>
+                      <span className="text-slate-700">{req.specialNotes}</span>
                     </div>
                   )}
                   {!req.exhibitionPurpose && !req.genreContent && !req.awarenessPath && !req.specialNotes && (
-                    <div className="text-sm text-gray-400">입력된 상세 정보 없음</div>
+                    <div className="text-sm text-slate-500">입력된 상세 정보 없음</div>
                   )}
                 </div>
                 {req.galleryGeneratedAt && (
-                  <div className="mt-2 text-xs text-gray-400">
+                  <div className="mt-2 text-xs text-slate-500">
                     서버 생성: {req.galleryGeneratedAt}
                     {req.galleryGenerationVersion ? ` (${req.galleryGenerationVersion})` : ""}
                   </div>
                 )}
               </div>
             ) : equipmentDetails.length > 0 ? (
-              <div className="mt-3 border-t border-gray-100 pt-3">
-                <div className="text-xs font-semibold text-gray-500 mb-2">{isStudio ? "촬영장비" : "기자재"}</div>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="text-xs font-semibold text-slate-500 mb-2">{isStudio ? "촬영장비" : "기자재"}</div>
                 <div className="space-y-1">
                   {equipmentDetails.map((eq) => (
                     <div key={eq.key} className="flex items-center justify-between text-sm">
-                      <span className="text-gray-700">{eq.label}</span>
-                      <span className="tabular-nums text-gray-600">{formatKRW(eq.feeKRW)}</span>
+                      <span className="text-slate-700">{eq.label}</span>
+                      <span className="tabular-nums text-slate-600">{formatKRW(eq.feeKRW)}</span>
                     </div>
                   ))}
                 </div>
               </div>
             ) : (
-              <div className="mt-3 border-t border-gray-100 pt-3">
-                <div className="text-xs font-semibold text-gray-500 mb-1">{isStudio ? "촬영장비" : "기자재"}</div>
-                <div className="text-sm text-gray-400">선택 없음</div>
+              <div className="mt-3 border-t border-slate-100 pt-3">
+                <div className="text-xs font-semibold text-slate-500 mb-1">{isStudio ? "촬영장비" : "기자재"}</div>
+                <div className="text-sm text-slate-500">선택 없음</div>
               </div>
             )}
           </dl>
@@ -546,7 +589,7 @@ export default async function AdminRequestDetail({
           <div className="overflow-x-auto -mx-5 px-5">
             <table className="min-w-full text-sm">
               <thead>
-                <tr className="border-b border-gray-100 text-left text-xs font-semibold text-gray-500">
+                <tr className="border-b border-slate-100 text-left text-xs font-semibold text-slate-500">
                   <th className="pb-2 pr-4">회차</th>
                   <th className="pb-2 pr-4">{isGallery ? "전시일" : "일시"}</th>
                   <th className="pb-2 pr-4">상태</th>
@@ -554,9 +597,9 @@ export default async function AdminRequestDetail({
                   <th className="pb-2 text-right">기본 이용료</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-slate-50">
                 {sessionSelectorRows.map((s) => (
-                  <tr key={s.requestId} className="text-gray-700">
+                  <tr key={s.requestId} className="text-slate-700">
                     <td className="py-2 pr-4 tabular-nums">{s.seq}</td>
                     <td className="py-2 pr-4">
                       {isGallery
@@ -569,7 +612,7 @@ export default async function AdminRequestDetail({
                     <td className="py-2 pr-4">
                       <StatusBadge status={s.status} />
                     </td>
-                    <td className="py-2 pr-4 text-gray-500">{s.status === "반려" ? s.rejectReason : "-"}</td>
+                    <td className="py-2 pr-4 text-slate-500">{s.status === "반려" ? s.rejectReason : "-"}</td>
                     <td className="py-2 text-right tabular-nums">{formatKRW(s.baseTotalKRW)}</td>
                   </tr>
                 ))}
@@ -585,22 +628,22 @@ export default async function AdminRequestDetail({
           {isBatch ? (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">{isGallery ? "이용료" : "대관료"} 합계(전체 {sessions.length}회)</span>
+                <span className="text-slate-600">{isGallery ? "이용료" : "대관료"} 합계(전체 {sessions.length}회)</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeAll!.rentalFeeKRW)}</span>
               </div>
               {feeAll!.equipmentFeeKRW > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">장비 사용료</span>
+                  <span className="text-slate-600">장비 사용료</span>
                   <span className="tabular-nums font-semibold">{formatKRW(feeAll!.equipmentFeeKRW)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">소계(전체 {sessions.length}회)</span>
+                <span className="text-slate-600">소계(전체 {sessions.length}회)</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeAll!.totalFeeKRW)}</span>
               </div>
               {usingApprovedBasis && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">
+                  <span className="text-slate-600">
                     소계(승인 {approvedSessions.length}회)
                   </span>
                   <span className="tabular-nums font-semibold">{formatKRW(feeBasis.totalFeeKRW)}</span>
@@ -610,17 +653,17 @@ export default async function AdminRequestDetail({
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">{isGallery ? "이용료" : "대관료"}</span>
+                <span className="text-slate-600">{isGallery ? "이용료" : "대관료"}</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeBasis.rentalFeeKRW)}</span>
               </div>
               {feeBasis.equipmentFeeKRW > 0 && (
                 <div className="flex items-center justify-between">
-                  <span className="text-gray-600">장비 사용료</span>
+                  <span className="text-slate-600">장비 사용료</span>
                   <span className="tabular-nums font-semibold">{formatKRW(feeBasis.equipmentFeeKRW)}</span>
                 </div>
               )}
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">소계</span>
+                <span className="text-slate-600">소계</span>
                 <span className="tabular-nums font-semibold">{formatKRW(feeBasis.totalFeeKRW)}</span>
               </div>
             </>
@@ -629,8 +672,8 @@ export default async function AdminRequestDetail({
           {isGallery ? (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">할인</span>
-                <span className="text-xs text-gray-400">적용 불가</span>
+                <span className="text-slate-600">할인</span>
+                <span className="text-xs text-slate-500">적용 불가</span>
               </div>
               <div className="rounded-lg bg-emerald-50 px-3 py-2 text-xs text-emerald-800">
                 평일 20,000원/일 · 토 10,000원/일 · 준비(세팅)일 1일 무료
@@ -639,18 +682,18 @@ export default async function AdminRequestDetail({
           ) : (
             <>
               <div className="flex items-center justify-between">
-                <span className="text-gray-600">할인</span>
-                <span className="tabular-nums text-gray-700">-{formatKRW(feeBasis.discountAmountKRW)} ({feeBasis.discountRatePct}%)</span>
+                <span className="text-slate-600">할인</span>
+                <span className="tabular-nums text-slate-700">-{formatKRW(feeBasis.discountAmountKRW)} ({feeBasis.discountRatePct}%)</span>
               </div>
               {feeBasis.discountReason && (
-                <div className="text-xs text-gray-500 pl-1">사유: {feeBasis.discountReason}</div>
+                <div className="text-xs text-slate-500 pl-1">사유: {feeBasis.discountReason}</div>
               )}
             </>
           )}
 
-          <div className="flex items-center justify-between border-t border-gray-100 pt-3">
-            <span className="font-bold text-gray-900">최종 결제 금액</span>
-            <span className="tabular-nums text-lg font-extrabold text-gray-900">{formatKRW(feeBasis.finalFeeKRW)}</span>
+          <div className="flex items-center justify-between border-t border-slate-100 pt-3">
+            <span className="font-bold text-slate-900">최종 결제 금액</span>
+            <span className="tabular-nums text-lg font-extrabold text-slate-900">{formatKRW(feeBasis.finalFeeKRW)}</span>
           </div>
         </div>
       </Section>
@@ -664,9 +707,9 @@ export default async function AdminRequestDetail({
       )}
 
       {/* ═══ 7. 관리자 처리 ═══ */}
-      <section className="rounded-xl border-2 border-gray-200 bg-white shadow-sm">
-        <div className="border-b border-gray-100 px-5 py-3">
-          <h2 className="text-sm font-bold text-gray-900">관리자 처리</h2>
+      <section className="rounded-xl border-2 border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-3">
+          <h2 className="text-sm font-bold text-slate-900">관리자 처리</h2>
         </div>
 
         <div className="px-5 py-5">
@@ -674,12 +717,12 @@ export default async function AdminRequestDetail({
             <div className="space-y-8">
               {/* ── 할인/메모 저장 (묶음 공통) ── */}
               <form action={saveBundleMeta} className="space-y-4">
-                <h3 className="text-sm font-bold text-gray-800">할인 및 메모 (묶음 공통)</h3>
+                <h3 className="text-sm font-bold text-slate-800">할인 및 메모 (묶음 공통)</h3>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1.5">할인</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">할인</label>
                   {isGallery ? (
-                    <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                    <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm text-slate-500">
                       갤러리는 할인/바우처 적용 대상이 아닙니다.
                     </div>
                   ) : (
@@ -693,11 +736,11 @@ export default async function AdminRequestDetail({
                 </div>
 
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700">관리 메모</label>
+                  <label className="block text-sm font-semibold text-slate-700">관리 메모</label>
                   <textarea
                     name="adminMemo"
                     defaultValue={req.adminMemo || ""}
-                    className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                    className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                     rows={2}
                     placeholder="예: 할인 적용 근거, 내부 확인 사항 등"
                   />
@@ -706,9 +749,9 @@ export default async function AdminRequestDetail({
                 <FormSubmitButton
                   idleText={isGallery ? "메모 저장" : "할인/메모 저장"}
                   pendingText="저장 중..."
-                  className="rounded-lg !bg-gray-900 px-5 py-2.5 hover:!bg-black"
+                  className="rounded-lg !bg-brand px-5 py-2.5 hover:!bg-brand-hover"
                 />
-                <p className="text-xs text-gray-500">
+                <p className="text-xs text-slate-500">
                   * 회차별 승인/반려 상태는 변경하지 않습니다.
                 </p>
               </form>
@@ -716,9 +759,9 @@ export default async function AdminRequestDetail({
               {isGallery ? (
                 <>
                   {/* ── 갤러리: 전체 일괄 승인/반려 ── */}
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-sm font-bold text-gray-800">전체 승인 / 반려</h3>
-                    <p className="mt-1 text-xs text-gray-500">전시 기간 전체({sessions.length}일)를 일괄 처리합니다.</p>
+                  <div className="border-t border-slate-100 pt-6">
+                    <h3 className="text-sm font-bold text-slate-800">전체 승인 / 반려</h3>
+                    <p className="mt-1 text-xs text-slate-500">전시 기간 전체({sessions.length}일)를 일괄 처리합니다.</p>
 
                     <form action={decideSelectedSessions} className="mt-4 space-y-4">
                       {/* 전체 세션을 hidden으로 전송 */}
@@ -733,15 +776,15 @@ export default async function AdminRequestDetail({
                     </form>
                   </div>
 
-                  <p className="mt-4 text-xs text-gray-500">
+                  <p className="mt-4 text-xs text-slate-500">
                     * 처리 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
                   </p>
                 </>
               ) : (
                 <>
                   {/* ── 강의실/스튜디오: 회차별 승인/반려 ── */}
-                  <div className="border-t border-gray-100 pt-6">
-                    <h3 className="text-sm font-bold text-gray-800">회차별 승인 / 반려</h3>
+                  <div className="border-t border-slate-100 pt-6">
+                    <h3 className="text-sm font-bold text-slate-800">회차별 승인 / 반려</h3>
 
                     <form action={decideSelectedSessions} className="mt-4 space-y-4">
                       <BatchSessionSelector sessions={sessionSelectorRows} />
@@ -752,11 +795,11 @@ export default async function AdminRequestDetail({
                         note="* 체크된 회차에만 적용됩니다. 전체 처리하려면 '전체 선택' 후 버튼을 누르세요."
                       >
                         <div>
-                          <label className="block text-sm font-semibold text-gray-700">관리 메모 (선택 회차에 적용, 미입력 시 기존 유지)</label>
+                          <label className="block text-sm font-semibold text-slate-700">관리 메모 (선택 회차에 적용, 미입력 시 기존 유지)</label>
                           <textarea
                             name="adminMemo"
                             defaultValue=""
-                            className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                            className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                             rows={2}
                             placeholder="예: 전화로 내용 확인 완료"
                           />
@@ -765,7 +808,7 @@ export default async function AdminRequestDetail({
                     </form>
                   </div>
 
-                  <p className="mt-4 text-xs text-gray-500">
+                  <p className="mt-4 text-xs text-slate-500">
                     * 처리 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
                   </p>
                 </>
@@ -782,9 +825,9 @@ export default async function AdminRequestDetail({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-1.5">할인</label>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">할인</label>
                 {isGallery ? (
-                  <div className="rounded-lg border border-gray-100 bg-gray-50 px-3 py-2.5 text-sm text-gray-500">
+                  <div className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-2.5 text-sm text-slate-500">
                     갤러리는 할인/바우처 적용 대상이 아닙니다.
                   </div>
                 ) : (
@@ -798,11 +841,11 @@ export default async function AdminRequestDetail({
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-gray-700">관리 메모</label>
+                <label className="block text-sm font-semibold text-slate-700">관리 메모</label>
                 <textarea
                   name="adminMemo"
                   defaultValue={req.adminMemo || ""}
-                  className="mt-1.5 w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+                  className="mt-1.5 w-full rounded-lg border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
                   rows={2}
                   placeholder="예: 전화로 내용 확인 완료"
                 />
@@ -811,9 +854,9 @@ export default async function AdminRequestDetail({
               <FormSubmitButton
                 idleText="저장"
                 pendingText="저장 중..."
-                className="w-full rounded-lg !bg-gray-900 px-4 py-3 hover:!bg-black"
+                className="w-full rounded-lg !bg-brand px-4 py-3 hover:!bg-brand-hover"
               />
-              <p className="text-xs text-gray-500 mt-2">
+              <p className="text-xs text-slate-500 mt-2">
                 * 저장 후 아래 메일 발송 섹션에서 별도로 안내 메일을 보낼 수 있습니다.
               </p>
             </form>

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { loadUnifiedTemplates, saveTemplates, type TemplateStatus } from "@/lib/emailTemplates";
 import { getClientIp } from "@/lib/rateLimit";
 import { auditLog } from "@/lib/auditLog";
@@ -10,9 +10,7 @@ export const dynamic = "force-dynamic";
 /** 통합 템플릿 조회 */
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   const templates = await loadUnifiedTemplates();
   return NextResponse.json({ ok: true, templates });
@@ -21,9 +19,7 @@ export async function GET(req: Request) {
 /** 상태별 템플릿 저장 (카테고리 구분 없이 통합) */
 export async function PUT(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const body = (await req.json()) as {

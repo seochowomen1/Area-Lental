@@ -17,8 +17,8 @@ export default function AdminLogoutButton({ variant = "light" }: { variant?: "li
   }
 
   const cls = variant === "dark"
-    ? "rounded-full border border-slate-500 bg-slate-700/50 px-4 py-2 text-sm font-medium text-slate-300 transition hover:bg-slate-700 hover:text-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800 disabled:opacity-50"
-    : "rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-500 shadow-sm transition hover:bg-gray-50 hover:text-gray-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2 disabled:opacity-50";
+    ? "min-h-[44px] whitespace-nowrap rounded-full border border-white/30 bg-white/10 px-4 py-2 text-sm font-medium text-white transition hover:bg-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2 focus-visible:ring-offset-brand disabled:bg-white/5 disabled:text-white/70"
+    : "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-500 shadow-sm transition hover:bg-slate-50 hover:text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:bg-slate-200 disabled:text-slate-500";
 
   return (
     <button
@@ -27,7 +27,7 @@ export default function AdminLogoutButton({ variant = "light" }: { variant?: "li
       disabled={loading}
       className={cls}
     >
-      {loading ? "로그아웃..." : "로그아웃"}
+      {loading ? "로그아웃 중…" : "로그아웃"}
     </button>
   );
 }

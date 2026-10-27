@@ -13,7 +13,7 @@ export function FieldLabel({ children, className, htmlFor }: { children: React.R
 export function FieldHelp({ children, className }: { children: React.ReactNode; className?: string }) {
   const isError = typeof className === "string" && className.includes("text-red");
   const base = isError
-    ? "mt-1 text-xs leading-4 font-semibold"
+    ? "mt-1 text-[13px] leading-5 font-semibold"
     : FIELD_HELP;
   return <p className={cn(base, className)}>{children}</p>;
 }

@@ -59,8 +59,8 @@ export default function WelfareCopyButton({ requestId }: { requestId: string }) 
       onClick={handleCopy}
       disabled={state === "loading"}
       className={
-        "rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-gray-50 disabled:opacity-60 " +
-        (state === "fail" ? "text-red-700" : "text-gray-700")
+        "rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium shadow-sm hover:bg-slate-50 disabled:opacity-60 " +
+        (state === "fail" ? "text-red-700" : "text-slate-700")
       }
       title="복지종합시스템 프로그램관리·홈페이지 등록 폼 입력 순서대로 텍스트를 복사합니다"
     >

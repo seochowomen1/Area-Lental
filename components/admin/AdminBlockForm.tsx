@@ -251,7 +251,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
           onClick={() => { setBlockType("time"); setEndDate(""); }}
           className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
             blockType === "time"
-              ? "bg-slate-900 text-white"
+              ? "bg-brand text-white"
               : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
           }`}
         >
@@ -262,7 +262,7 @@ export default function AdminBlockForm({ rooms, isSubmitting, resetAfterSuccess,
           onClick={() => setBlockType("day")}
           className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
             blockType === "day"
-              ? "bg-slate-900 text-white"
+              ? "bg-brand text-white"
               : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
           }`}
         >

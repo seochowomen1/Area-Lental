@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { isMockMode } from "@/lib/env";
 import { overlaps } from "@/lib/datetime";
 import { validateOperatingHoursByDayOfWeek } from "@/lib/operating";
@@ -25,7 +25,7 @@ function is30Min(v: string) {
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   try {
     const db = getDatabase();
     const schedules = await db.getClassSchedules();
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   try {
     const body = (await req.json()) as Partial<ClassSchedule>;
     // UI에서 제목은 선택 입력일 수 있으므로, 서버에서 기본값을 부여하여 저장 안정성을 높입니다.
@@ -109,7 +109,7 @@ export async function POST(req: Request) {
 
 export async function PATCH(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   try {
     const body = (await req.json()) as Partial<ClassSchedule> & { id?: string };
     const id = String(body.id ?? "").trim();
@@ -171,7 +171,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   try {
     const url = new URL(req.url);
     const id = url.searchParams.get("id");

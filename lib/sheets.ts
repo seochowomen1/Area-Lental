@@ -1,7 +1,7 @@
 import { getGoogleClient } from "@/lib/google";
 import { isMockMode, requireGoogleEnv } from "@/lib/env";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch, GalleryFeeUpdate } from "@/lib/types";
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { ROOMS } from "@/lib/config";
 import {
@@ -10,6 +10,7 @@ import {
   mock_appendRequest,
   mock_updateRequestStatus,
   mock_updateRequestPayment,
+  mock_updateGalleryFee,
   mock_updateRequestsStatusBatch,
   mock_getRevokedAdminSessions,
   mock_addRevokedAdminSession,
@@ -1095,6 +1096,61 @@ export async function updateRequestPayment(args: { requestId: string; patch: Pay
   const refreshed = await getAllRequests();
   const ids = new Set(targets.map((t) => t.requestId));
   return refreshed.filter((r) => ids.has(r.requestId));
+}
+
+/**
+ * 갤러리 이용료 다시 계산 (audit-fix-2 R2)
+ * - 이 1행의 galleryWeekdayCount·gallerySaturdayCount·galleryExhibitionDayCount·galleryAuditJson 4칸만 갱신
+ * - 시트 호출: 헤더 확인 + A:ZZ 읽기 + values.batchUpdate 1회(한 요청 → 부분 반영 없음)
+ */
+export async function updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRequest> {
+  if (isMockMode()) return mock_updateGalleryFee(args);
+
+  const env = requireGoogleEnv();
+  await ensureRequestOptionalHeaders({ allowCached: true });
+  const { sheets } = getGoogleClient();
+
+  const rows = await readRequestsSheet();
+  const all = parseRequestRows(rows);
+  const current = all.find((r) => r.requestId === args.requestId);
+  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  if (current.roomId !== "gallery") throw new Error("갤러리 신청만 다시 계산할 수 있습니다.");
+
+  const header = (rows[0] ?? []).map((v) => String(v ?? "").trim());
+  const col = new Map<string, number>();
+  header.forEach((h, i) => { if (h && !col.has(h)) col.set(h, i); });
+  const idCol = col.get("requestId");
+  if (idCol === undefined) throw new Error("requests 시트에 'requestId' 헤더가 없습니다.");
+  let rn = 0;
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i]?.[idCol] ?? "").trim() === args.requestId) { rn = i + 1; break; }
+  }
+  if (!rn) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
+
+  const cells: Array<[string, string]> = [
+    ["galleryWeekdayCount", String(args.weekdayCount)],
+    ["gallerySaturdayCount", String(args.saturdayCount)],
+    ["galleryExhibitionDayCount", String(args.exhibitionDayCount)],
+    ["galleryAuditJson", args.galleryAuditJson],
+  ];
+  const data = cells.map(([name, value]) => {
+    const ci = col.get(name);
+    if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
+    const letter = colToLetter(ci + 1);
+    return { range: `${SHEET_REQUESTS}!${letter}${rn}:${letter}${rn}`, values: [[value]] };
+  });
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: { valueInputOption: "RAW", data },
+  });
+
+  return {
+    ...current,
+    galleryWeekdayCount: args.weekdayCount,
+    gallerySaturdayCount: args.saturdayCount,
+    galleryExhibitionDayCount: args.exhibitionDayCount,
+    galleryAuditJson: args.galleryAuditJson,
+  };
 }
 
 // class_schedule 시트의 선택 컬럼(없으면 헤더 끝에 자동 추가) — 업무 시스템 동기화 표식

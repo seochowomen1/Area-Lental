@@ -4,6 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import Button from "@/components/ui/Button";
+import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
+import { AUTH_STORE_BUSY_CODE, AUTH_STORE_BUSY_MESSAGE } from "@/lib/adminConstants";
 import Card from "@/components/ui/Card";
 import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
 import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
@@ -199,6 +201,22 @@ export default function OfflineIntakeForm({ category }: { category: string }) {
     exhibitionTitle.trim().length > 0 && isYmd(startDate) && isYmd(endDate) && endDate >= startDate && !!galleryRemovalTime &&
     isYmd(appliedAt) && privacyPaper && pledgePaper && isYmd(pledgeDate) && pledgeName.trim().length >= 2;
 
+  /** ③-D 서면 등록 비활성 이유 — MissingFieldsSummary와 같은 형식 */
+  const missingFields: MissingField[] = [];
+  if (applicantName.trim().length < 2) missingFields.push({ key: "applicantName", label: "성명", targetId: "applicantName" });
+  if (!isYmd(birth)) missingFields.push({ key: "birth", label: "생년월일", targetId: "birth" });
+  if (address.trim().length < 2) missingFields.push({ key: "address", label: "주소", targetId: "address" });
+  if (phone.trim().length < 9) missingFields.push({ key: "phone", label: "연락처", targetId: "phone" });
+  if (!email.includes("@")) missingFields.push({ key: "email", label: "이메일", targetId: "email" });
+  if (exhibitionTitle.trim().length === 0) missingFields.push({ key: "exhibitionTitle", label: "전시명", targetId: "exhibitionTitle" });
+  if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) missingFields.push({ key: "period", label: "전시 기간", targetId: isYmd(startDate) ? "endDate" : "startDate" });
+  if (!galleryRemovalTime) missingFields.push({ key: "galleryRemovalTime", label: "철수 시간", targetId: isYmd(endDate) ? "galleryRemovalTime" : "endDate" });
+  if (!isYmd(appliedAt)) missingFields.push({ key: "appliedAt", label: "접수일", targetId: "appliedAt" });
+  if (!privacyPaper) missingFields.push({ key: "privacyPaper", label: "개인정보 동의서 확인", targetId: "privacyPaper" });
+  if (!pledgePaper) missingFields.push({ key: "pledgePaper", label: "서약서 확인", targetId: "pledgePaper" });
+  if (!isYmd(pledgeDate)) missingFields.push({ key: "pledgeDate", label: "서약일", targetId: "pledgeDate" });
+  if (pledgeName.trim().length < 2) missingFields.push({ key: "pledgeName", label: "서약자 성명", targetId: "pledgeName" });
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!canSubmit) return;
@@ -248,6 +266,14 @@ export default function OfflineIntakeForm({ category }: { category: string }) {
       for (const f of files) fd.append("attachments", f);
 
       const res = await fetch("/api/requests", { method: "POST", body: fd, credentials: "include" });
+      // R3: 접속 확인 지연(503)은 로그인으로 보내지 않고 G-1 문구
+      if (res.status === 503) {
+        const b = await res.clone().json().catch(() => null);
+        if (b?.code === AUTH_STORE_BUSY_CODE) {
+          setError(AUTH_STORE_BUSY_MESSAGE);
+          return;
+        }
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data?.ok) {
         setError(data?.message ?? `등록에 실패했습니다. (${res.status})`);
@@ -406,11 +432,11 @@ export default function OfflineIntakeForm({ category }: { category: string }) {
         <h2 className={sectionTitle}>4. 서면 동의 확인 · 원본 첨부</h2>
         <div className="space-y-2 text-sm text-slate-800">
           <label className="flex items-start gap-2">
-            <input type="checkbox" className="mt-1" checked={privacyPaper} onChange={(e) => setPrivacyPaper(e.target.checked)} />
+            <input id="privacyPaper" type="checkbox" className="mt-1 h-5 w-5" checked={privacyPaper} onChange={(e) => setPrivacyPaper(e.target.checked)} />
             <span>종이 신청서의 <b>개인정보 수집·이용 동의</b>란에 신청자가 동의 표시(체크·서명)한 것을 확인했습니다. *</span>
           </label>
           <label className="flex items-start gap-2">
-            <input type="checkbox" className="mt-1" checked={pledgePaper} onChange={(e) => setPledgePaper(e.target.checked)} />
+            <input id="pledgePaper" type="checkbox" className="mt-1 h-5 w-5" checked={pledgePaper} onChange={(e) => setPledgePaper(e.target.checked)} />
             <span>신청자가 서명한 <b>전시 이용규정 서약서</b>를 받았고 원본을 센터에서 보관합니다. *</span>
           </label>
         </div>
@@ -442,8 +468,9 @@ export default function OfflineIntakeForm({ category }: { category: string }) {
         </div>
       )}
 
-      <div className="flex items-center justify-end gap-3">
-        <span className="text-xs text-slate-500">등록 후 상세 화면에서 승인 처리와 안내 메일을 진행합니다.</span>
+      {!submitting && missingFields.length > 0 ? <MissingFieldsSummary items={missingFields} /> : null}
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        <span className="text-[13px] text-slate-500">등록 후 상세 화면에서 승인 처리와 안내 메일을 진행합니다.</span>
         <Button type="submit" variant="primary" disabled={!canSubmit}>
           {submitting ? "등록 중…" : "서면 신청 등록"}
         </Button>

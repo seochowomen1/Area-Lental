@@ -22,6 +22,7 @@ export default function SuccessClient() {
   // 서버 공용 계산 금액(POST /api/requests 응답 estimatedFeeKRW)
   const feeRaw = sp.get("fee");
   const estimatedFee = feeRaw !== null && feeRaw !== "" && Number.isFinite(Number(feeRaw)) ? Number(feeRaw) : null;
+  const holidayUnchecked = sp.get("hc") === "unavailable";
 
   // ★ [10] 조회 권한은 sessionStorage(applicantAccess)에서만 읽는다. 주소창에는 토큰이 없다.
   const [hasAccess, setHasAccess] = useState(false);
@@ -64,7 +65,7 @@ export default function SuccessClient() {
             <div className="mt-3 divide-y divide-slate-100">
               <div className="flex justify-between gap-3 py-2.5">
                 <span className="text-sm text-slate-500">신청번호</span>
-                <span className="break-all text-right text-sm font-bold text-[rgb(var(--brand-primary))]">{requestId ?? "-"}</span>
+                <span className="break-all text-right text-sm font-bold text-brand">{requestId ?? "-"}</span>
               </div>
               {count > 1 && (
                 <div className="flex justify-between py-2.5">
@@ -80,9 +81,10 @@ export default function SuccessClient() {
               </div>
               {estimatedFee !== null ? (
                 <div className="flex justify-between gap-3 py-2.5">
-                  <span className="shrink-0 text-sm text-slate-500">예상 이용료</span>
+                  <span className="shrink-0 text-sm text-slate-500">{isGallery ? "예상 전시 공간 이용료" : "예상 이용료"}</span>
                   <span className="text-right text-sm font-semibold text-slate-900 tabular-nums">
                     {estimatedFee.toLocaleString()}원 (담당자 승인 시 확정)
+                    {holidayUnchecked ? <span className="block text-[13px] font-medium text-amber-800">(공휴일 미확인 · 승인 때 확정)</span> : null}
                   </span>
                 </div>
               ) : null}
@@ -124,7 +126,7 @@ export default function SuccessClient() {
               <button
                 type="button"
                 onClick={clearDeviceRecord}
-                className="text-sm font-semibold text-[rgb(var(--brand-primary))] underline-offset-2 hover:underline"
+                className="text-sm font-semibold text-brand underline-offset-2 hover:underline"
               >
                 이 기기에서 조회 기록 지우기
               </button>

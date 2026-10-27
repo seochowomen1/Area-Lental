@@ -3,6 +3,9 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 
+import { AUTH_STORE_BUSY_MESSAGE } from "@/lib/adminConstants";
+import { adminFetch, AdminFetchError, isAuthBusyError } from "@/lib/adminFetch";
+
 import Checkbox from "@/components/ui/Checkbox";
 import { PAYMENT_LABELS } from "@/lib/labels";
 import { PAYMENT_METHODS, addDaysYmd, formatShortMd, autoCancelReason } from "@/lib/payment";
@@ -25,23 +28,29 @@ type Props = {
 };
 
 /* ── 스타일 토큰 (02_ui §0) ── */
+// 버튼 3종·비활성(투명도 없음) — audit-fix-2 ③-A-5
+const DISABLED = "disabled:cursor-not-allowed disabled:border-transparent disabled:bg-slate-200 disabled:text-slate-500";
 const BTN_PRIMARY =
-  "inline-flex items-center justify-center rounded-lg bg-[rgb(var(--brand-primary))] px-5 py-2.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 min-h-[44px] md:min-h-0";
+  `inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl bg-brand px-5 py-2 text-[15px] font-semibold text-white hover:bg-brand-hover ${DISABLED}`;
 const BTN_OUTLINE =
-  "inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 min-h-[44px] md:min-h-0";
+  `inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-slate-300 bg-white px-5 py-2 text-[15px] font-semibold text-ink hover:bg-slate-50 ${DISABLED}`;
 const BTN_OUTLINE_SM =
-  "inline-flex items-center justify-center rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60 min-h-[44px] md:min-h-[36px]";
+  `inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-slate-300 bg-white px-3 py-1.5 text-sm font-semibold text-ink hover:bg-slate-50 ${DISABLED}`;
 const BTN_PRIMARY_SM =
-  "inline-flex items-center justify-center rounded-lg bg-[rgb(var(--brand-primary))] px-3 py-1.5 text-sm font-semibold text-white hover:opacity-90 disabled:opacity-60 min-h-[44px] md:min-h-[36px]";
+  `inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl bg-brand px-3 py-1.5 text-sm font-semibold text-white hover:bg-brand-hover ${DISABLED}`;
 const BTN_DISABLED_SM =
-  "inline-flex items-center justify-center rounded-lg border border-gray-100 bg-gray-50 px-3 py-1.5 text-sm font-semibold text-gray-400 cursor-not-allowed min-h-[44px] md:min-h-[36px]";
+  "inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded-xl bg-slate-200 px-3 py-1.5 text-sm font-semibold text-slate-500 cursor-not-allowed";
 const INPUT =
-  "w-full rounded-lg border border-gray-200 px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 min-h-[44px]";
-const LABEL = "block text-sm font-semibold text-gray-700 mb-1.5";
-const HELP = "mt-1 text-xs text-gray-500 leading-4";
-const HELP_WARN = "mt-1 text-xs text-amber-700 leading-4";
-const ERR = "mt-1 text-xs font-semibold text-red-600";
-const LINK = "text-xs font-semibold text-[rgb(var(--brand-primary))] underline hover:opacity-80";
+  "w-full rounded-lg border border-slate-300 px-3 py-2.5 text-base outline-none focus:border-brand focus:ring-2 focus:ring-sky/40 min-h-[44px] sm:text-[15px]";
+const LABEL = "block text-sm font-semibold text-slate-700 mb-1.5";
+const HELP = "mt-1 text-[13px] text-slate-500 leading-5";
+const HELP_WARN = "mt-1 text-[13px] text-amber-800 leading-5";
+const ERR = "mt-1 text-[13px] font-semibold text-red-700";
+const ERR_BUSY = "mt-1 text-[13px] font-semibold text-amber-800";
+const LINK = "inline-flex min-h-[44px] items-center text-sm font-semibold text-brand underline hover:opacity-80";
+
+/** ③-D 실패 문구(네트워크·서버 오류) */
+const SAVE_FAIL = "저장하지 못했습니다. 잠시 후 다시 눌러 주세요.";
 
 function isAllowedLinkClient(url: string): boolean {
   if (!url.trim()) return true; // 빈값 허용(기한만 저장)
@@ -55,19 +64,38 @@ function isAllowedLinkClient(url: string): boolean {
   }
 }
 
+/**
+ * 관리자 API 호출 — 401은 로그인으로, 503 AUTH_STORE_BUSY는 로그인으로 보내지 않고 G-1 문구(R3).
+ * 그 밖 4xx는 서버 message를 그대로 보여 주고, 네트워크·5xx는 ③-D 실패 문구.
+ */
 async function callApi(url: string, method: "PUT" | "POST", body?: unknown): Promise<{ status: number; data: Record<string, unknown> }> {
-  const res = await fetch(url, {
-    method,
-    headers: { "content-type": "application/json" },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-  let data: Record<string, unknown> = {};
   try {
-    data = (await res.json()) as Record<string, unknown>;
-  } catch {
-    data = {};
+    const res = await adminFetch(url, {
+      method,
+      headers: { "content-type": "application/json" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    let data: Record<string, unknown> = {};
+    try {
+      data = (await res.json()) as Record<string, unknown>;
+    } catch {
+      data = {};
+    }
+    return { status: res.status, data };
+  } catch (e) {
+    if (e instanceof AdminFetchError) {
+      if (e.busy) throw e;
+      if (e.status >= 500) throw e;
+      return { status: e.status, data: { ok: false, message: e.message, code: e.code } };
+    }
+    throw e;
   }
-  return { status: res.status, data };
+}
+
+/** catch 블록 문구 — busy(503)면 G-1, 아니면 ③-D */
+function failText(e: unknown, fallback: string = SAVE_FAIL): { text: string; busy: boolean } {
+  if (isAuthBusyError(e)) return { text: AUTH_STORE_BUSY_MESSAGE, busy: true };
+  return { text: fallback, busy: false };
 }
 
 export default function PaymentSection({ requestId, view, todayYmd }: Props) {
@@ -75,8 +103,14 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
   const base = `/api/admin/requests/${encodeURIComponent(requestId)}`;
 
   const [panel, setPanel] = useState<Panel>(null);
-  const [busy, setBusy] = useState(false);
+  /** 처리 중인 버튼 — 그 버튼만 라벨을 처리 중 문구로 바꾼다(③-D) */
+  const [busyAction, setBusyAction] = useState<null | "notice" | "payment" | "refund" | "homepage" | "restore">(null);
+  const busy = busyAction !== null;
   const [error, setError] = useState<string | null>(null);
+  /** 503 지연이면 오류색 대신 접수톤 */
+  const [errorBusy, setErrorBusy] = useState(false);
+  /** 4단계(홈페이지 마감) 버튼 아래 실패 문구 */
+  const [homeError, setHomeError] = useState<{ text: string; busy: boolean } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [noticeWarnings, setNoticeWarnings] = useState<string[]>([]);
   const [restoreConflicts, setRestoreConflicts] = useState<Array<{ requestId: string; date: string; startTime: string; endTime: string; reason: string }>>([]);
@@ -121,12 +155,14 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
 
   const openPanel = useCallback((p: Panel) => {
     setError(null);
+    setErrorBusy(false);
     setRestoreConflicts([]);
     setPanel(p);
   }, []);
 
   const closePanel = useCallback(() => {
     setError(null);
+    setErrorBusy(false);
     setPanel(null);
   }, []);
 
@@ -180,11 +216,14 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
 
   async function saveNotice() {
     setError(null);
+    setErrorBusy(false);
     if (!due) return setError("결제 기한을 입력해 주세요.");
     if (due < todayYmd)
       return setError("결제 기한은 오늘 이전으로 저장할 수 없습니다. 이미 지난 기한으로 두려면 그대로 두고, 취소하려면 처리 상태에서 취소하세요.");
     if (!isAllowedLinkClient(link)) return setError("결제 링크는 https://www.seochowomen.kr 로 시작하는 주소만 저장할 수 있습니다.");
-    setBusy(true);
+    if (busy) return;
+    setErrorBusy(false);
+    setBusyAction("notice");
     try {
       const { data } = await callApi(`${base}/payment-notice`, "PUT", {
         paymentLinkUrl: link.trim(),
@@ -197,10 +236,12 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
       setToast(changed && changed.from ? `결제 기한을 ${formatShortMd(changed.to ?? due)}로 바꿨습니다. 자동 취소 대상에서 제외됩니다.` : "결제 안내를 저장했습니다.");
       setPanel(null);
       router.refresh();
-    } catch {
-      setError("저장 중 오류가 발생했습니다.");
+    } catch (e) {
+      const f = failText(e);
+      setError(f.text);
+      setErrorBusy(f.busy);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -209,11 +250,14 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
 
   async function savePayment() {
     setError(null);
+    setErrorBusy(false);
     if (!paidAt) return setError("결제일을 입력해 주세요.");
     if (paidAt > todayYmd) return setError("결제일은 오늘 이후로 입력할 수 없습니다.");
     if (!Number.isFinite(amountNum) || amountNum < 0) return setError("결제 금액은 0원 이상이어야 합니다.");
     if (amountDiffers && !note.trim()) return setError("승인 금액과 다른 금액은 비고가 필요합니다.");
-    setBusy(true);
+    if (busy) return;
+    setErrorBusy(false);
+    setBusyAction("payment");
     try {
       const { data } = await callApi(`${base}/payment`, "POST", {
         paymentMethod: method,
@@ -225,21 +269,26 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
       setToast(data.action === "update" ? "결제 기록을 수정했습니다." : "결제 완료로 기록했습니다.");
       setPanel(null);
       router.refresh();
-    } catch {
-      setError("기록 중 오류가 발생했습니다.");
+    } catch (e) {
+      const f = failText(e);
+      setError(f.text);
+      setErrorBusy(f.busy);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function saveRefund() {
     setError(null);
+    setErrorBusy(false);
     const n = Number.parseInt(refundAmount || "0", 10);
     if (!refundedAt) return setError("환불일을 입력해 주세요.");
     if (refundedAt > todayYmd) return setError("환불일은 오늘 이후로 입력할 수 없습니다.");
     if (!Number.isFinite(n) || n < 0 || n > view.paidAmountKRW) return setError("환불 금액은 0원 이상, 결제 금액 이하여야 합니다.");
     if (!refundReason.trim()) return setError("환불 사유를 입력해 주세요.");
-    setBusy(true);
+    if (busy) return;
+    setErrorBusy(false);
+    setBusyAction("refund");
     try {
       const { data } = await callApi(`${base}/payment/refund`, "POST", {
         refundedAt,
@@ -251,38 +300,46 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
       setPanel(null);
       setRefundReason("");
       router.refresh();
-    } catch {
-      setError("기록 중 오류가 발생했습니다.");
+    } catch (e) {
+      const f = failText(e);
+      setError(f.text);
+      setErrorBusy(f.busy);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function closeHomepage() {
+    if (busy) return;
     setError(null);
-    setBusy(true);
+    setErrorBusy(false);
+    setHomeError(null);
+    setBusyAction("homepage");
     try {
       const { data } = await callApi(`${base}/homepage-close`, "POST", {});
       if (!data.ok) {
-        setToast(String(data.message || "기록에 실패했습니다."));
+        setHomeError({ text: String(data.message || SAVE_FAIL), busy: false });
         return;
       }
       setToast("홈페이지 마감을 기록했습니다. 노출이 끝났습니다.");
       router.refresh();
-    } catch {
-      setToast("기록 중 오류가 발생했습니다.");
+    } catch (e) {
+      setHomeError(failText(e));
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
   async function restore() {
     setError(null);
+    setErrorBusy(false);
     setRestoreConflicts([]);
     if (!restoreDue) return setError("새 결제 기한을 입력해 주세요.");
     if (restoreDue < todayYmd)
       return setError("결제 기한은 오늘 이전으로 저장할 수 없습니다. 이미 지난 기한으로 두려면 그대로 두고, 취소하려면 처리 상태에서 취소하세요.");
-    setBusy(true);
+    if (busy) return;
+    setErrorBusy(false);
+    setBusyAction("restore");
     try {
       const { data } = await callApi(`${base}/restore`, "POST", { paymentDueDate: restoreDue });
       if (!data.ok) {
@@ -293,10 +350,12 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
       setToast("승인으로 복구했습니다.");
       setPanel(null);
       router.refresh();
-    } catch {
-      setError("복구 중 오류가 발생했습니다.");
+    } catch (e) {
+      const f = failText(e);
+      setError(f.text);
+      setErrorBusy(f.busy);
     } finally {
-      setBusy(false);
+      setBusyAction(null);
     }
   }
 
@@ -304,7 +363,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
   if (!flow) {
     return (
       <SectionCard title="결제 안내·확인">
-        <p className="text-sm text-gray-500">승인 후에 결제 안내를 진행할 수 있습니다.</p>
+        <p className="text-sm text-slate-500">승인 후에 결제 안내를 진행할 수 있습니다.</p>
       </SectionCard>
     );
   }
@@ -314,7 +373,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
   return (
     <>
       {toast && (
-        <div aria-live="polite" className="fixed bottom-6 right-6 z-[60] rounded-lg bg-gray-900 px-5 py-3 text-sm font-medium text-white shadow-lg">
+        <div aria-live="polite" className="fixed bottom-6 right-6 z-[60] rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white shadow-lg">
           {toast}
         </div>
       )}
@@ -342,7 +401,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
         {/* 자동 취소 띠 + 승인으로 복구 */}
         {isAuto && (
           <div className="mb-3">
-            <div role="status" className="flex flex-col gap-3 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-sm text-gray-700 md:flex-row md:items-center md:justify-between">
+            <div role="status" className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700 md:flex-row md:items-center md:justify-between">
               <span>
                 {fullDateTimeFromIso(view.autoCancelledAt)} 자동 취소 · 사유: {autoCancelReason(view.paymentDueDate)}
               </span>
@@ -359,7 +418,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
                     <p className={HELP}>복구하면 같은 날짜·시간대에 다른 신청이 없는지 먼저 확인합니다. 겹치면 복구되지 않습니다.</p>
                   </div>
                 </div>
-                {error && <p className={ERR}>{error}</p>}
+                {error && <p role="alert" className={errorBusy ? ERR_BUSY : ERR}>{error}</p>}
                 {restoreConflicts.length > 0 && (
                   <ul className="mt-2 space-y-1 text-xs text-rose-700">
                     {restoreConflicts.map((c, i) => (
@@ -371,7 +430,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
                   </ul>
                 )}
                 <div className="mt-4 flex gap-2">
-                  <button type="button" onClick={restore} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>승인으로 복구</button>
+                  <button type="button" onClick={restore} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>{busyAction === "restore" ? "복구 중…" : "승인으로 복구"}</button>
                   <button type="button" onClick={closePanel} disabled={busy} className={`${BTN_OUTLINE} flex-1 md:flex-none whitespace-nowrap`}>닫기</button>
                 </div>
               </Panel>
@@ -379,7 +438,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
           </div>
         )}
 
-        <ol className="divide-y divide-gray-100">
+        <ol className="divide-y divide-slate-100">
           {/* ── 1단계 ── */}
           <Step
             n={1}
@@ -448,9 +507,9 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
                     />
                   </div>
                 </div>
-                {error && <p className={ERR}>{error}</p>}
+                {error && <p role="alert" className={errorBusy ? ERR_BUSY : ERR}>{error}</p>}
                 <div className="mt-4 flex gap-2">
-                  <button type="button" onClick={saveNotice} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>결제 안내 저장</button>
+                  <button type="button" onClick={saveNotice} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>{busyAction === "notice" ? "저장 중…" : "결제 안내 저장"}</button>
                   {step1Done && (
                     <button type="button" onClick={closePanel} disabled={busy} className={`${BTN_OUTLINE} flex-1 md:flex-none whitespace-nowrap`}>닫기</button>
                   )}
@@ -483,7 +542,7 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
             {!isAuto && !step2Done && current === 2 && (
               <Panel>
                 {hasLink ? (
-                  <p className="text-sm text-gray-600">결제 안내가 메일에 자동으로 들어갑니다. 내용을 확인하고 발송하세요.</p>
+                  <p className="text-sm text-slate-600">결제 안내가 메일에 자동으로 들어갑니다. 내용을 확인하고 발송하세요.</p>
                 ) : (
                   <p className="text-sm text-amber-700">링크를 저장하지 않으면 메일에 결제 안내가 빠집니다.</p>
                 )}
@@ -566,11 +625,11 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
                     placeholder="카드번호·계좌번호 전체는 적지 마세요"
                   />
                 </div>
-                <p className="mt-3 text-xs text-gray-600">이 신청을 &quot;결제완료&quot;로 기록합니다. 실제 결제는 홈페이지·복지종합시스템에서 확인했는지 한 번 더 보세요.</p>
-                {error && <p className={ERR}>{error}</p>}
+                <p className="mt-3 text-xs text-slate-600">이 신청을 &quot;결제완료&quot;로 기록합니다. 실제 결제는 홈페이지·복지종합시스템에서 확인했는지 한 번 더 보세요.</p>
+                {error && <p role="alert" className={errorBusy ? ERR_BUSY : ERR}>{error}</p>}
                 <div className="mt-3 flex gap-2">
                   <button type="button" onClick={savePayment} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>
-                    {step3Done ? "결제 기록 수정" : "결제 완료로 기록"}
+                    {busyAction === "payment" ? "기록 중…" : step3Done ? "결제 기록 수정" : "결제 완료로 기록"}
                   </button>
                   <button type="button" onClick={closePanel} disabled={busy} className={`${BTN_OUTLINE} flex-1 md:flex-none whitespace-nowrap`}>닫기</button>
                 </div>
@@ -603,9 +662,9 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
                     <input id="refund-reason" type="text" maxLength={300} className={INPUT} value={refundReason} onChange={(e) => setRefundReason(e.target.value)} placeholder="예: 신청자 취소(이용 7일 전)" />
                   </div>
                 </div>
-                {error && <p className={ERR}>{error}</p>}
+                {error && <p role="alert" className={errorBusy ? ERR_BUSY : ERR}>{error}</p>}
                 <div className="mt-4 flex gap-2">
-                  <button type="button" onClick={saveRefund} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>환불로 기록</button>
+                  <button type="button" onClick={saveRefund} disabled={busy} className={`${BTN_PRIMARY} flex-1 md:flex-none whitespace-nowrap break-keep`}>{busyAction === "refund" ? "기록 중…" : "환불로 기록"}</button>
                   <button type="button" onClick={closePanel} disabled={busy} className={`${BTN_OUTLINE} flex-1 md:flex-none whitespace-nowrap`}>닫기</button>
                 </div>
               </Panel>
@@ -621,17 +680,18 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
               closed_ ? (
                 <span>✓ 홈페이지 마감·미게시 {formatShortMd(view.homepageClosedAt)}</span>
               ) : step4NotPosted ? (
-                <span className="text-gray-500">홈페이지에 게시하지 않음</span>
+                <span className="text-slate-500">홈페이지에 게시하지 않음</span>
               ) : step4Enabled ? (
                 <>
-                  {isAuto && !posted_ && <span className="text-xs text-gray-500">홈페이지·복지종합시스템 등록을 확인하고 닫았으면 누르세요</span>}
+                  {isAuto && !posted_ && <span className="text-xs text-slate-500">홈페이지·복지종합시스템 등록을 확인하고 닫았으면 누르세요</span>}
                   <button type="button" onClick={closeHomepage} disabled={busy} className={current === 4 ? BTN_PRIMARY_SM : BTN_OUTLINE_SM}>
-                    홈페이지 마감·미게시 처리 완료
+                    {busyAction === "homepage" ? "기록 중…" : "홈페이지 마감·미게시 처리 완료"}
                   </button>
+                  {homeError && <p role="alert" className={`w-full ${homeError.busy ? ERR_BUSY : ERR}`}>{homeError.text}</p>}
                 </>
               ) : (
                 <>
-                  <span className="text-xs text-gray-500">결제 확인 후 홈페이지에서 마감·미게시로 바꾼 다음 누르세요.</span>
+                  <span className="text-xs text-slate-500">결제 확인 후 홈페이지에서 마감·미게시로 바꾼 다음 누르세요.</span>
                   <button type="button" disabled className={BTN_DISABLED_SM}>홈페이지 마감·미게시 처리 완료</button>
                 </>
               )
@@ -647,10 +707,10 @@ export default function PaymentSection({ requestId, view, todayYmd }: Props) {
 
 function SectionCard({ title, summary, children }: { title: string; summary?: string; children: ReactNode }) {
   return (
-    <section className="rounded-xl border-2 border-gray-200 bg-white shadow-sm" id="payment-section">
-      <div className="flex items-center justify-between gap-3 border-b border-gray-100 px-5 py-3">
-        <h2 className="shrink-0 break-keep text-sm font-bold text-gray-900">{title}</h2>
-        {summary && <span className="text-xs text-gray-500">{summary}</span>}
+    <section className="rounded-xl border-2 border-slate-200 bg-white shadow-sm" id="payment-section">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
+        <h2 className="shrink-0 break-keep text-sm font-bold text-slate-900">{title}</h2>
+        {summary && <span className="text-xs text-slate-500">{summary}</span>}
       </div>
       <div className="px-5 py-3">{children}</div>
     </section>
@@ -659,7 +719,7 @@ function SectionCard({ title, summary, children }: { title: string; summary?: st
 
 function Panel({ children }: { children: ReactNode }) {
   return (
-    <div className="mt-3 rounded-xl border border-slate-200 border-l-[3px] border-l-[rgb(var(--brand-primary))] bg-white p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+    <div className="mt-3 rounded-xl border border-slate-200 border-l-[3px] border-l-brand bg-white p-4 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
       {children}
     </div>
   );
@@ -672,25 +732,25 @@ function Step({ n, title, state, right, children }: { n: number; title: string; 
     state === "done"
       ? "border-emerald-200 bg-emerald-50 text-emerald-800"
       : state === "current"
-        ? "border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary))] text-white"
+        ? "border-brand bg-brand text-white"
         : state === "off"
-          ? "border-gray-100 bg-gray-50 text-gray-400"
+          ? "border-slate-100 bg-slate-50 text-slate-500"
           : state === "skip"
-            ? "border-gray-200 bg-gray-50 text-gray-500"
-            : "border-gray-200 bg-white text-gray-500";
+            ? "border-slate-200 bg-slate-50 text-slate-500"
+            : "border-slate-200 bg-white text-slate-500";
   const titleCls =
-    state === "current" ? "text-base font-bold text-gray-900 leading-[22px]" : state === "done" ? "text-sm font-semibold text-gray-700 leading-7" : "text-sm font-semibold text-gray-500 leading-7";
+    state === "current" ? "text-base font-bold text-slate-900 leading-[22px]" : state === "done" ? "text-sm font-semibold text-slate-700 leading-7" : "text-sm font-semibold text-slate-500 leading-7";
   return (
     <li className="grid grid-cols-[28px_1fr] gap-3 py-3.5" aria-current={state === "current" ? "step" : undefined}>
       <div className={`flex h-7 w-7 items-center justify-center rounded-full border text-xs font-bold ${circle}`}>{state === "done" || state === "skip" ? "✓" : n}</div>
       <div className="min-w-0">
         <div className="flex flex-col gap-2 md:flex-row md:items-start md:justify-between md:gap-3">
           <div>
-            {state === "current" && <div className="text-[11px] font-bold leading-[14px] text-[rgb(var(--brand-primary))]">지금 할 일</div>}
+            {state === "current" && <div className="text-xs font-bold leading-[14px] text-brand">지금 할 일</div>}
             <div className={titleCls}>{n}. {title}</div>
           </div>
           {right && (
-            <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm md:justify-end md:leading-7 ${state === "off" ? "text-gray-500" : "text-gray-600"}`}>{right}</div>
+            <div className={`flex flex-wrap items-center gap-x-2.5 gap-y-1 text-sm md:justify-end md:leading-7 ${state === "off" ? "text-slate-500" : "text-slate-600"}`}>{right}</div>
           )}
         </div>
         {children}

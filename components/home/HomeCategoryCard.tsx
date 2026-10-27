@@ -13,12 +13,13 @@ import {
   HOME_NOTE_BOX,
 } from "@/components/ui/presets";
 
-type AccentColor = "blue" | "violet" | "emerald";
+/** 공간 구분 — 테마 색 대신 점 색만(강의실 brand · 스튜디오 sky · 갤러리 accent · audit-fix-2 ③-A-2) */
+type AccentColor = "lecture" | "studio" | "gallery";
 
 const ACCENT_STYLES: Record<AccentColor, { border: string; badge: string; badgeText: string; dot: string }> = {
-  blue: { border: "border-blue-200", badge: "bg-blue-50 border-blue-200", badgeText: "text-blue-700", dot: "bg-blue-500" },
-  violet: { border: "border-violet-200", badge: "bg-violet-50 border-violet-200", badgeText: "text-violet-700", dot: "bg-violet-500" },
-  emerald: { border: "border-emerald-200", badge: "bg-emerald-50 border-emerald-200", badgeText: "text-emerald-700", dot: "bg-emerald-500" },
+  lecture: { border: "border-line", badge: "bg-white border-slate-300", badgeText: "text-ink-2", dot: "bg-brand" },
+  studio: { border: "border-line", badge: "bg-white border-slate-300", badgeText: "text-ink-2", dot: "bg-sky" },
+  gallery: { border: "border-line", badge: "bg-white border-slate-300", badgeText: "text-ink-2", dot: "bg-accent" },
 };
 
 type Props = {

@@ -11,7 +11,7 @@ export const revalidate = 0;
 
 export default function SuccessPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-gray-400">로딩 중...</div>}>
+    <Suspense fallback={<div className="flex min-h-[40vh] items-center justify-center text-slate-500">로딩 중...</div>}>
       <SuccessClient />
     </Suspense>
   );

@@ -81,7 +81,7 @@ export default function DataRetentionPanel() {
           type="button"
           onClick={handleCheck}
           disabled={loading}
-          className="rounded-xl border border-gray-200 bg-white px-4 py-2 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-50 disabled:opacity-50"
+          className="rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50 disabled:opacity-50"
         >
           {loading ? "조회 중..." : "만료 데이터 조회"}
         </button>

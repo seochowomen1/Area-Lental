@@ -4,9 +4,9 @@
 
 :root {
   color-scheme: light;
-  /* 서초센터 톤(대략): 네이비/오렌지 포인트 */
-  --brand-primary: 14 74 122; /* rgb */
-  --brand-accent: 242 132 43; /* rgb */
+  /* 서초센터 CI: 남색 #0E4A7A · CI 오렌지 #CA772B(점·밑줄·테두리 전용) */
+  --brand-primary: 14 74 122; /* rgb #0E4A7A */
+  --brand-accent: 202 119 43; /* rgb #CA772B */
   --brand-bg: 246 248 250;
 }
 
@@ -16,6 +16,7 @@ html, body {
 
 body {
   background: rgb(var(--brand-bg));
+  font-family: var(--font-pretendard), "Pretendard Variable", Pretendard, -apple-system, "Malgun Gothic", sans-serif;
 }
 
 /* 달력: 대관불가 표시(사선 패턴) */
@@ -32,4 +33,6 @@ body {
 @media print {
   .no-print { display: none !important; }
   .print-break { break-after: page; }
+  /* 표가 쪽 경계에서 행 중간이 잘리지 않게(01_spec ③-A-4) */
+  tr { break-inside: avoid; page-break-inside: avoid; }
 }

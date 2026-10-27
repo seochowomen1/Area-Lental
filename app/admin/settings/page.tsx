@@ -7,9 +7,33 @@ import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomC
 import { getDatabase } from "@/lib/database";
 import { categoryAccent } from "@/lib/requestUtils";
 import { assertAdminAuth } from "@/lib/adminAuth";
+import { getHolidayHealth, type HolidayHealth } from "@/lib/holidays";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
+
+/**
+ * ③-F-7 설정 화면 공휴일 상태 한 줄 — 키 값·URL은 화면에 내보내지 않는다.
+ * 내장표(2026~2027 법정공휴일)를 쓰는 동안은 "평일로 계산" 문구를 쓰지 않는다(03_api 2절 · 오케스트레이터 확정).
+ */
+function holidayHealthLine(h: HolidayHealth): { text: string; tone: "ok" | "warn" | "error" } {
+  if (h.status === "ok") return { text: "공휴일 자동 조회: 정상", tone: "ok" };
+  if (h.status === "no_key") {
+    return h.usingFallback
+      ? {
+          text: "공휴일 자동 조회: 꺼져 있음 — 공휴일 조회 키가 설정되지 않아 기본 공휴일표(법정 공휴일)로 계산 중입니다. 임시공휴일은 빠질 수 있으니 관리 담당자에게 알려 주세요.",
+          tone: "warn",
+        }
+      : {
+          text: "공휴일 자동 조회: 꺼져 있음 — 공휴일 조회 키가 설정되지 않아 공휴일 정보를 확인하지 못합니다. 이용료는 승인 때 확정해 주세요. 관리 담당자에게 알려 주세요.",
+          tone: "error",
+        };
+  }
+  if (h.status === "fallback") {
+    return { text: "공휴일 자동 조회: 오류 — 기본 공휴일표로 대신 계산 중입니다(임시공휴일은 빠질 수 있음).", tone: "warn" };
+  }
+  return { text: "공휴일 자동 조회: 오류 — 최근 조회에 실패했습니다. 갤러리 신청 금액을 확인해 주세요.", tone: "error" };
+}
 
 const DAY_OPTIONS = [
   { value: 1, label: "월" },
@@ -36,21 +60,43 @@ export default async function AdminSettingsPage({
     ? [{ id: "all", name: "전체" }, ...categoryRooms]
     : categoryRooms;
   const [schedules, blocks] = await Promise.all([db.getClassSchedules(), db.getBlocks()]);
+  let healthLine: ReturnType<typeof holidayHealthLine>;
+  try {
+    healthLine = holidayHealthLine(await getHolidayHealth());
+  } catch {
+    healthLine = holidayHealthLine({ status: "error", usingFallback: false, checkedAt: null, fallbackYears: [] });
+  }
 
   return (
     <div className="mx-auto max-w-5xl pb-16 pt-2">
       {/* 카테고리 헤더 */}
-      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 shadow-sm mb-6`}>
+      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 mb-3`}>
         <div className="flex items-center gap-3">
-          <span className={`inline-flex h-3 w-3 rounded-full ${accent.dot}`} />
-          <h1 className={`text-lg font-bold ${accent.text}`}>{categoryLabel} 운영 설정</h1>
+          <span className={`inline-block h-6 w-1 shrink-0 rounded-full ${accent.bar}`} aria-hidden="true" />
+          <h1 className={`text-xl font-bold ${accent.text}`}>{categoryLabel} 운영 설정</h1>
         </div>
-        <p className="mt-1 ml-6 text-sm text-gray-600">
+        <p className="mt-1 ml-4 text-sm text-slate-600">
           {category === "gallery"
             ? "내부 전시 일정을 관리합니다. 등록된 기간에는 외부 전시 신청이 불가능합니다."
             : "정규 수업시간 및 내부 대관 일정을 관리합니다. 등록된 시간/기간에는 대관 신청이 불가능합니다."}
         </p>
       </div>
+
+      {/* ③-F-7 공휴일 자동 조회 상태 — 페이지 제목 바로 아래 첫 줄 */}
+      <p
+        role="status"
+        className={
+          "mb-6 flex items-start gap-2 rounded-xl border px-4 py-3 text-[15px] " +
+          (healthLine.tone === "ok"
+            ? "border-line bg-white text-ink"
+            : healthLine.tone === "warn"
+              ? "border-amber-200 bg-amber-50 text-amber-800"
+              : "border-red-200 bg-red-50 text-red-700")
+        }
+      >
+        {healthLine.tone === "ok" ? <span className="mt-2 inline-block h-2 w-2 shrink-0 rounded-full bg-emerald-700" aria-hidden="true" /> : null}
+        <span>{healthLine.text}</span>
+      </p>
 
       <Notice title="안내" variant="info">
         <ul className="list-disc pl-5 space-y-1">

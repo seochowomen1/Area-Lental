@@ -12,6 +12,17 @@ import { dayOfWeek } from "@/lib/datetime";
 
 export type GalleryMonthStatus = "idle" | "loading" | "ok" | "error";
 
+/** 서버 공휴일 상태(/api/booked-dates holidayStatus · 03_api 1-1) — 화면은 unavailable일 때만 F-1 */
+export type PublicHolidayStatus = "ok" | "stale" | "fallback" | "unavailable";
+const HOLIDAY_STATUS_RANK: Record<PublicHolidayStatus, number> = { ok: 0, stale: 1, fallback: 2, unavailable: 3 };
+export function parseHolidayStatus(v: unknown): PublicHolidayStatus {
+  return v === "stale" || v === "fallback" || v === "unavailable" ? v : "ok";
+}
+/** 여러 달 중 가장 나쁜 상태 */
+export function worstPublicHolidayStatus(list: PublicHolidayStatus[]): PublicHolidayStatus {
+  return list.reduce<PublicHolidayStatus>((w, s) => (HOLIDAY_STATUS_RANK[s] > HOLIDAY_STATUS_RANK[w] ? s : w), "ok");
+}
+
 const DOW = ["일", "월", "화", "수", "목", "금", "토"] as const;
 const YMD = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -47,7 +58,7 @@ export function formatExcludedHolidays(dates: string[], names: ReadonlyMap<strin
   return `선택한 기간의 일요일·공휴일은 휴관이라 빠집니다: ${parts.join(", ")}`;
 }
 
-type MonthPayload = { holidays: Array<{ date: string; name: string }>; booked: string[]; ends: string[]; prepOnly: string[] };
+type MonthPayload = { holidays: Array<{ date: string; name: string }>; booked: string[]; ends: string[]; prepOnly: string[]; holidayStatus: PublicHolidayStatus };
 
 export function useGalleryMonthData(monthKeys: string[]) {
   const keyStr = monthKeys.join(",");
@@ -75,6 +86,7 @@ export function useGalleryMonthData(monthKeys: string[]) {
               booked: Array.isArray(data.bookedDates) ? data.bookedDates : [],
               ends: Array.isArray(data.exhibitionEndDates) ? data.exhibitionEndDates : [],
               prepOnly: Array.isArray(data.prepOnlyDates) ? data.prepOnlyDates : [],
+              holidayStatus: parseHolidayStatus(data.holidayStatus),
             };
           })
       )
@@ -107,7 +119,8 @@ export function useGalleryMonthData(monthKeys: string[]) {
       for (const d of p.ends) exhibitionEnds.add(d);
       for (const d of p.prepOnly) prepOnly.add(d);
     }
-    return { holidayNames, holidaySet: new Set(holidayNames.keys()) as ReadonlySet<string>, booked, exhibitionEnds, prepOnly };
+    const holidayStatus = worstPublicHolidayStatus(payloads.map((p) => p.holidayStatus));
+    return { holidayNames, holidaySet: new Set(holidayNames.keys()) as ReadonlySet<string>, booked, exhibitionEnds, prepOnly, holidayStatus };
   }, [payloads]);
 
   return { status, reload, ...merged };

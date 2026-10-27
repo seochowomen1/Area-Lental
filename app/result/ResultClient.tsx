@@ -330,7 +330,7 @@ export default function ResultClient() {
             <div>
               <h2 className="text-2xl font-semibold">신청 결과 조회</h2>
               {showLinkForm ? (
-                <p className="mt-2 text-sm text-gray-700">
+                <p className="mt-2 text-sm text-slate-700">
                   신청번호와 신청할 때 입력한 이메일을 넣으면 이 신청의 조회 링크를 메일로 보내 드립니다.
                 </p>
               ) : null}
@@ -339,7 +339,7 @@ export default function ResultClient() {
               <button
                 type="button"
                 onClick={clearDeviceRecord}
-                className="shrink-0 self-end text-sm font-semibold text-[rgb(var(--brand-primary))] underline-offset-2 hover:underline sm:self-start"
+                className="shrink-0 self-end text-sm font-semibold text-brand underline-offset-2 hover:underline sm:self-start"
               >
                 이 기기에서 조회 기록 지우기
               </button>
@@ -477,7 +477,7 @@ export default function ResultClient() {
               {/* 신청 정보 */}
               <section>
                 <div className="mb-4 flex items-center gap-2">
-                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">⏰</span>
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white text-xs">⏰</span>
                   <h3 className="text-lg font-bold text-slate-900">신청 정보</h3>
                 </div>
                 <div className="overflow-x-auto border-t-2 border-slate-900">
@@ -530,7 +530,7 @@ export default function ResultClient() {
                               <input
                                 className={cn(
                                   "w-full rounded-md border border-slate-300 px-3 py-2 text-sm",
-                                  "focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-primary)/0.3)]",
+                                  "focus:outline-none focus:ring-2 focus:ring-brand/[0.3]",
                                 )}
                                 defaultValue="위의 예약을 취소합니다."
                                 readOnly
@@ -561,7 +561,7 @@ export default function ResultClient() {
               {data.equipmentDetails && data.equipmentDetails.length > 0 && (
                 <section>
                   <div className="mb-4 flex items-center gap-2">
-                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-slate-900 text-white text-xs">🎬</span>
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-brand text-white text-xs">🎬</span>
                     <h3 className="text-lg font-bold text-slate-900">{isGallery ? "장비" : data.roomId === "media" ? "촬영장비" : "기자재"}</h3>
                   </div>
                   <div className="overflow-x-auto border-t-2 border-slate-900">
@@ -678,7 +678,7 @@ type PaymentCellData = {
 function PaymentCell({ data, mobile = false }: { data: PaymentCellData; mobile?: boolean }) {
   const t = (data.paymentStatusText || "-").trim();
   const noteCls = cn("text-xs leading-5 text-slate-600", mobile ? "mt-2" : "mt-2 text-left");
-  const btnCls = cn("inline-flex items-center justify-center rounded-xl bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white hover:opacity-95", mobile && "mt-3 w-full min-h-[44px]");
+  const btnCls = cn("inline-flex items-center justify-center rounded-xl bg-brand px-4 py-2 text-sm font-semibold text-white hover:opacity-95", mobile && "mt-3 w-full min-h-[44px]");
 
   let note: string | null = null;
   if (t === "결제 안내 예정") note = "승인 메일로 결제 방법을 안내드립니다.";

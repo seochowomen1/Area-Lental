@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { dayOfWeek, inRangeYmd } from "@/lib/datetime";
 import { galleryOperatingWindow } from "@/lib/gallery";
 import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
@@ -149,9 +149,7 @@ function kindWeight(k: CalendarKind): number {
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
   const { searchParams } = new URL(req.url);

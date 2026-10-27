@@ -1,7 +1,10 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
+
+import Modal, { MODAL_BTN_DANGER, MODAL_BTN_SECONDARY } from "@/components/ui/Modal";
+import { adminFetch, AdminFetchError } from "@/lib/adminFetch";
 
 type Candidate = { key: string; requestIds: string[]; roomName: string; paymentDueDate: string; approvedCount: number; mailOk: boolean | null };
 type RunResult = {
@@ -36,19 +39,15 @@ export default function PaymentDeadlineCheckButton() {
     setError(null);
   }, []);
 
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, close]);
-
   async function call(dryRun: boolean): Promise<RunResult> {
-    const res = await fetch(`/api/admin/payment-deadline/run${dryRun ? "?dryRun=1" : ""}`, { method: "POST" });
-    const data = (await res.json().catch(() => ({ ok: false, message: "응답을 읽을 수 없습니다." }))) as RunResult;
-    return data;
+    try {
+      const res = await adminFetch(`/api/admin/payment-deadline/run${dryRun ? "?dryRun=1" : ""}`, { method: "POST" });
+      return (await res.json().catch(() => ({ ok: false, message: "응답을 읽을 수 없습니다." }))) as RunResult;
+    } catch (e) {
+      // 503 AUTH_STORE_BUSY → G-1 문구(로그인으로 보내지 않음) · 그 밖 → 서버 메시지
+      if (e instanceof AdminFetchError) return { ok: false, message: e.message, code: e.code };
+      throw e;
+    }
   }
 
   async function startPreview() {
@@ -72,6 +71,7 @@ export default function PaymentDeadlineCheckButton() {
   }
 
   async function execute() {
+    if (loading) return;
     setLoading(true);
     setError(null);
     try {
@@ -92,67 +92,67 @@ export default function PaymentDeadlineCheckButton() {
 
   return (
     <>
-      <button type="button" onClick={startPreview} className="text-xs text-gray-600 underline hover:text-gray-900 min-h-[44px] md:min-h-0">
+      <button type="button" onClick={startPreview} className="min-h-[44px] text-sm text-slate-600 underline hover:text-slate-900">
         지금 점검
       </button>
 
-      {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" role="dialog" aria-modal="true" aria-labelledby="deadline-check-title">
-          <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl">
-            <div className="border-b border-gray-100 px-6 py-4">
-              <h2 id="deadline-check-title" className="text-lg font-bold text-gray-900">결제 기한 경과 점검</h2>
-              <p className="mt-1 text-sm text-gray-500">기한이 지난 미결제 승인 건을 먼저 확인하고, 확인 후에만 취소를 실행합니다.</p>
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto px-6 py-4 text-sm text-gray-700">
-              {loading && <p className="text-gray-500">확인 중…</p>}
-              {error && <p role="alert" className="font-semibold text-red-600">{error}</p>}
-
-              {!loading && !error && result && (
-                <div className="space-y-2">
-                  <p className="font-semibold text-gray-900">취소 실행 완료 · {result.cancelled?.length ?? 0}건</p>
-                  {(result.skippedOverCap ?? 0) > 0 && <p className="text-amber-700">상한 초과로 다음 실행으로 넘긴 건: {result.skippedOverCap}건</p>}
-                  {(result.errors?.length ?? 0) > 0 && (
-                    <ul className="list-disc pl-5 text-xs text-red-600">
-                      {result.errors!.map((e, i) => (
-                        <li key={i}>{e.key} · {e.stage} · {e.message}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <CandidateList items={result.cancelled ?? []} />
-                </div>
-              )}
-
-              {!loading && !error && !result && preview && (
-                <div className="space-y-2">
-                  {count === 0 ? (
-                    <p>자동 취소 대상이 없습니다.{preview.today ? ` (기준일 ${preview.today})` : ""}</p>
-                  ) : (
-                    <>
-                      <p className="font-semibold text-gray-900">
-                        자동 취소 대상 {count}건{preview.today ? ` · 기준일 ${preview.today}` : ""}
-                      </p>
-                      <CandidateList items={preview.cancelled ?? []} />
-                      <p className="text-xs text-gray-500">실행하면 위 신청의 승인 회차가 취소되고 신청자에게 취소 안내 메일이 발송됩니다. 홈페이지·복지종합시스템 강좌는 자동으로 닫히지 않습니다.</p>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-3 border-t border-gray-100 px-6 py-4">
-              <button type="button" onClick={close} disabled={loading} className="flex-1 rounded-lg border border-gray-200 bg-white px-5 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50 md:flex-none">
-                닫기
+      <Modal
+        open={open}
+        onClose={close}
+        busy={loading}
+        size="lg"
+        title="결제 기한 경과 점검"
+        showClose={false}
+        footer={
+          <>
+            <button type="button" onClick={close} disabled={loading} data-modal-cancel className={`${MODAL_BTN_SECONDARY} flex-1 md:flex-none`}>
+              닫기
+            </button>
+            {!result && preview && count > 0 && (
+              <button type="button" onClick={execute} disabled={loading} className={`${MODAL_BTN_DANGER} flex-1 md:flex-none`}>
+                {loading ? "취소 실행 중…" : `${count}건 취소 실행`}
               </button>
-              {!result && preview && count > 0 && (
-                <button type="button" onClick={execute} disabled={loading} className="flex-1 rounded-lg bg-rose-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-rose-700 disabled:opacity-60 md:flex-none">
-                  {count}건 취소 실행
-                </button>
+            )}
+          </>
+        }
+      >
+        <div className="text-[15px] text-slate-700">
+          <p className="mb-3 text-sm text-slate-500">기한이 지난 미결제 승인 건을 먼저 확인하고, 확인 후에만 취소를 실행합니다.</p>
+          {loading && <p className="text-slate-500">확인 중…</p>}
+          {error && <p role="alert" className="font-semibold text-red-700">{error}</p>}
+
+          {!loading && !error && result && (
+            <div className="space-y-2">
+              <p className="font-semibold text-slate-900">취소 실행 완료 · {result.cancelled?.length ?? 0}건</p>
+              {(result.skippedOverCap ?? 0) > 0 && <p className="text-amber-800">상한 초과로 다음 실행으로 넘긴 건: {result.skippedOverCap}건</p>}
+              {(result.errors?.length ?? 0) > 0 && (
+                <ul className="list-disc pl-5 text-[13px] text-red-700">
+                  {result.errors!.map((e, i) => (
+                    <li key={i}>{e.key} · {e.stage} · {e.message}</li>
+                  ))}
+                </ul>
+              )}
+              <CandidateList items={result.cancelled ?? []} />
+            </div>
+          )}
+
+          {!loading && !error && !result && preview && (
+            <div className="space-y-2">
+              {count === 0 ? (
+                <p>자동 취소 대상이 없습니다.{preview.today ? ` (기준일 ${preview.today})` : ""}</p>
+              ) : (
+                <>
+                  <p className="font-semibold text-slate-900">
+                    자동 취소 대상 {count}건{preview.today ? ` · 기준일 ${preview.today}` : ""}
+                  </p>
+                  <CandidateList items={preview.cancelled ?? []} />
+                  <p className="text-[13px] text-slate-500">실행하면 위 신청의 승인 회차가 취소되고 신청자에게 취소 안내 메일이 발송됩니다. 홈페이지·복지종합시스템 강좌는 자동으로 닫히지 않습니다.</p>
+                </>
               )}
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </Modal>
     </>
   );
 }
@@ -160,12 +160,12 @@ export default function PaymentDeadlineCheckButton() {
 function CandidateList({ items }: { items: Candidate[] }) {
   if (!items.length) return null;
   return (
-    <ul className="divide-y divide-gray-100 rounded-lg border border-gray-200">
+    <ul className="divide-y divide-slate-100 rounded-lg border border-slate-200">
       {items.map((c) => (
-        <li key={c.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-xs">
-          <span className="font-medium text-gray-900">{c.roomName}</span>
-          <span className="text-gray-600">기한 {c.paymentDueDate} · 승인 {c.approvedCount}회</span>
-          <span className="w-full text-gray-500 tabular-nums">{c.requestIds.join(", ")}</span>
+        <li key={c.key} className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 text-sm">
+          <span className="font-medium text-slate-900">{c.roomName}</span>
+          <span className="text-slate-600">기한 {c.paymentDueDate} · 승인 {c.approvedCount}회</span>
+          <span className="w-full text-slate-500 tabular-nums">{c.requestIds.join(", ")}</span>
         </li>
       ))}
     </ul>

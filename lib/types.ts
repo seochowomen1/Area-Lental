@@ -69,6 +69,15 @@ export const PAYMENT_FIELD_KEYS = [
 /** 숫자형 결제 필드 */
 export const PAYMENT_NUMERIC_KEYS: ReadonlySet<string> = new Set(["paidAmountKRW", "refundAmountKRW"]);
 
+/** 갤러리 이용료 다시 계산(audit-fix-2 R2) — 이 1행의 일수 3열 + galleryAuditJson만 바꾼다 */
+export type GalleryFeeUpdate = {
+  requestId: string;
+  weekdayCount: number;
+  saturdayCount: number;
+  exhibitionDayCount: number;
+  galleryAuditJson: string;
+};
+
 /** 결제 필드 갱신 패치 — null 또는 "" 은 "비움" */
 export type PaymentPatch = { [K in keyof PaymentFields]?: PaymentFields[K] | null };
 

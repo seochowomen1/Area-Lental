@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { RETENTION_YEARS } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { auditLog } from "@/lib/auditLog";
@@ -32,9 +32,7 @@ function hasPaymentRecord(r: { paymentStatus?: string }): boolean {
  */
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const db = getDatabase();
@@ -80,9 +78,7 @@ export async function GET(req: Request) {
  */
 export async function DELETE(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const body = (await req.json()) as { requestIds?: string[] };

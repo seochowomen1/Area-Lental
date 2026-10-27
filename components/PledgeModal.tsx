@@ -63,7 +63,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
+            className="rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
             aria-label="모달 닫기"
           >
             닫기
@@ -71,11 +71,11 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
         </div>
 
         <div id="pledge-modal-desc" className="max-h-[60vh] overflow-auto px-5 py-4">
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-slate-700">
             {pledgeIntro}
           </p>
 
-          <p className="mt-2 text-sm text-gray-700">
+          <p className="mt-2 text-sm text-slate-700">
             <b>운영시간:</b> {operatingNoticeText(roomId)}
           </p>
 
@@ -83,9 +83,9 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
 
           <div className="mt-4 space-y-4">
             {sections.map((sec) => (
-              <section key={sec.title} className="rounded-xl border bg-gray-50 p-4">
+              <section key={sec.title} className="rounded-xl border bg-slate-50 p-4">
                 <h4 className="text-sm font-semibold">{sec.title}</h4>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
                   {sec.bullets.map((b, idx) => (
                     <li key={idx}>{b}</li>
                   ))}
@@ -94,7 +94,7 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
             ))}
           </div>
 
-          <p className="mt-4 text-sm text-gray-700">{PLEDGE_FOOTER}</p>
+          <p className="mt-4 text-sm text-slate-700">{PLEDGE_FOOTER}</p>
 
         </div>
 

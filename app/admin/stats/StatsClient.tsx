@@ -1,5 +1,7 @@
 "use client";
 
+import { adminFetch, isAuthBusyError } from "@/lib/adminFetch";
+import { AUTH_STORE_BUSY_MESSAGE } from "@/lib/adminConstants";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
 import { PAYMENT_LABELS } from "@/lib/labels";
@@ -100,13 +102,19 @@ export default function StatsClient() {
   const [revBasis, setRevBasis] = useState<"usage" | "paid">("usage");
   const [data, setData] = useState<ApiResp | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busyNotice, setBusyNotice] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    fetch(`/api/admin/stats?year=${year}`)
+    // adminFetch: 401 → 로그인 · 503 AUTH_STORE_BUSY → G-1 문구(로그인 유지)
+    adminFetch(`/api/admin/stats?year=${year}`)
       .then((r) => r.json())
-      .then((j: ApiResp) => setData(j))
-      .catch((e) => { console.error("통계 조회 실패:", e); setData({ ok: false, year: String(year), months: [], message: "조회 실패" }); })
+      .then((j: ApiResp) => { setBusyNotice(false); setData(j); })
+      .catch((e) => {
+        console.error("통계 조회 실패:", e);
+        setBusyNotice(isAuthBusyError(e));
+        setData({ ok: false, year: String(year), months: [], message: isAuthBusyError(e) ? AUTH_STORE_BUSY_MESSAGE : "조회 실패" });
+      })
       .finally(() => setLoading(false));
   }, [year]);
 
@@ -147,7 +155,7 @@ export default function StatsClient() {
             id="year-select"
             value={year}
             onChange={(e) => setYear(Number(e.target.value))}
-            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:outline-none focus:ring-2 focus:ring-[rgb(var(--brand-primary)/0.15)]"
+            className="rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand/[0.15]"
           >
             {years.map((y) => (
               <option key={y} value={y}>{y}년</option>
@@ -198,7 +206,7 @@ export default function StatsClient() {
             </label>
             <a
               href={revenueHref(false)}
-              className="rounded-lg bg-[rgb(var(--brand-primary))] px-3 py-2 text-sm font-semibold text-white hover:opacity-95"
+              className="rounded-lg bg-brand px-3 py-2 text-sm font-semibold text-white hover:opacity-95"
             >
               엑셀 받기
             </a>
@@ -218,7 +226,7 @@ export default function StatsClient() {
       {loading ? (
         <div className="py-12 text-center text-sm text-slate-500">조회 중...</div>
       ) : data && !data.ok ? (
-        <div className="py-12 text-center text-sm text-red-500">{data.message}</div>
+        <div role="alert" className={busyNotice ? "my-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" : "py-12 text-center text-sm text-red-700"}>{data.message}</div>
       ) : data ? (
         <div className="space-y-6">
           {/* 월별 상세 테이블 */}
@@ -228,9 +236,9 @@ export default function StatsClient() {
                 <tr className="border-b border-slate-200 bg-slate-50">
                   <th rowSpan={2} className="whitespace-nowrap px-4 py-3 text-left font-semibold text-slate-700 border-r border-slate-200">월</th>
                   <th colSpan={3} className="px-4 py-2 text-center font-semibold text-blue-700 border-r border-slate-200 bg-blue-50/50">강의실</th>
-                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-violet-700 border-r border-slate-200 bg-violet-50/50">E-스튜디오</th>
-                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-indigo-700 border-r border-slate-200 bg-indigo-50/50">강의실+E-스튜디오</th>
-                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-emerald-700 bg-emerald-50/50">우리동네 갤러리</th>
+                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-ink border-r border-slate-200 bg-slate-50">E-스튜디오</th>
+                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-ink border-r border-slate-200 bg-slate-50">강의실+E-스튜디오</th>
+                  <th colSpan={3} className="px-4 py-2 text-center font-semibold text-ink bg-slate-50">우리동네 갤러리</th>
                 </tr>
                 <tr className="border-b border-slate-200 bg-slate-50 text-xs text-slate-600">
                   {/* 강의실 */}
@@ -262,7 +270,7 @@ export default function StatsClient() {
                       key={m.month}
                       className={cn(
                         "border-b border-slate-100 transition hover:bg-slate-50",
-                        !hasData && "text-slate-400"
+                        !hasData && "text-slate-500"
                       )}
                     >
                       <td className="whitespace-nowrap px-4 py-3 font-medium text-slate-700 border-r border-slate-200">{MONTH_LABELS[idx]}</td>
@@ -275,9 +283,9 @@ export default function StatsClient() {
                       <td className="px-3 py-3 text-center">{formatCount(m.studio.totalDays)}</td>
                       <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={m.studio} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                       {/* 강의실+E-스튜디오 합산 */}
-                      <td className="px-3 py-3 text-center bg-indigo-50/30 font-medium">{formatCount(m.lectureStudio.uniqueApplicants)}</td>
-                      <td className="px-3 py-3 text-center bg-indigo-50/30 font-medium">{formatCount(m.lectureStudio.totalDays)}</td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30 font-medium"><RevenueCell c={m.lectureStudio} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
+                      <td className="px-3 py-3 text-center bg-slate-50 font-medium">{formatCount(m.lectureStudio.uniqueApplicants)}</td>
+                      <td className="px-3 py-3 text-center bg-slate-50 font-medium">{formatCount(m.lectureStudio.totalDays)}</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-slate-50 font-medium"><RevenueCell c={m.lectureStudio} showCollected={showCollected} collectedPrimary={collectedPrimary} /></td>
                       {/* 갤러리 */}
                       <td className="px-3 py-3 text-center">{formatCount(m.gallery.uniqueApplicants)}</td>
                       <td className="px-3 py-3 text-center">{formatCount(m.gallery.totalDays)}</td>
@@ -296,9 +304,9 @@ export default function StatsClient() {
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.studio.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.studio.totalDays)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums"><RevenueCell c={yearTotal.studio} showCollected collectedPrimary={collectedPrimary} /></td>
-                    <td className="px-3 py-3 text-center bg-indigo-50/30">{formatCount(yearTotal.lectureStudio.uniqueApplicants)}</td>
-                    <td className="px-3 py-3 text-center bg-indigo-50/30">{formatCount(yearTotal.lectureStudio.totalDays)}</td>
-                    <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-indigo-50/30"><RevenueCell c={yearTotal.lectureStudio} showCollected collectedPrimary={collectedPrimary} /></td>
+                    <td className="px-3 py-3 text-center bg-slate-50">{formatCount(yearTotal.lectureStudio.uniqueApplicants)}</td>
+                    <td className="px-3 py-3 text-center bg-slate-50">{formatCount(yearTotal.lectureStudio.totalDays)}</td>
+                    <td className="whitespace-nowrap px-3 py-3 text-right border-r border-slate-200 tabular-nums bg-slate-50"><RevenueCell c={yearTotal.lectureStudio} showCollected collectedPrimary={collectedPrimary} /></td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.gallery.uniqueApplicants)}</td>
                     <td className="px-3 py-3 text-center">{formatCount(yearTotal.gallery.totalDays)}</td>
                     <td className="whitespace-nowrap px-3 py-3 text-right tabular-nums"><RevenueCell c={yearTotal.gallery} showCollected collectedPrimary={collectedPrimary} /></td>
@@ -313,7 +321,7 @@ export default function StatsClient() {
             <p><span className="font-semibold text-slate-700">연인원</span>: 해당 월 총 대관(전시) 일수 (회차 수)</p>
             <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.revenue}</span>: 해당 월 총 대관료(갤러리는 이용료) (승인 건 기준, 할인 적용 후)</p>
             <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.collected}</span>: 결제완료 건의 결제 금액 − 환불 금액 · 결제 미확인 건은 공란 · 2026년 11월 이용분부터 표시</p>
-            <p><span className="font-semibold text-indigo-700">강의실+E-스튜디오</span>: 강의실과 E-스튜디오의 합산 실적 (실인원은 이메일 기준 중복 제거)</p>
+            <p><span className="font-semibold text-ink">강의실+E-스튜디오</span>: 강의실과 E-스튜디오의 합산 실적 (실인원은 이메일 기준 중복 제거)</p>
           </div>
         </div>
       ) : null}

@@ -5,7 +5,7 @@
  * 환경 변수에 따라 자동으로 적절한 구현체를 선택합니다.
  */
 
-import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch } from "./types";
+import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch, GalleryFeeUpdate } from "./types";
 import { isMockMode } from "./env";
 
 /**
@@ -66,6 +66,8 @@ export interface Database {
   ): Promise<RentalRequest[]>;
   /** 결제 기록 필드 갱신 — 묶음이면 전 행 동기화. 갱신된 행 전부 반환 (2026-10-26) */
   updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]>;
+  /** 갤러리 이용료 다시 계산 — 이 1행의 일수 3열 + galleryAuditJson만 (audit-fix-2 R2) */
+  updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRequest>;
   /** 반려/취소된 신청건 삭제 */
   deleteRequests(requestIds: string[]): Promise<void>;
 
@@ -140,6 +142,11 @@ class MockDatabase implements Database {
   async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
     const { mock_updateRequestPayment } = await this.mockdb;
     return mock_updateRequestPayment(args);
+  }
+
+  async updateGalleryFee(args: GalleryFeeUpdate) {
+    const { mock_updateGalleryFee } = await this.mockdb;
+    return mock_updateGalleryFee(args);
   }
 
   async deleteRequests(requestIds: string[]) {
@@ -273,6 +280,12 @@ class SheetsDatabase implements Database {
     const result = await updateRequestPayment(args);
     this.requestsCache.invalidate();
     return result;
+  }
+
+  async updateGalleryFee(args: GalleryFeeUpdate) {
+    this.requestsCache.invalidate();
+    const { updateGalleryFee } = await this.sheets;
+    try { return await updateGalleryFee(args); } finally { this.requestsCache.invalidate(); }
   }
 
   async deleteRequests(requestIds: string[]) {

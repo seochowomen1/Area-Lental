@@ -126,7 +126,7 @@ export default function DatePickerCalendar({
         <div className="flex items-center gap-1">
           <button
             type="button"
-            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-gray-50"
+            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-slate-50"
             onClick={() => setMonth((m) => addMonths(m, -1))}
             aria-label="이전 달"
           >
@@ -134,7 +134,7 @@ export default function DatePickerCalendar({
           </button>
           <button
             type="button"
-            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-gray-50"
+            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-slate-50"
             onClick={() => {
               const today = new Date();
               setMonth(new Date(today.getFullYear(), today.getMonth(), 1));
@@ -145,7 +145,7 @@ export default function DatePickerCalendar({
           </button>
           <button
             type="button"
-            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-gray-50"
+            className="rounded border bg-white px-1.5 py-0.5 text-xs hover:bg-slate-50"
             onClick={() => setMonth((m) => addMonths(m, 1))}
             aria-label="다음 달"
           >
@@ -156,9 +156,9 @@ export default function DatePickerCalendar({
 
       {/* 달력 그리드 */}
       <div className="overflow-hidden rounded-lg border bg-white" role="grid" aria-label={`${monthLabel} 달력`}>
-        <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-[11px] font-semibold text-gray-600" role="row">
+        <div className="grid grid-cols-7 border-b bg-slate-50 text-center text-xs font-semibold text-slate-600" role="row">
           {["일", "월", "화", "수", "목", "금", "토"].map((d) => (
-            <div key={d} role="columnheader" className={cn("py-1.5", d === "일" && "text-rose-500", d === "토" && "text-blue-600")}>
+            <div key={d} role="columnheader" className={cn("py-1.5", d === "일" && "text-rose-700")}>
               {d}
             </div>
           ))}
@@ -172,13 +172,14 @@ export default function DatePickerCalendar({
             const isToday = ymd === todayYmd;
             const isPast = ymd < todayYmd;
             const isSunday = d.getDay() === 0;
-            const isSaturday = d.getDay() === 6;
             const isHoliday = holidayMap.has(ymd);
             const holidayName = holidayMap.get(ymd);
             const isBooked = bookedDates.has(ymd);
             const isDisabled = !isCurrentMonth || isPast || isSunday || isHoliday || isBooked;
+            // 칸 상태(02_ui §4-1과 같은 순서: 지난 날짜 > 휴관 > 공휴일 > 마감 > 선택 > 선택 가능)
+            const view = !isCurrentMonth ? "other" : isPast ? "past" : isSunday ? "closed" : isHoliday ? "holiday" : isBooked ? "booked" : isSelected ? "selected" : "available";
 
-            const statusHint = !isCurrentMonth ? "" : isSelected ? "선택됨" : isSunday || isHoliday ? `휴관${holidayName ? ` (${holidayName})` : ""}` : isBooked ? "마감" : isPast ? "지난 날짜" : "선택 가능";
+            const statusHint = view === "other" ? "" : view === "selected" ? "선택" : view === "closed" ? "휴관" : view === "holiday" ? (holidayName ?? "공휴일") : view === "booked" ? "마감" : view === "past" ? "지난 날짜" : "선택 가능";
 
             return (
               <button
@@ -190,34 +191,36 @@ export default function DatePickerCalendar({
                 aria-current={isToday && isCurrentMonth ? "date" : undefined}
                 aria-pressed={isSelected || undefined}
                 className={cn(
-                  "relative flex flex-col items-center justify-center border-b border-r py-1.5 text-xs transition",
-                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
-                  !isCurrentMonth && "bg-gray-50 text-gray-300 cursor-default",
-                  isCurrentMonth && (isSunday || isHoliday) && !isSelected && "cursor-not-allowed bg-rose-50/80",
-                  isCurrentMonth && (isPast || isBooked) && !isSunday && !isHoliday && !isSelected && "cursor-not-allowed bg-gray-50/80",
-                  isCurrentMonth && !isDisabled && !isSelected && "bg-white text-slate-800 hover:bg-slate-50",
-                  isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
+                  "relative flex min-h-[48px] flex-col items-center justify-start border-b border-r border-line pt-1.5 transition",
+                  "focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky",
+                  isDisabled && "cursor-default",
+                  (view === "other" || view === "past") && "bg-white",
+                  (view === "closed" || view === "holiday") && "bg-rose-50",
+                  view === "booked" && "bg-slate-100",
+                  view === "available" && "bg-white hover:bg-slate-50",
+                  view === "selected" && "z-10 bg-brand-soft shadow-[inset_0_0_0_2px_rgb(var(--brand-primary))]",
                 )}
               >
-                <span
-                  className={cn(
-                    "text-xs font-medium leading-tight",
-                    isCurrentMonth && (isSunday || isHoliday) && "text-rose-500",
-                    isCurrentMonth && isSaturday && !isHoliday && !isSunday && "text-blue-600",
-                    isCurrentMonth && isPast && !isSunday && !isHoliday && "text-gray-400",
-                    isToday && isCurrentMonth && "text-[rgb(var(--brand-primary))] font-bold",
-                  )}
-                >
-                  {d.getDate()}
-                </span>
-                {isCurrentMonth && isHoliday && !isSunday && (
-                  <span className="mt-0.5 text-[9px] leading-none text-rose-500 font-medium truncate max-w-[3.5rem]">
-                    {holidayName}
+                {view !== "other" && (
+                  <span
+                    className={cn(
+                      "text-[15px] tabular-nums leading-5",
+                      view === "past" && "font-medium text-slate-300",
+                      (view === "closed" || view === "holiday") && "font-semibold text-rose-700",
+                      view === "booked" && "font-medium text-slate-500",
+                      view === "selected" && "font-bold text-brand",
+                      view === "available" && "font-bold text-ink",
+                      isToday && "underline decoration-accent decoration-2 underline-offset-4",
+                    )}
+                  >
+                    {d.getDate()}
                   </span>
                 )}
-                {isCurrentMonth && isBooked && !isHoliday && !isSunday && !isPast && (
-                  <span className="mt-0.5 text-[9px] leading-none text-gray-400">마감</span>
-                )}
+                {view === "available" && <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
+                {view === "closed" && <span className="text-xs leading-4 text-rose-700">휴관</span>}
+                {view === "holiday" && <span className="text-xs leading-4 text-rose-700">공휴일</span>}
+                {view === "booked" && <span className="text-xs leading-4 text-slate-600">마감</span>}
+                {view === "selected" && <span className="text-xs font-bold leading-4 text-brand">선택</span>}
               </button>
             );
           })}
@@ -225,18 +228,21 @@ export default function DatePickerCalendar({
       </div>
 
       {/* 범례 */}
-      <div className="mt-1.5 flex flex-wrap gap-3 text-[10px] text-gray-500" aria-hidden="true">
+      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs text-ink-2" aria-hidden="true">
         <div className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-rose-400" />
-          <span>휴관·공휴일</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-gray-400" />
-          <span>마감</span>
-        </div>
-        <div className="flex items-center gap-1">
-          <span className="inline-block h-2 w-2 rounded-full bg-orange-400" />
+          <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" />
           <span>선택 가능</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-flex h-4 items-center rounded-sm bg-slate-100 px-1 text-slate-600">마감</span>
+          <span>= 예약 완료</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span className="inline-flex h-4 items-center rounded-sm bg-rose-50 px-1 text-rose-700">휴관</span>
+          <span>= 일요일·공휴일</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <span>흐린 숫자 = 지난 날짜</span>
         </div>
       </div>
     </div>

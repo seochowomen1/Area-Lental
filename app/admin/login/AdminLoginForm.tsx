@@ -47,7 +47,7 @@ export default function AdminLoginForm() {
   return (
     <Card pad="lg" className="mx-auto max-w-md shadow-[0_8px_24px_rgba(0,0,0,0.06)]">
       <h1 className="text-xl font-semibold">관리자 로그인</h1>
-      <p className="mt-2 text-sm text-gray-600">환경변수 ADMIN_PASSWORD로 보호됩니다.</p>
+      <p className="mt-2 text-sm text-slate-600">환경변수 ADMIN_PASSWORD로 보호됩니다.</p>
 
       <form onSubmit={onLogin} className="mt-6 space-y-3">
         <label className="block text-sm font-medium">비밀번호</label>

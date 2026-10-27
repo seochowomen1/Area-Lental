@@ -16,7 +16,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
       className={cn(
         "group overflow-hidden rounded-xl border border-slate-200 bg-white",
         "shadow-[0_1px_0_rgba(0,0,0,0.02)] transition",
-        "hover:border-[rgb(var(--brand-primary))]/40 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]"
+        "hover:border-brand/40 hover:shadow-[0_14px_34px_rgba(0,0,0,0.08)]"
       )}
     >
       <div className="relative aspect-[4/3] w-full overflow-hidden bg-slate-100">
@@ -26,7 +26,11 @@ function RoomCard({ room }: { room: SpaceRoom }) {
           <img
             src={room.image}
             alt={room.name}
-            className="h-full w-full object-cover transition group-hover:scale-[1.02]"
+            width={800}
+            height={600}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center text-xs text-slate-500">
@@ -34,7 +38,7 @@ function RoomCard({ room }: { room: SpaceRoom }) {
           </div>
         )}
 
-        <span className="absolute left-3 top-3 rounded-full bg-[rgb(var(--brand-primary))] px-3 py-1 text-xs font-semibold text-white shadow">
+        <span className="absolute left-3 top-3 rounded-full bg-brand px-3 py-1 text-xs font-semibold text-white shadow">
           {isGallery ? "전시 신청 필수" : "대관신청 필수"}
         </span>
       </div>

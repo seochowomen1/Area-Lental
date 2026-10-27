@@ -13,6 +13,7 @@ import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import Button from "@/components/ui/Button";
+import Modal, { MODAL_BTN_SECONDARY } from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
@@ -20,6 +21,7 @@ import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/
 import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
 import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
 import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
+import HolidayUnavailableNotice from "@/components/HolidayUnavailableNotice";
 import { PAYMENT_FLOW_SHORT } from "@/lib/policy";
 import { GALLERY_FEE_KRW } from "@/lib/constants";
 import { availablePrepDates, planGallery } from "@/lib/galleryPlan";
@@ -335,6 +337,13 @@ export default function ApplyGalleryClient() {
   }, [startDate, setValue]);
 
   function handleConfirm(values: GalleryApplyValues) {
+    // 기간은 맞게 들어왔지만 회차가 0(예: 일요일만)인 경우 — 요약(전시 기간)으로 안내하고 그 칸으로 이동
+    if (sessionsBundle.sessions.length === 0) {
+      const el = document.getElementById("startDate");
+      el?.scrollIntoView({ behavior: "smooth", block: "center" });
+      (el as HTMLElement | null)?.focus({ preventScroll: true });
+      return;
+    }
     setError(null);
     setBatchError(null);
     setConfirmData(values);
@@ -406,16 +415,20 @@ export default function ApplyGalleryClient() {
   };
   const excludedHolidayText = formatExcludedHolidays(plan.excludedHolidays, monthData.holidayNames);
 
-  /** 빠진 항목 — 버튼이 비활성이거나 제출 뒤 오류가 있으면 버튼 위에 보인다(ux.md Top④) */
+  /**
+   * 빠진 항목 — [신청하기]는 항상 누를 수 있고(처리 중만 비활성), 누른 뒤 빠진 항목이 있으면 버튼 바로 위에 요약한다
+   * (audit-fix-2 ②-2-3 · 수용 4-4). 전시 기간·전시명·철수 시간 포함.
+   */
   const missingFields: MissingField[] = (() => {
     const out: MissingField[] = [];
     const add = (key: string, label: string, targetId: string) => {
       if (!out.some((x) => x.key === key)) out.push({ key, label, targetId });
     };
-    if (sessionCount === 0 || errors.startDate || errors.endDate) add("period", "전시 기간", "startDate");
-    if (!exhibitionTitle || errors.exhibitionTitle) add("exhibitionTitle", "전시명", "exhibitionTitle");
-    if (!galleryRemovalTime || errors.galleryRemovalTime) add("galleryRemovalTime", "철수 시간", isYmd(endDate) ? "galleryRemovalTime" : "endDate");
     if (submitCount > 0) {
+      if (sessionCount === 0 || errors.startDate || errors.endDate) add("period", "전시 기간", "startDate");
+      // 요약 순서 = 화면 순서(철수 시간이 전시명보다 위) — 첫 항목으로 포커스가 간다 (audit-fix-2 검수 P-1)
+      if (!galleryRemovalTime || errors.galleryRemovalTime) add("galleryRemovalTime", "철수 시간", isYmd(endDate) ? "galleryRemovalTime" : "endDate");
+      if (!exhibitionTitle || errors.exhibitionTitle) add("exhibitionTitle", "전시명", "exhibitionTitle");
       if (errors.applicantName) add("applicantName", "성명", "applicantName");
       if (errors.birth) add("birth", "생년월일", "birthYear");
       if (errors.address) add("address", "주소", "address");
@@ -557,8 +570,9 @@ export default function ApplyGalleryClient() {
 
             {/* 예상 이용료 */}
             <Card pad="lg">
-              <h3 className={SECTION_TITLE}>예상 이용료</h3>
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+              <h3 className={SECTION_TITLE}>예상 전시 공간 이용료</h3>
+              {monthData.status === "ok" && monthData.holidayStatus === "unavailable" ? <HolidayUnavailableNotice className="mt-3" /> : null}
+              <div className="mt-3 overflow-hidden rounded-xl border border-line bg-white">
                 <div className="px-4 py-3 space-y-2">
                   {feeBreakdown.weekdays > 0 && (
                     <div className="flex items-center justify-between text-sm text-slate-600">
@@ -572,17 +586,17 @@ export default function ApplyGalleryClient() {
                       <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
                     </div>
                   )}
-                  {excludedHolidayText ? <p className="text-xs text-slate-500">{excludedHolidayText}</p> : null}
+                  {excludedHolidayText ? <p className="text-[13px] text-slate-500">{excludedHolidayText}</p> : null}
                   {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
-                    <div className="flex items-center justify-between text-sm text-emerald-600">
+                    <div className="flex items-center justify-between text-sm text-ink-2">
                       <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
                       <span className="font-medium">무료</span>
                     </div>
                   )}
                 </div>
-                <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-                  <span className="text-sm font-bold text-slate-900">합계</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
+                <div className="mx-4 mb-3 flex items-center justify-between rounded-lg bg-brand-soft px-4 py-3">
+                  <span className="text-[15px] font-bold text-ink">합계</span>
+                  <span className="text-2xl font-bold tabular-nums text-brand">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
                 </div>
               </div>
             </Card>
@@ -593,7 +607,7 @@ export default function ApplyGalleryClient() {
                 수정하기
               </Button>
               <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting || holidaysPending} onClick={submitConfirmed}>
-                {submitting ? "제출 중..." : holidaysPending ? "공휴일 확인 중…" : "최종 제출"}
+                {submitting ? "제출 중…" : holidaysPending ? "공휴일 확인 중…" : "최종 제출"}
               </Button>
             </div>
           </div>
@@ -673,7 +687,7 @@ export default function ApplyGalleryClient() {
                 <div className="text-sm text-slate-700">
                   자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
                 </div>
-                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-[rgb(var(--brand-primary))] hover:underline">
+                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-brand hover:underline">
                   우리동네 갤러리 안내 보기
                 </button>
               </div>
@@ -714,7 +728,7 @@ export default function ApplyGalleryClient() {
                 <div className="mt-3">
                   <Notice variant="warn">
                     공휴일 정보를 불러오지 못해 예상 이용료가 실제와 다를 수 있습니다.{" "}
-                    <button type="button" onClick={monthData.reload} className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+                    <button type="button" onClick={monthData.reload} className="font-semibold text-brand underline underline-offset-2">
                       다시 불러오기
                     </button>
                   </Notice>
@@ -723,11 +737,13 @@ export default function ApplyGalleryClient() {
             </div>
 
             {/* 이용료 자동 계산 */}
+            {sessionCount > 0 && monthData.status === "ok" && monthData.holidayStatus === "unavailable" ? (
+              <HolidayUnavailableNotice className="mt-4" />
+            ) : null}
             {sessionCount > 0 && (
-              <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                  <span className="text-base">💰</span>
-                  <span className="text-sm font-bold text-slate-800">예상 이용료</span>
+              <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
+                <div className="border-b border-line bg-slate-50 px-4 py-2.5">
+                  <span className="text-[15px] font-bold text-ink">예상 전시 공간 이용료</span>
                 </div>
                 <div className="px-4 py-3">
                   <div className="space-y-2">
@@ -744,17 +760,17 @@ export default function ApplyGalleryClient() {
                       </div>
                     )}
                     {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
-                      <div className="flex items-center justify-between text-sm text-emerald-600">
+                      <div className="flex items-center justify-between text-sm text-ink-2">
                         <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
                         <span className="font-medium">무료</span>
                       </div>
                     )}
                   </div>
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-                    <span className="text-sm font-bold text-slate-900">합계</span>
-                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
+                  <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-soft px-4 py-3">
+                    <span className="text-[15px] font-bold text-ink">합계</span>
+                    <span className="text-2xl font-bold tabular-nums text-brand">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
+                  <p className="mt-2 text-[13px] text-ink-3">※ 할인 및 바우처 적용 불가</p>
                 </div>
               </div>
             )}
@@ -819,7 +835,7 @@ export default function ApplyGalleryClient() {
                       handleBirthSync(v, birthMonth, birthDay);
                     }}
                   />
-                  <span className="text-slate-400">-</span>
+                  <span className="text-slate-500">-</span>
                   <input
                     ref={birthMonthRef}
                     className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
@@ -834,7 +850,7 @@ export default function ApplyGalleryClient() {
                       handleBirthSync(birthYear, v, birthDay);
                     }}
                   />
-                  <span className="text-slate-400">-</span>
+                  <span className="text-slate-500">-</span>
                   <input
                     ref={birthDayRef}
                     className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
@@ -1009,8 +1025,8 @@ export default function ApplyGalleryClient() {
             <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
           ) : null}
           <MissingFieldsSummary items={missingFields} />
-          <Button type="submit" variant="primary" disabled={submitting || !exhibitionTitle || sessionCount === 0 || !galleryRemovalTime} className="w-full py-3 shadow-sm hover:opacity-90">
-            {submitting ? "신청 중..." : "신청하기"}
+          <Button type="submit" variant="primary" disabled={submitting} className="min-h-[48px] w-full py-3 text-base">
+            {submitting ? "신청 중…" : "신청하기"}
           </Button>
         </form>
 
@@ -1048,44 +1064,19 @@ export default function ApplyGalleryClient() {
 
 /* 갤러리 안내 팝업 */
 function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
+    <Modal
+      open={open}
+      onClose={onClose}
+      size="lg"
+      title="우리동네 갤러리 안내"
+      footer={
+        <button type="button" data-modal-cancel onClick={onClose} className={MODAL_BTN_SECONDARY}>
+          닫기
+        </button>
+      }
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="닫기"
-        onClick={onClose}
-        tabIndex={-1}
-      />
-
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 className="text-base font-semibold">우리동네 갤러리 안내</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-gray-600 hover:bg-gray-100"
-          >
-            닫기
-          </button>
-        </div>
-
-        <div className="max-h-[70vh] overflow-auto px-5 py-4 space-y-4 text-sm text-gray-800">
+        <div className="space-y-4 text-[15px] text-slate-800">
           {/* 운영 시간 */}
           <div>
             <h4 className="font-semibold mb-2">운영 시간</h4>
@@ -1166,14 +1157,13 @@ function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => voi
           {/* 신청 제한 */}
           <div>
             <h4 className="font-semibold mb-2">신청 제한 사항</h4>
-            <ul className="list-disc space-y-1.5 pl-5 text-gray-700">
+            <ul className="list-disc space-y-1.5 pl-5 text-slate-700">
               <li>부적절한 목적, 시설 훼손 우려, 종교 포교, 정치적 목적, 영리적 목적</li>
               <li>작품 판매, 세미나, 퍼포먼스, 기타 판촉행사 등 부대행사 진행</li>
               <li>전시 운영 규정 미진 시 전시 중 발견 시 즉시 취소 및 환불 불가</li>
             </ul>
           </div>
         </div>
-      </div>
-    </div>
+    </Modal>
   );
 }

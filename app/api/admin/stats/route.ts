@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { ROOMS_BY_ID } from "@/lib/space";
 import { computeFeesForRequest, computeFeesForBundle } from "@/lib/pricing";
 import { dayOfWeek } from "@/lib/datetime";
@@ -66,9 +66,7 @@ function countDaysByMonth(startDate: string, endDate: string): Map<string, numbe
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const { searchParams } = new URL(req.url);

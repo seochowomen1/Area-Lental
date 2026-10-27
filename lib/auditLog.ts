@@ -44,7 +44,9 @@ export type AuditAction =
   | "PAYMENT_AUTO_CANCEL_RESTORE"
   | "PAYMENT_DEADLINE_AUTO_CANCEL"
   | "PAYMENT_REMINDER_SEND"
-  | "REQUEST_DUPLICATE_AUTO_CANCEL";
+  | "REQUEST_DUPLICATE_AUTO_CANCEL"
+  // 갤러리 이용료 다시 계산 (audit-fix-2 R2)
+  | "GALLERY_FEE_RECALC";
 
 /** 시트에 영구 저장할 작업(데이터 변경). 조회성 작업(PI_ACCESS·STATS_VIEW·EXPORT_*)은 로그 폭증 방지를 위해 제외 */
 const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
@@ -77,6 +79,7 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   // audit-fix-1: 로그아웃(세션 폐기)·동시 신청 중복 자동 취소도 시트에 남긴다
   "ADMIN_LOGOUT",
   "REQUEST_DUPLICATE_AUTO_CANCEL",
+  "GALLERY_FEE_RECALC",
 ]);
 
 /** 감사로그 시트의 작업명 한글 표기 */
@@ -109,6 +112,7 @@ const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   PAYMENT_AUTO_CANCEL_RESTORE: "자동 취소 복구",
   PAYMENT_DEADLINE_AUTO_CANCEL: "결제 기한 경과 자동 취소",
   PAYMENT_REMINDER_SEND: "결제 기한 리마인드",
+  GALLERY_FEE_RECALC: "갤러리 이용료 다시 계산",
 };
 
 export interface AuditEntry {

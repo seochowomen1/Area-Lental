@@ -9,10 +9,11 @@ import { normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 
 const STORAGE_KEY = "rental-app-improved:admin:lastCategory";
 
-const CATEGORIES: { id: RoomCategory; label: string; color: string; bg: string }[] = [
-  { id: "lecture", label: "강의실", color: "text-blue-700", bg: "bg-blue-50 border-blue-200" },
-  { id: "studio", label: "E-스튜디오", color: "text-violet-700", bg: "bg-violet-50 border-violet-200" },
-  { id: "gallery", label: "우리동네 갤러리", color: "text-emerald-700", bg: "bg-emerald-50 border-emerald-200" },
+// 공간별 테마 색은 쓰지 않는다(audit-fix-2 ③-A-2). 구분은 제목 글자 + 4px 좌측 바(bar)로만.
+const CATEGORIES: { id: RoomCategory; label: string; bar: string }[] = [
+  { id: "lecture", label: "강의실", bar: "bg-brand" },
+  { id: "studio", label: "E-스튜디오", bar: "bg-sky" },
+  { id: "gallery", label: "우리동네 갤러리", bar: "bg-accent" },
 ];
 
 export function getCategoryMeta(category: RoomCategory) {
@@ -52,7 +53,6 @@ export default function AdminNavTabs() {
   }, [rawCategory, normalizedFromUrl]);
 
   const category = rawCategory ? normalizedFromUrl : persisted;
-  const meta = getCategoryMeta(category as RoomCategory);
 
   const pageTabs = [
     {
@@ -85,8 +85,8 @@ export default function AdminNavTabs() {
   return (
     <div className="space-y-3">
       {/* 카테고리 전환 */}
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="mr-1 text-xs font-medium text-slate-400">공간:</span>
+      <div className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
+        <span className="mr-1 shrink-0 text-sm font-medium text-white/80">공간:</span>
         {CATEGORIES.map((cat) => {
           const isActive = cat.id === category;
           return (
@@ -94,10 +94,10 @@ export default function AdminNavTabs() {
               key={cat.id}
               href={buildCategoryHref(cat.id)}
               className={cn(
-                "rounded-full border px-3 py-1 text-xs font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
+                "inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full border px-4 py-1.5 text-sm font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2 focus-visible:ring-offset-brand",
                 isActive
-                  ? `${cat.bg} ${cat.color}`
-                  : "border-slate-600 bg-slate-700/50 text-slate-300 hover:bg-slate-700"
+                  ? "border-white bg-white text-brand"
+                  : "border-white/30 bg-white/10 text-white hover:bg-white/20"
               )}
             >
               {cat.label}
@@ -107,16 +107,16 @@ export default function AdminNavTabs() {
       </div>
 
       {/* 페이지 탭 */}
-      <nav className="flex flex-wrap items-center gap-2">
+      <nav className="-mx-4 flex items-center gap-2 overflow-x-auto px-4 sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0">
         {pageTabs.map((t) => (
           <Link
             key={t.label}
             href={t.href}
             className={cn(
-              "rounded-full px-4 py-2 text-sm transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-800",
+              "inline-flex min-h-[44px] shrink-0 items-center whitespace-nowrap rounded-full px-4 py-2 text-[15px] transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2 focus-visible:ring-offset-brand",
               t.active
-                ? "bg-white text-slate-900 font-semibold shadow-sm"
-                : "bg-slate-700/50 text-slate-300 shadow-sm ring-1 ring-slate-600 hover:bg-slate-700"
+                ? "bg-white font-semibold text-brand"
+                : "bg-white/10 text-white ring-1 ring-white/30 hover:bg-white/20"
             )}
           >
             {t.label}

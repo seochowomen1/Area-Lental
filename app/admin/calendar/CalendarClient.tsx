@@ -1,5 +1,6 @@
 "use client";
 
+import { adminFetch, isAuthBusyError } from "@/lib/adminFetch";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -139,16 +140,16 @@ function statusBadge(status?: RequestStatus) {
     return <span className={cn(base, "border-rose-200 bg-rose-50 text-rose-700")}>{status}</span>;
   }
 
-  return <span className={cn(base, "border-gray-200 bg-gray-50 text-gray-700")}>{status}</span>;
+  return <span className={cn(base, "border-slate-200 bg-slate-50 text-slate-700")}>{status}</span>;
 }
 
 function kindBadge(kind: CalendarKind) {
   const base = "inline-flex items-center rounded-full border px-2 py-0.5 text-xs font-semibold";
   if (kind === "schedule") {
-    return <span className={cn(base, "border-indigo-200 bg-indigo-50 text-indigo-700")}>정규수업</span>;
+    return <span className={cn(base, "border-sky/40 bg-sky/10 text-ink-2")}>정규수업</span>;
   }
   if (kind === "block") {
-    return <span className={cn(base, "border-gray-200 bg-gray-50 text-gray-700")}>차단</span>;
+    return <span className={cn(base, "border-slate-200 bg-slate-50 text-slate-700")}>차단</span>;
   }
   return null;
 }
@@ -259,6 +260,7 @@ export default function CalendarClient({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [errorBusy, setErrorBusy] = useState(false);
   const [items, setItems] = useState<CalendarItem[]>([]);
   const [holidays, setHolidays] = useState<Map<string, string>>(new Map());
 
@@ -374,11 +376,8 @@ export default function CalendarClient({
         qs.set("blocks", showBlocks ? "1" : "0");
         qs.set("schedules", showSchedules ? "1" : "0");
 
-        const res = await fetch(`/api/admin/calendar?${qs.toString()}`, { cache: "no-store" });
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `HTTP ${res.status}`);
-        }
+        // adminFetch: 401 → 로그인 · 503 AUTH_STORE_BUSY → G-1 문구(로그인 유지)
+        const res = await adminFetch(`/api/admin/calendar?${qs.toString()}`, { cache: "no-store", fallbackMessage: "캘린더 데이터를 불러오지 못했습니다." });
 
         const data = (await res.json()) as CalendarResponse;
         if (!data.ok) throw new Error("캘린더 데이터를 불러오지 못했습니다.");
@@ -397,6 +396,7 @@ export default function CalendarClient({
         }
       } catch (e: unknown) {
         if (!cancelled) {
+          setErrorBusy(isAuthBusyError(e));
           setError(e instanceof Error ? e.message : "알 수 없는 오류");
           setItems([]);
         }
@@ -509,27 +509,27 @@ export default function CalendarClient({
 
           <div className="flex flex-col justify-end gap-2">
             <div className="flex flex-wrap items-center gap-3">
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={showSchedules}
                   onChange={(e) => setShowSchedules(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-slate-300"
                 />
                 정규수업
               </label>
-              <label className="inline-flex items-center gap-2 text-sm text-gray-700">
+              <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                 <input
                   type="checkbox"
                   checked={showBlocks}
                   onChange={(e) => setShowBlocks(e.target.checked)}
-                  className="h-4 w-4 rounded border-gray-300"
+                  className="h-4 w-4 rounded border-slate-300"
                 />
                 차단시간
               </label>
             </div>
 
-            <p className="text-xs text-gray-500">표시 범위: {range.from} ~ {range.to}</p>
+            <p className="text-xs text-slate-500">표시 범위: {range.from} ~ {range.to}</p>
           </div>
         </div>
 
@@ -538,44 +538,44 @@ export default function CalendarClient({
             <button
               type="button"
               onClick={() => setMonthStart((d) => addMonthsUtc(d, -1))}
-              className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               이전
             </button>
             <button
               type="button"
               onClick={() => setMonthStart((d) => startOfMonthUtc(ymdToUtcDate(today)))}
-              className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               이번 달
             </button>
             <button
               type="button"
               onClick={() => setMonthStart((d) => addMonthsUtc(d, 1))}
-              className="rounded-full border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+              className="rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               다음
             </button>
           </div>
 
-          <div className="text-sm font-semibold text-gray-800">
+          <div className="text-sm font-semibold text-slate-800">
             {monthStart.getUTCFullYear()}년 {monthStart.getUTCMonth() + 1}월
           </div>
         </div>
 
         {error ? (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+          <div role="alert" className={errorBusy ? "mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800" : "mt-4 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"}>
             {error}
           </div>
         ) : null}
 
         {loading ? (
-          <div className="mt-4 rounded-xl border bg-slate-50 p-4 text-sm text-gray-600">불러오는 중…</div>
+          <div className="mt-4 rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">불러오는 중…</div>
         ) : null}
       </div>
 
       <div className="rounded-xl bg-white p-4 shadow">
-        <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-gray-600">
+        <div className="grid grid-cols-7 gap-2 text-center text-xs font-semibold text-slate-600">
           {[
             "월",
             "화",
@@ -585,7 +585,7 @@ export default function CalendarClient({
             "토",
             "일"
           ].map((d) => (
-            <div key={d} className={cn("py-2", d === "토" ? "text-blue-600" : d === "일" ? "text-rose-600" : "")}>{d}</div>
+            <div key={d} className={cn("py-2", d === "토" ? "text-brand" : d === "일" ? "text-rose-700" : "")}>{d}</div>
           ))}
         </div>
 
@@ -613,25 +613,25 @@ export default function CalendarClient({
                 type="button"
                 onClick={() => setSelectedDate(ymd)}
                 className={cn(
-                  "min-h-[106px] rounded-2xl border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2",
+                  "min-h-[106px] rounded-2xl border p-2 text-left transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2",
                   inMonth ? "bg-white" : "bg-slate-50",
-                  isSelected ? "border-[rgb(var(--brand-primary))]" : "border-gray-200",
-                  "hover:bg-gray-50"
+                  isSelected ? "border-brand" : "border-slate-200",
+                  "hover:bg-slate-50"
                 )}
                 aria-current={isSelected ? "date" : undefined}
               >
                 <div className="flex items-center justify-between">
-                  <div className={cn("text-sm font-semibold", inMonth ? "text-gray-900" : "text-gray-400")}>
+                  <div className={cn("text-sm font-semibold", inMonth ? "text-slate-900" : "text-slate-500")}>
                     {d.getUTCDate()}
                   </div>
                   <div className="flex items-center gap-1">
                     {holidays.has(ymd) && (
-                      <span className="rounded bg-rose-100 px-1 py-0.5 text-[10px] font-semibold text-rose-600 leading-none" title={`공휴일: ${holidays.get(ymd)}`}>
+                      <span className="rounded bg-rose-100 px-1 py-0.5 text-xs font-semibold text-rose-600 leading-none" title={`공휴일: ${holidays.get(ymd)}`}>
                         {holidays.get(ymd)}
                       </span>
                     )}
                     {isToday ? (
-                      <span className="inline-flex h-2 w-2 rounded-full bg-[rgb(var(--brand-primary))]" aria-label="오늘" />
+                      <span className="inline-flex h-2 w-2 rounded-full bg-brand" aria-label="오늘" />
                     ) : null}
                   </div>
                 </div>
@@ -645,8 +645,8 @@ export default function CalendarClient({
                           ? "border-emerald-200 bg-emerald-50 text-emerald-800"
                           : "border-amber-200 bg-amber-50 text-amber-900"
                         : it.kind === "schedule"
-                          ? "border-indigo-200 bg-indigo-50 text-indigo-800"
-                          : "border-gray-200 bg-gray-50 text-gray-700";
+                          ? "border-sky/40 bg-sky/10 text-ink-2"
+                          : "border-slate-200 bg-slate-50 text-slate-700";
 
                     // 표시 텍스트 생성
                     let label = "";
@@ -680,7 +680,7 @@ export default function CalendarClient({
                     return (
                       <div
                         key={it.id}
-                        className={cn("truncate rounded px-1.5 py-0.5 text-[10px] leading-tight", colorCls)}
+                        className={cn("truncate rounded px-1.5 py-0.5 text-xs leading-tight", colorCls)}
                         title={label}
                       >
                         {label}
@@ -688,7 +688,7 @@ export default function CalendarClient({
                     );
                   })}
                   {more > 0 ? (
-                    <div className="text-[10px] text-gray-500">+{more}건</div>
+                    <div className="text-xs text-slate-500">+{more}건</div>
                   ) : null}
                 </div>
               </button>
@@ -696,8 +696,8 @@ export default function CalendarClient({
           })}
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-[11px] text-gray-600">
-          <span className="font-semibold text-gray-700">범례</span>
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <span className="font-semibold text-slate-700">범례</span>
           <span className="inline-flex items-center gap-1.5">
             <span className="h-2.5 w-2.5 rounded-sm bg-emerald-100 border border-emerald-300" /> 승인
           </span>
@@ -705,10 +705,10 @@ export default function CalendarClient({
             <span className="h-2.5 w-2.5 rounded-sm bg-amber-100 border border-amber-300" /> 접수
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-indigo-100 border border-indigo-300" /> 정규수업
+            <span className="h-2.5 w-2.5 rounded-sm bg-sky/10 border border-sky/40" /> 정규수업
           </span>
           <span className="inline-flex items-center gap-1.5">
-            <span className="h-2.5 w-2.5 rounded-sm bg-gray-100 border border-gray-300" /> 차단
+            <span className="h-2.5 w-2.5 rounded-sm bg-slate-100 border border-slate-300" /> 차단
           </span>
         </div>
       </div>
@@ -716,21 +716,21 @@ export default function CalendarClient({
       <div className="rounded-xl bg-white p-4 shadow">
         <div className="flex flex-col gap-1 md:flex-row md:items-center md:justify-between">
           <div>
-            <h2 className="text-base font-semibold text-gray-900">
+            <h2 className="text-base font-semibold text-slate-900">
               {selectedDate} ({weekdayLabel(selectedDate)}) 일정
             </h2>
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-slate-500">
               예약(신청) 항목을 클릭하면 상세/승인/메일/엑셀 흐름으로 이동합니다.
             </p>
           </div>
 
-          <div className="text-sm text-gray-700">
+          <div className="text-sm text-slate-700">
             총 {selectedItems.length}건
           </div>
         </div>
 
         {selectedItems.length === 0 ? (
-          <div className="mt-4 rounded-xl border bg-slate-50 p-4 text-sm text-gray-600">등록된 일정이 없습니다.</div>
+          <div className="mt-4 rounded-xl border bg-slate-50 p-4 text-sm text-slate-600">등록된 일정이 없습니다.</div>
         ) : (
           <div className="mt-4 divide-y rounded-xl border">
             {selectedItems.map((it) => {
@@ -778,8 +778,8 @@ export default function CalendarClient({
                       ? "border-l-amber-400"
                       : "border-l-rose-400"
                   : it.kind === "schedule"
-                    ? "border-l-indigo-400"
-                    : "border-l-gray-400";
+                    ? "border-l-sky"
+                    : "border-l-slate-400";
 
               // request ID에서 원본 requestId 추출 (갤러리 ":prep", ":2026-02-20" 접미사 제거)
               const linkId = it.kind === "request"
@@ -791,7 +791,7 @@ export default function CalendarClient({
                   <div className="flex min-w-0 items-start gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
-                        <div className="text-sm font-semibold text-gray-900">{it.roomName}</div>
+                        <div className="text-sm font-semibold text-slate-900">{it.roomName}</div>
                         {it.kind === "request" ? statusBadge(it.status) : kindBadge(it.kind)}
                         {bundleText ? (
                           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-700">
@@ -799,8 +799,8 @@ export default function CalendarClient({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-1 text-sm text-gray-800">{detailMain}</div>
-                      {detailSub ? <div className="mt-0.5 text-xs text-gray-500">{detailSub}</div> : null}
+                      <div className="mt-1 text-sm text-slate-800">{detailMain}</div>
+                      {detailSub ? <div className="mt-0.5 text-xs text-slate-500">{detailSub}</div> : null}
                     </div>
                   </div>
 
@@ -808,14 +808,14 @@ export default function CalendarClient({
                     {it.kind === "request" ? (
                       <Link
                         href={`/admin/requests/${encodeURIComponent(linkId)}?category=${encodeURIComponent(category)}`}
-                        className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+                        className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                       >
                         상세 보기
                       </Link>
                     ) : (
                       <Link
                         href={`/admin/settings?category=${encodeURIComponent(category)}`}
-                        className="rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
+                        className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
                       >
                         설정 이동
                       </Link>

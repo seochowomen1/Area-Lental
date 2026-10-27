@@ -22,15 +22,15 @@ export default function BatchActionSection({
   return (
     <>
       <div>
-        <label className="block text-sm font-semibold text-gray-700 mb-2">처리 방식</label>
+        <label className="block text-sm font-semibold text-slate-700 mb-2">처리 방식</label>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => setIntent("승인")}
             className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               !isReject
-                ? "bg-[rgb(var(--brand-primary))] text-white shadow-sm"
-                : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                ? "bg-brand text-white shadow-sm"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
             {approveLabel}
@@ -41,7 +41,7 @@ export default function BatchActionSection({
             className={`rounded-lg px-4 py-2 text-sm font-semibold transition-colors ${
               isReject
                 ? "bg-red-600 text-white shadow-sm"
-                : "border border-gray-200 bg-white text-gray-600 hover:bg-gray-50"
+                : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
             }`}
           >
             {rejectLabel}
@@ -50,17 +50,17 @@ export default function BatchActionSection({
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-gray-700">
+        <label className="block text-sm font-semibold text-slate-700">
           반려 사유 (반려 시 필수)
         </label>
         <textarea
           name="rejectReason"
           defaultValue=""
           disabled={!isReject}
-          className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 ${
+          className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 ${
             isReject
-              ? "border-gray-200 bg-white"
-              : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed"
+              ? "border-slate-200 bg-white"
+              : "border-slate-100 bg-slate-50 text-slate-500 cursor-not-allowed"
           }`}
           rows={2}
           placeholder={isReject ? "반려 사유를 입력해 주세요" : "반려를 선택하면 입력할 수 있습니다"}
@@ -79,7 +79,7 @@ export default function BatchActionSection({
           variant={isReject ? "danger" : "primary"}
           className="rounded-lg px-5 py-2.5"
         />
-        {note && <span className="text-xs text-gray-500">{note}</span>}
+        {note && <span className="text-xs text-slate-500">{note}</span>}
       </div>
     </>
   );

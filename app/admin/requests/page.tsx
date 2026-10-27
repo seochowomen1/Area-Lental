@@ -22,6 +22,14 @@ function matchesPaymentFocus(view: PaymentView, focus: PaymentFocus): boolean {
   return view.paymentState === "autoCancelled" && !view.homepageClosedAt;
 }
 
+const FILTER_CONTROL =
+  "mt-1 min-h-[44px] w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base text-ink focus:border-brand focus:outline-none focus:ring-2 focus:ring-sky/40 sm:text-[15px]";
+/** 툴바 버튼 — 글자 한 줄 고정(whitespace-nowrap shrink-0) · 높이 44 (01_spec ②-2-4) */
+const TOOLBAR_PRIMARY =
+  "inline-flex min-h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-xl bg-brand px-5 text-[15px] font-semibold text-white transition hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2";
+const TOOLBAR_SECONDARY =
+  "inline-flex min-h-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-xl border border-slate-300 bg-white px-5 text-[15px] font-semibold text-ink transition hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2";
+
 // 관리자 목록은 승인/반려 등 상태 변경 후 즉시 반영되어야 하므로 캐시를 끕니다.
 export const dynamic = "force-dynamic";
 
@@ -326,12 +334,12 @@ export default async function AdminRequestsPage({
   return (
     <div className="space-y-4">
       {/* 카테고리 헤더 */}
-      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 shadow-sm`}>
+      <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4`}>
         <div className="flex items-center gap-3">
-          <span className={`inline-flex h-3 w-3 rounded-full ${accent.dot}`} />
-          <h1 className={`text-lg font-bold ${accent.text}`}>{roomLabel} {isGalleryCategory ? "전시 신청" : "대관 신청"} 목록</h1>
+          <span className={`inline-block h-6 w-1 shrink-0 rounded-full ${accent.bar}`} aria-hidden="true" />
+          <h1 className={`text-xl font-bold ${accent.text}`}>{roomLabel} {isGalleryCategory ? "전시 신청" : "대관 신청"} 목록</h1>
         </div>
-        <p className="mt-1 ml-6 text-sm text-gray-600">
+        <p className="mt-1 ml-4 text-sm text-slate-600">
           {roomLabel} {isGalleryCategory ? "전시 신청" : "대관 신청"} 현황을 조회하고 관리합니다.
         </p>
       </div>
@@ -339,21 +347,22 @@ export default async function AdminRequestsPage({
       {/* 결제 현황 칩 (payment-link-record) — 전부 0건이면 숨김 */}
       <PaymentStatusChips summary={chipSummary} listHref={listHref} activeFocus={focus} />
 
-      {/* 필터 영역 */}
-      <div className="no-print rounded-xl bg-white p-4 shadow">
+      {/* 필터 영역 — 보기(묶음/회차)는 아래 토글 한 벌만(01_spec ⑧ Q10) */}
+      <div className="no-print rounded-xl border border-line bg-white p-4">
         <form
-          className="grid grid-cols-1 gap-3 md:grid-cols-5"
+          className="grid grid-cols-1 gap-3 min-[900px]:grid-cols-[1fr_1fr_1fr_2fr]"
           action="/admin/requests"
           method="get"
         >
           <input type="hidden" name="category" value={category} />
+          <input type="hidden" name="view" value={view} />
           {focus && <input type="hidden" name="focus" value={focus} />}
 
           <div>
-            <label className="text-xs font-semibold text-gray-700">
+            <label htmlFor="f-room" className="text-sm font-semibold text-ink-2">
               {category === "gallery" ? "공간" : category === "studio" ? "공간" : "강의실"}
             </label>
-            <select name="roomId" defaultValue={roomId} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
+            <select id="f-room" name="roomId" defaultValue={roomId} className={FILTER_CONTROL}>
               {roomOptions.map((r) => (
                 <option key={r.id} value={r.id}>
                   {r.name}
@@ -363,8 +372,8 @@ export default async function AdminRequestsPage({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-700">상태</label>
-            <select name="status" defaultValue={status} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
+            <label htmlFor="f-status" className="text-sm font-semibold text-ink-2">상태</label>
+            <select id="f-status" name="status" defaultValue={status} className={FILTER_CONTROL}>
               {["all", "접수", "승인", "반려", "취소"].map((s) => (
                 <option key={s} value={s}>
                   {s === "all" ? "전체" : statusLabel(s as RequestStatus)}
@@ -374,75 +383,65 @@ export default async function AdminRequestsPage({
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-700">날짜</label>
-            <input type="date" name="date" defaultValue={date} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]" />
+            <label htmlFor="f-date" className="text-sm font-semibold text-ink-2">날짜</label>
+            <input id="f-date" type="date" name="date" defaultValue={date} className={FILTER_CONTROL} />
           </div>
 
           <div>
-            <label className="text-xs font-semibold text-gray-700">검색</label>
+            <label htmlFor="f-q" className="text-sm font-semibold text-ink-2">검색</label>
             <input
+              id="f-q"
               name="q"
               defaultValue={q}
-              className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]"
+              className={FILTER_CONTROL}
               placeholder="이름/연락처/단체/신청번호..."
             />
           </div>
 
-          <div>
-            <label className="text-xs font-semibold text-gray-700">보기</label>
-            <select name="view" defaultValue={view} className="mt-1 w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm focus:border-[rgb(var(--brand-primary))] focus:ring-1 focus:ring-[rgb(var(--brand-primary))]">
-              <option value="group">묶음 기준</option>
-              <option value="items">개별 건</option>
-            </select>
-          </div>
-
-          <div className="md:col-span-5 flex items-center justify-between gap-3">
-            <div className="flex gap-2">
-              <button className="rounded-full bg-[rgb(var(--brand-primary))] px-5 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2">
-                검색
-              </button>
-              <ExcelDownloadButton
-                href={exportUrl}
-                className="rounded-full border border-gray-200 bg-white px-5 py-2 text-sm font-medium text-gray-700 shadow-sm transition hover:bg-gray-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))] focus-visible:ring-offset-2"
-              />
-              {isGalleryCategory && (
-                <Link
-                  href={`/admin/requests/new?category=${encodeURIComponent(category)}`}
-                  className="rounded-full border border-emerald-300 bg-emerald-50 px-5 py-2 text-sm font-semibold text-emerald-800 shadow-sm transition hover:bg-emerald-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
-                  title="방문·이메일·팩스로 받은 종이 신청서를 대신 등록합니다"
-                >
-                  + 서면 신청 등록
-                </Link>
-              )}
-            </div>
-
-            <div className="flex items-center gap-3">
-              <div className="inline-flex overflow-hidden rounded-full border border-gray-200 bg-white shadow-sm">
-                <Link
-                  href={makeUrl("group")}
-                  className={
-                    "px-4 py-2 text-sm transition focus-visible:outline-none " +
-                    (view === "group" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
-                  }
-                >
-                  그룹
-                </Link>
-                <Link
-                  href={makeUrl("items")}
-                  className={
-                    "px-4 py-2 text-sm transition focus-visible:outline-none " +
-                    (view === "items" ? "bg-[rgb(var(--brand-primary))] text-white" : "text-gray-700 hover:bg-gray-50")
-                  }
-                >
-                  회차
-                </Link>
-              </div>
-              <div className="text-sm text-gray-600">
-                총 <b className="text-gray-900">{totalCount}</b>건
-              </div>
-            </div>
+          <div className="flex flex-wrap items-center gap-2 min-[900px]:col-span-4">
+            <button type="submit" className={TOOLBAR_PRIMARY}>
+              검색
+            </button>
+            <ExcelDownloadButton href={exportUrl} label="엑셀 받기" className={TOOLBAR_SECONDARY} />
+            {isGalleryCategory && (
+              <Link
+                href={`/admin/requests/new?category=${encodeURIComponent(category)}`}
+                className={TOOLBAR_SECONDARY}
+                title="방문·이메일·팩스로 받은 종이 신청서를 대신 등록합니다"
+              >
+                + 서면 신청 등록
+              </Link>
+            )}
           </div>
         </form>
+
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-line pt-3">
+          <div className="inline-flex overflow-hidden rounded-xl border border-slate-300 bg-white" role="group" aria-label="보기">
+            <Link
+              href={makeUrl("group")}
+              aria-current={view === "group" ? "true" : undefined}
+              className={
+                "inline-flex min-h-[44px] items-center whitespace-nowrap px-4 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky " +
+                (view === "group" ? "bg-brand text-white" : "text-ink hover:bg-slate-50")
+              }
+            >
+              묶음
+            </Link>
+            <Link
+              href={makeUrl("items")}
+              aria-current={view === "items" ? "true" : undefined}
+              className={
+                "inline-flex min-h-[44px] items-center whitespace-nowrap border-l border-slate-300 px-4 text-[15px] font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky " +
+                (view === "items" ? "bg-brand text-white" : "text-ink hover:bg-slate-50")
+              }
+            >
+              회차
+            </Link>
+          </div>
+          <div className="text-base text-ink-2">
+            총 <b className="tabular-nums text-ink">{totalCount}</b>건
+          </div>
+        </div>
       </div>
 
       {/* 테이블 (클라이언트 컴포넌트: 체크박스 + 선택 삭제) */}
@@ -451,6 +450,7 @@ export default async function AdminRequestsPage({
         isGalleryCategory={isGalleryCategory}
         view={view}
         idLabel={REQUEST_ID_LABEL}
+        resetHref={`/admin/requests?category=${encodeURIComponent(category)}`}
       />
     </div>
   );

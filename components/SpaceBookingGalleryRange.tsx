@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 
 import Button from "@/components/ui/Button";
 import { FieldHelp } from "@/components/ui/Field";
+import HolidayUnavailableNotice from "@/components/HolidayUnavailableNotice";
 import { cn } from "@/lib/cn";
 import { CARD_BASE } from "@/components/ui/presets";
-import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
+import { GALLERY_FEE_KRW } from "@/lib/constants";
+import { todayYmdSeoul } from "@/lib/datetime";
+import { countGallerySelectableDays, galleryBaseDayState, galleryPrepAfterText } from "@/lib/galleryCalendar";
 import { defaultPrepDate as computeDefaultPrepDate, planGallery } from "@/lib/galleryPlan";
 import { formatExcludedHolidays, galleryMonthsForRange, useGalleryMonthData } from "@/lib/useGalleryMonthData";
 
@@ -69,22 +72,27 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
   const [month, setMonth] = useState<Date>(() => startOfMonth(new Date()));
   const [bookedDates, setBookedDates] = useState<Set<string>>(new Set());
-  /** 기존 전시의 마지막 날(철거일) — 다음 전시 준비일로 허용(평일 17:00·토 11:00 이후) */
-  const [exhibitionEndDates, setExhibitionEndDates] = useState<Set<string>>(new Set());
   /** 다른 신청의 준비일만 잡힌 날 — 우리 전시의 마지막 날(종료일)로만 선택 가능 */
   const [prepOnlyDates, setPrepOnlyDates] = useState<Set<string>>(new Set());
   const [holidayMap, setHolidayMap] = useState<Map<string, string>>(new Map());
+  /** 서버 기준 오늘(KST) — 지난 날짜 판정은 브라우저 시계 대신 이 값(03_api 1-1) */
+  const [serverToday, setServerToday] = useState<string>("");
+  /** 서버가 같은 규칙(lib/galleryCalendar)으로 센 이번 달 신청 가능한 날 */
+  const [serverAvailable, setServerAvailable] = useState<number | null>(null);
+  const [monthLoaded, setMonthLoaded] = useState(false);
 
   // 월 변경 시 예약 마감 날짜 + 공휴일 조회
   useEffect(() => {
     const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+    let alive = true;
+    setMonthLoaded(false);
     fetch(`/api/booked-dates?roomId=gallery&month=${monthKey}`)
       .then((r) => r.json())
       .then((data) => {
+        if (!alive) return;
         if (data.ok && Array.isArray(data.bookedDates)) {
           setBookedDates(new Set(data.bookedDates));
         }
-        setExhibitionEndDates(new Set(Array.isArray(data.exhibitionEndDates) ? data.exhibitionEndDates : []));
         setPrepOnlyDates(new Set(Array.isArray(data.prepOnlyDates) ? data.prepOnlyDates : []));
         if (Array.isArray(data.holidays)) {
           const m = new Map<string, string>();
@@ -93,9 +101,27 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         } else {
           setHolidayMap(new Map());
         }
+        if (typeof data.today === "string" && isYmd(data.today)) setServerToday(data.today);
+        setServerAvailable(typeof data.availableDayCount === "number" ? data.availableDayCount : null);
+        setMonthLoaded(true);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (alive) setMonthLoaded(true);
+      });
+    return () => {
+      alive = false;
+    };
   }, [month]);
+
+  const today = serverToday || todayYmdSeoul();
+  const monthKey = `${month.getFullYear()}-${String(month.getMonth() + 1).padStart(2, "0")}`;
+  const holidaySetForMonth = useMemo(() => new Set(holidayMap.keys()), [holidayMap]);
+  const calCtx = useMemo(
+    () => ({ today, booked: bookedDates, holidays: holidaySetForMonth }),
+    [today, bookedDates, holidaySetForMonth]
+  );
+  /** 이번 달 신청 가능한 날 N일 — 주황 점 수와 같은 함수(countGallerySelectableDays) */
+  const availableCount = serverAvailable ?? countGallerySelectableDays(monthKey, calCtx);
 
   // ★ [3] 선택 기간(준비일 후보 포함)이 걸친 달의 공휴일·예약 현황 — 회차·금액은 planGallery() 한 곳에서 계산
   const rangeMonths = useMemo(() => galleryMonthsForRange(startDate, endDate), [startDate, endDate]);
@@ -110,17 +136,18 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
   const prepInfo = useMemo(() => {
     if (!isYmd(startDate)) return { date: "", afterExhibition: false };
     const prepYmd = computeDefaultPrepDate(startDate, rangeHolidays);
-    if (!isYmd(prepYmd) || prepYmd <= dateToYmdLocal(new Date())) return { date: "", afterExhibition: false };
+    if (!isYmd(prepYmd) || prepYmd <= today) return { date: "", afterExhibition: false };
     if (rangeData.booked.has(prepYmd)) {
       if (rangeData.exhibitionEnds.has(prepYmd)) return { date: prepYmd, afterExhibition: true };
       return { date: "", afterExhibition: false };
     }
     return { date: prepYmd, afterExhibition: false };
-  }, [startDate, rangeHolidays, rangeData.booked, rangeData.exhibitionEnds]);
+  }, [startDate, rangeHolidays, rangeData.booked, rangeData.exhibitionEnds, today]);
   const defaultPrepDate = prepInfo.date;
-  const prepAfterLabel = prepInfo.afterExhibition
-    ? `${dayOfWeekLocal(prepInfo.date) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY} 이후`
-    : "";
+  /** 준비일 둘째 줄(앞 전시 철거일과 겹칠 때만) — PC "17:00 이후" */
+  const prepAfterLabel = prepInfo.afterExhibition ? galleryPrepAfterText(prepInfo.date) : "";
+  /** 휴대폰 칸 폭(약 47px)에 맞춘 짧은 표기 "17:00~"(02_ui §4-3) — 전체 문장은 아래 요약 줄 */
+  const prepAfterShort = prepAfterLabel ? `${prepAfterLabel.replace(" 이후", "")}~` : "";
 
   // 이용료: planGallery()(평일·토 일수 × GALLERY_FEE_KRW · 준비일 무료) — 신청서·서버와 같은 함수
   const plan = useMemo(
@@ -137,6 +164,12 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
   const excludedHolidayText = formatExcludedHolidays(plan.excludedHolidays, rangeData.holidayNames);
 
   const canSubmit = Boolean(startDate) && Boolean(endDate) && !error;
+  /** ③-D 비활성 이유 한 줄 */
+  const ctaReason = !startDate
+    ? "시작일과 종료일을 달력에서 먼저 골라 주세요."
+    : !endDate
+      ? "종료일을 골라 주세요."
+      : "";
 
   function clearRange() {
     setStartDate("");
@@ -222,41 +255,25 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
     const lastDay = new Date(year, m + 1, 0).getDate();
 
     const cells: Array<{ ymd: string; day: number; inMonth: boolean }> = [];
-
-    // 이전 달 날짜로 첫 줄 채우기 (강의실 캘린더와 동일)
-    const prevMonthLast = new Date(year, m, 0).getDate();
-    for (let i = firstDow - 1; i >= 0; i--) {
-      const d = prevMonthLast - i;
-      const ymd = dateToYmdLocal(new Date(year, m - 1, d));
-      cells.push({ ymd, day: d, inMonth: false });
-    }
-
+    // 다른 달 칸은 빈 칸(숫자 없음 · 01_spec ②-2-1)
+    for (let i = firstDow - 1; i >= 0; i--) cells.push({ ymd: "", day: 0, inMonth: false });
     for (let d = 1; d <= lastDay; d++) {
-      const ymd = dateToYmdLocal(new Date(year, m, d));
-      cells.push({ ymd, day: d, inMonth: true });
+      cells.push({ ymd: dateToYmdLocal(new Date(year, m, d)), day: d, inMonth: true });
     }
-
-    // 다음 달 날짜로 마지막 줄 채우기
-    let nextDay = 1;
-    while (cells.length % 7 !== 0) {
-      const ymd = dateToYmdLocal(new Date(year, m + 1, nextDay));
-      cells.push({ ymd, day: nextDay, inMonth: false });
-      nextDay++;
-    }
-
+    while (cells.length % 7 !== 0) cells.push({ ymd: "", day: 0, inMonth: false });
     return cells;
   }, [month]);
 
-  function isCellDisabled(ymd: string) {
-    if (!isYmd(ymd)) return true;
-    // 일요일·공휴일은 선택 불가
-    if (dayOfWeekLocal(ymd) === 0) return true;
-    if (holidayMap.has(ymd)) return true;
-    // 예약 마감 날짜는 선택 불가
-    if (bookedDates.has(ymd)) return true;
-    // 과거 및 당일 선택 불가 (준비일이 과거가 되므로 익일부터 선택 가능)
-    if (ymd <= dateToYmdLocal(new Date())) return true;
+  /** 이번 달 공휴일 목록(휴대폰은 칸에 "공휴일"만 쓰고 이름은 달력 아래 · 02_ui §4-2) */
+  const monthHolidayList = useMemo(() => {
+    return Array.from(holidayMap.entries())
+      .filter(([d]) => d.startsWith(monthKey))
+      .sort(([a], [b]) => (a < b ? -1 : 1))
+      .map(([d, name]) => `${parseInt(d.slice(5, 7), 10)}/${parseInt(d.slice(8, 10), 10)}(${dowLabel(d)}) ${name}`);
+  }, [holidayMap, monthKey]);
 
+  /** 선택 단계(B·C)에서 고를 수 없는 날 — 기본 상태(galleryBaseDayState)가 available이어도 막힘 */
+  function isBlockedBySelection(ymd: string) {
     // 시작일만 선택된 상태: 시작일 이전은 비활성, 최대 30일(포함) 초과는 비활성
     if (isYmd(startDate) && !isYmd(endDate)) {
       if (ymd < startDate) return true;
@@ -272,21 +289,22 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
         if (cur <= ymd && bookedDates.has(cur)) return true;
       }
     }
-
     // 시작/종료 모두 선택된 상태: 범위 밖은 비활성 (단, 시작일은 재클릭으로 초기화 가능)
     if (isYmd(startDate) && isYmd(endDate)) {
       if (ymd === startDate) return false;
       if (!inRange(ymd, startDate, endDate)) return true;
     }
-
     return false;
   }
 
+  const navBtn =
+    "inline-flex h-11 min-w-[44px] items-center justify-center whitespace-nowrap rounded-xl border border-slate-300 bg-white px-3 text-[15px] font-semibold text-ink hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky";
+
   return (
-    <div className={cn(CARD_BASE, "p-5", className)}>
-      <div className="rounded-lg border bg-slate-50 p-4 text-sm text-slate-700">
+    <div className={cn(CARD_BASE, "p-4 sm:p-5", className)}>
+      <div className="rounded-lg border border-line bg-slate-50 p-4 text-[15px] text-slate-700">
         <p className="font-semibold">우리동네 갤러리(4층) 신청 안내</p>
-        <ul className="mt-2 list-disc space-y-1 pl-5 text-xs">
+        <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
           <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
           <li>일요일·공휴일은 휴관으로 자동 제외됩니다.</li>
           <li>준비(세팅)일 1일은 <span className="font-semibold">무료</span>로 포함됩니다. (시작 직전 운영일 · 신청서에서 변경 가능)</li>
@@ -297,140 +315,171 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       </div>
 
       <div className="mt-5">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex flex-wrap items-center gap-2">
-            <div className="text-lg font-semibold">{getMonthLabel(month)}</div>
-            <span className={cn(
-              "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
-              startDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-400"
-            )}>
-              시작: {startDate || "-"}
-            </span>
-            <span className={cn(
-              "rounded-full px-2.5 py-0.5 text-[11px] font-bold",
-              endDate ? "border border-[rgb(var(--brand-primary))] bg-[rgb(var(--brand-primary)/0.06)] text-[rgb(var(--brand-primary))]" : "border border-slate-200 bg-white text-slate-400"
-            )}>
-              종료: {endDate || "-"}
-            </span>
-            {startDate ? (
-              <button
-                type="button"
-                onClick={clearRange}
-                className="rounded-md border bg-white px-2 py-1 text-xs text-slate-600 hover:bg-gray-50"
-              >
-                초기화
-              </button>
+        {/* 달력 머리: 월 · 이번 달 신청 가능한 날 · ◀ 오늘 ▶ */}
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h3 className="text-xl font-bold tabular-nums text-ink">{getMonthLabel(month)}</h3>
+            {monthLoaded ? (
+              availableCount > 0 ? (
+                <p className="text-sm text-ink-2" aria-live="polite">
+                  이번 달 신청 가능한 날 <b className="text-base font-bold tabular-nums text-ink">{availableCount}</b>일
+                </p>
+              ) : (
+                <p className="text-sm text-ink-2" aria-live="polite">
+                  이번 달은 신청 가능한 날이 없습니다 ·{" "}
+                  <button
+                    type="button"
+                    onClick={() => setMonth((prev) => addMonths(prev, 1))}
+                    className="inline-flex min-h-[44px] items-center font-semibold text-brand underline underline-offset-2"
+                  >
+                    다음 달 보기 →
+                  </button>
+                </p>
+              )
             ) : null}
           </div>
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setMonth((prev) => addMonths(prev, -1))}
-              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
-              aria-label="이전 달"
-            >
+            <button type="button" onClick={() => setMonth((prev) => addMonths(prev, -1))} className={navBtn} aria-label="이전 달">
               ◀
             </button>
-            <button
-              type="button"
-              onClick={() => setMonth(startOfMonth(new Date()))}
-              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
-            >
+            <button type="button" onClick={() => setMonth(startOfMonth(new Date()))} className={navBtn}>
               오늘
             </button>
-            <button
-              type="button"
-              onClick={() => setMonth((prev) => addMonths(prev, 1))}
-              className="rounded-md border bg-white px-2 py-1 text-sm hover:bg-gray-50"
-              aria-label="다음 달"
-            >
+            <button type="button" onClick={() => setMonth((prev) => addMonths(prev, 1))} className={navBtn} aria-label="다음 달">
               ▶
             </button>
           </div>
         </div>
 
-        <div className="overflow-hidden rounded-lg border bg-white">
-          <div className="grid grid-cols-7 border-b bg-gray-50 text-center text-xs font-semibold text-gray-700">
+        {/* 선택한 시작·종료 */}
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <span className={cn(
+            "rounded-full border px-3 py-1 text-sm font-semibold tabular-nums",
+            startDate ? "border-brand bg-brand-soft text-brand" : "border-slate-200 bg-white text-ink-3"
+          )}>
+            시작: {startDate || "-"}
+          </span>
+          <span className={cn(
+            "rounded-full border px-3 py-1 text-sm font-semibold tabular-nums",
+            endDate ? "border-brand bg-brand-soft text-brand" : "border-slate-200 bg-white text-ink-3"
+          )}>
+            종료: {endDate || "-"}
+          </span>
+          {startDate ? (
+            <button
+              type="button"
+              onClick={clearRange}
+              className="inline-flex min-h-[44px] items-center rounded-xl border border-slate-300 bg-white px-3 text-sm font-semibold text-ink hover:bg-slate-50"
+            >
+              초기화
+            </button>
+          ) : null}
+        </div>
+
+        <div className="overflow-hidden rounded-lg border border-line bg-white">
+          <div className="grid grid-cols-7 border-b border-line bg-slate-50 text-center text-sm font-semibold text-ink-2">
             {["일", "월", "화", "수", "목", "금", "토"].map((w) => (
-              <div key={w} className={`py-2${w === "일" ? " text-rose-500" : w === "토" ? " text-blue-600" : ""}`}>{w}</div>
+              <div key={w} className={cn("py-2", w === "일" && "text-rose-700")}>{w}</div>
             ))}
           </div>
 
           <div className="grid grid-cols-7">
             {monthGrid.map((c, idx) => {
-              const isSunday = c.inMonth && dayOfWeekLocal(c.ymd) === 0;
-              const isToday = c.inMonth && c.ymd === dateToYmdLocal(new Date());
-              const isStart = c.inMonth && c.ymd === startDate;
-              const isEnd = c.inMonth && c.ymd === endDate;
-              const isBetween = c.inMonth && startDate && endDate ? inRange(c.ymd, startDate, endDate) : false;
-              const isPrep = c.inMonth && defaultPrepDate && c.ymd === defaultPrepDate;
-              const disabled = !c.inMonth || isCellDisabled(c.ymd);
-              const isSelected = isStart || isEnd;
+              if (!c.inMonth) {
+                return <div key={`blank-${idx}`} className="h-[60px] border-b border-r border-line bg-white sm:h-[76px]" aria-hidden="true" />;
+              }
+              const base = galleryBaseDayState(c.ymd, calCtx);
+              const isToday = c.ymd === today;
+              const isStart = c.ymd === startDate;
+              const isEnd = c.ymd === endDate;
+              const isBetween = startDate && endDate ? inRange(c.ymd, startDate, endDate) : false;
+              const isPrep = !!defaultPrepDate && c.ymd === defaultPrepDate;
+              const holidayName = holidayMap.get(c.ymd);
 
-              const isHoliday = c.inMonth && holidayMap.has(c.ymd);
-              const isPast = c.inMonth && c.ymd <= dateToYmdLocal(new Date());
-              const isBooked = c.inMonth && bookedDates.has(c.ymd);
-              const isClosed = isSunday || isHoliday;
+              // 칸 상태(02_ui §2-1 표 · 위가 우선)
+              type View = "past" | "closed" | "holiday" | "prep" | "start" | "end" | "between" | "booked" | "available" | "blocked";
+              let view: View;
+              if (base === "past") view = "past";
+              else if (base === "closed") view = "closed";
+              else if (base === "holiday") view = "holiday";
+              else if (isPrep && !isStart && !isEnd) view = "prep";
+              else if (isStart) view = "start";
+              else if (isEnd) view = "end";
+              else if (isBetween) view = "between";
+              else if (base === "booked") view = "booked";
+              else view = isBlockedBySelection(c.ymd) ? "blocked" : "available";
+
+              const clickable = (view === "available" || view === "start" || view === "end" || view === "between")
+                && !(view === "between" && isBlockedBySelection(c.ymd));
+              const inMyRangeBg = isBetween && (view === "closed" || view === "holiday");
+
+              const stateLabel =
+                view === "past" ? "지난 날짜"
+                : view === "closed" ? "휴관"
+                : view === "holiday" ? (holidayName ?? "공휴일")
+                : view === "prep" ? `준비일${prepAfterLabel ? ` ${prepAfterLabel}` : ""}`
+                : view === "start" ? "시작일"
+                : view === "end" ? "종료일"
+                : view === "between" ? "선택한 기간"
+                : view === "booked" ? "마감"
+                : view === "blocked" ? "선택할 수 없음"
+                : "선택 가능";
 
               return (
                 <button
-                  key={`${c.ymd || idx}`}
+                  key={c.ymd}
                   type="button"
-                  disabled={disabled}
-                  onClick={() => c.inMonth ? onPickDay(c.ymd) : undefined}
+                  disabled={!clickable}
+                  onClick={() => onPickDay(c.ymd)}
+                  aria-label={`${parseInt(c.ymd.slice(5, 7), 10)}월 ${c.day}일 ${dowLabel(c.ymd)}요일, ${stateLabel}`}
+                  aria-pressed={isStart || isEnd}
                   className={cn(
-                    "relative flex h-20 flex-col items-center justify-center border-b border-r text-sm transition",
-                    "focus:outline-none focus-visible:ring-2 focus-visible:ring-[rgb(var(--brand-primary))]",
-                    !c.inMonth && "bg-gray-50 text-gray-300 cursor-default",
-                    c.inMonth && isClosed && !isSelected && !isBetween && "cursor-not-allowed bg-rose-50/80",
-                    c.inMonth && !isClosed && (isPast || isBooked) && !isSelected && !isBetween && !isPrep && "cursor-not-allowed bg-gray-50/80",
-                    c.inMonth && !disabled && !isSelected && !isBetween && !isPrep && "bg-white text-slate-900 hover:bg-slate-50",
-                    isSelected && "z-10 bg-orange-50 ring-2 ring-orange-400 ring-inset",
-                    isBetween && !isSelected && !isClosed && "bg-blue-50",
-                    isBetween && !isSelected && isClosed && "bg-rose-50/60",
-                    isPrep && !isSelected && !isBetween && "bg-emerald-50 ring-2 ring-emerald-300 ring-inset",
+                    "relative flex h-[60px] flex-col items-center justify-start gap-0.5 border-b border-r border-line pt-2 transition sm:h-[76px] sm:pt-2.5",
+                    "focus:outline-none focus-visible:z-20 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-sky",
+                    !clickable && "cursor-default",
+                    view === "past" && "bg-white",
+                    (view === "closed" || view === "holiday") && (inMyRangeBg ? "bg-brand-soft" : "bg-rose-50"),
+                    view === "prep" && "bg-white shadow-[inset_0_0_0_2px_rgb(var(--brand-accent))]",
+                    (view === "start" || view === "end") && "z-10 bg-brand-soft shadow-[inset_0_0_0_2px_rgb(var(--brand-primary))]",
+                    view === "between" && "bg-brand-soft",
+                    view === "booked" && "bg-slate-100",
+                    view === "available" && "bg-white hover:bg-slate-50",
+                    view === "blocked" && "bg-white",
                   )}
-                  aria-pressed={isSelected}
                 >
                   <span className={cn(
-                    "font-medium",
-                    isToday && "text-[rgb(var(--brand-primary))]",
-                    c.inMonth && isClosed && !isToday && "text-rose-500",
-                    c.inMonth && !isClosed && (isPast || isBooked) && !isToday && "text-gray-400",
-                  )}>{c.day || ""}</span>
-                  {c.inMonth && (
-                    <div className="mt-1 flex items-center gap-1">
-                      {isPrep ? (
-                        <span className="text-center text-[9px] font-bold leading-none text-emerald-700">
-                          준비{prepAfterLabel ? <><br />{prepAfterLabel}</> : null}
-                        </span>
-                      ) : (isSunday || holidayMap.has(c.ymd)) ? (
+                    "text-base tabular-nums leading-5",
+                    view === "past" && "font-medium text-slate-300",
+                    (view === "closed" || view === "holiday") && "font-semibold text-rose-700",
+                    view === "booked" && "font-medium text-slate-500",
+                    (view === "start" || view === "end") && "font-bold text-brand",
+                    (view === "available" || view === "between" || view === "prep") && "font-bold text-ink",
+                    view === "blocked" && "font-medium text-ink-3",
+                    isToday && "underline decoration-accent decoration-2 underline-offset-4",
+                  )}>{c.day}</span>
+                  {view === "available" && <span className="mt-1 inline-block h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />}
+                  {view === "closed" && <span className="text-xs leading-[18px] text-rose-700">휴관</span>}
+                  {view === "holiday" && (
+                    <>
+                      <span className="text-xs leading-[18px] text-rose-700 sm:hidden">공휴일</span>
+                      <span className="hidden max-w-full break-keep px-0.5 text-center text-xs leading-[14px] text-rose-700 sm:block">{holidayName}</span>
+                    </>
+                  )}
+                  {view === "booked" && <span className="text-xs leading-[18px] text-slate-600">마감</span>}
+                  {(view === "start" || view === "end") && (
+                    <span className="text-xs font-bold leading-[18px] text-brand">{view === "start" ? "시작" : "종료"}</span>
+                  )}
+                  {view === "prep" && (
+                    <span className="text-center text-xs font-bold leading-[14px] text-accent-ink">
+                      준비
+                      {prepAfterLabel ? (
                         <>
-                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" title={holidayMap.get(c.ymd) ?? "휴관"} />
-                          {holidayMap.has(c.ymd) && !isSunday && (
-                            <span className="text-[9px] leading-none text-rose-500 font-medium truncate max-w-[3.5rem]">{holidayMap.get(c.ymd)}</span>
-                          )}
+                          <br />
+                          <span className="hidden font-semibold sm:inline">{prepAfterLabel}</span>
+                          <span className="font-semibold sm:hidden">{prepAfterShort}</span>
                         </>
-                      ) : bookedDates.has(c.ymd) ? (
-                        exhibitionEndDates.has(c.ymd) ? (
-                          <span className="text-[9px] leading-none text-gray-500" title="기존 전시 철거일 — 철거 후 준비 가능">철거</span>
-                        ) : (
-                          <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
-                        )
-                      ) : isStart ? (
-                        <span className="text-[9px] font-bold text-orange-600">시작</span>
-                      ) : isEnd && !isStart ? (
-                        <span className="text-[9px] font-bold text-orange-600">종료</span>
-                      ) : isBetween ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" />
-                      ) : c.ymd < dateToYmdLocal(new Date()) ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" title="마감" />
-                      ) : prepOnlyDates.has(c.ymd) ? (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" title="다음 전시 준비일 — 종료일로만 선택 가능(철거 후 인계)" />
-                      ) : (
-                        <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" />
-                      )}
-                    </div>
+                      ) : null}
+                    </span>
                   )}
                 </button>
               );
@@ -438,37 +487,41 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
           </div>
         </div>
 
-        <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-gray-600">
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-orange-500" aria-hidden />
-            <span>선택 가능</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-blue-400" aria-hidden />
-            <span>선택 기간</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-sm border border-emerald-300 bg-emerald-50" aria-hidden />
-            <span>준비일</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-gray-400" aria-hidden />
-            <span>마감</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <span className="inline-block h-2.5 w-2.5 rounded-full bg-rose-400" aria-hidden />
-            <span>휴관</span>
-          </div>
-        </div>
+        {monthHolidayList.length > 0 && (
+          <p className="mt-2 text-[13px] text-rose-700 sm:hidden">이번 달 공휴일: {monthHolidayList.join(" · ")}</p>
+        )}
 
-        <p className="mt-2 text-xs text-gray-500">
-          ※ 날짜를 클릭하여 시작일과 종료일을 선택 · 일요일·공휴일 휴관 · 최대 30일
-          {startDate && !endDate ? <><br />※ <b>종료일</b>을 선택해 주세요.</> : null}
+        {/* 범례(칸과 같은 모양의 작은 견본) */}
+        <ul className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs text-ink-2" aria-label="달력 범례">
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-1.5 w-1.5 rounded-full bg-accent" aria-hidden />
+            <span>선택 가능</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-block h-4 w-5 rounded-sm bg-brand-soft" aria-hidden />
+            <span>연한 칸 = 선택한 기간</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-flex h-5 items-center rounded-sm bg-white px-1 font-bold text-accent-ink shadow-[inset_0_0_0_2px_rgb(var(--brand-accent))]" aria-hidden>준비</span>
+            <span>= 무료 준비일</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-flex h-5 items-center rounded-sm bg-slate-100 px-1 text-slate-600" aria-hidden>마감</span>
+            <span>= 전시·예약 있음</span>
+          </li>
+          <li className="flex items-center gap-1.5">
+            <span className="inline-flex h-5 items-center rounded-sm bg-rose-50 px-1 text-rose-700" aria-hidden>휴관</span>
+            <span>= 일요일·공휴일</span>
+          </li>
+        </ul>
+
+        <p className="mt-2 text-[13px] text-ink-3">
+          ※ 날짜를 눌러 시작일과 종료일을 선택 · 일요일·공휴일 휴관 · 최대 30일
         </p>
       </div>
 
       <div className="mt-2">
-        {error ? <p className="text-sm font-semibold text-red-600">{error}</p> : null}
+        {error ? <p role="alert" className="text-sm font-semibold text-red-700">{error}</p> : null}
         {!error && days > 0 ? (
           <div className="space-y-1">
             <FieldHelp>선택 기간: {days}일 (일요일·공휴일 자동 제외)</FieldHelp>
@@ -485,9 +538,9 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       </div>
 
       {rangeData.status === "error" ? (
-        <div className="mt-3 rounded-lg border-l-[3px] border-l-amber-500 bg-white px-3 py-2 text-sm text-slate-700 shadow-sm">
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
           공휴일 정보를 불러오지 못해 예상 이용료가 실제와 다를 수 있습니다.{" "}
-          <button type="button" onClick={rangeData.reload} className="font-semibold text-[rgb(var(--brand-primary))] underline underline-offset-2">
+          <button type="button" onClick={rangeData.reload} className="inline-flex min-h-[44px] items-center font-semibold text-brand underline underline-offset-2">
             다시 불러오기
           </button>
         </div>
@@ -495,45 +548,48 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
 
       {/* 이용료 자동 계산 */}
       {!error && days > 0 && (feeBreakdown.weekdays > 0 || feeBreakdown.saturdays > 0) && (
-        <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-          <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-            <span className="text-base">💰</span>
-            <span className="text-sm font-bold text-slate-800">예상 이용료</span>
-          </div>
-          <div className="px-4 py-3">
-            <div className="space-y-2">
-              {feeBreakdown.weekdays > 0 && (
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>평일 {feeBreakdown.weekdays}일 × {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
-                  <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
-                </div>
-              )}
-              {feeBreakdown.saturdays > 0 && (
-                <div className="flex items-center justify-between text-sm text-slate-600">
-                  <span>토요일 {feeBreakdown.saturdays}일 × {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
-                  <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
-                </div>
-              )}
-              {feeBreakdown.prepDays > 0 && defaultPrepDate && (
-                <div className="flex items-center justify-between text-sm text-emerald-600">
-                  <span>준비일 {feeBreakdown.prepDays}일 ({defaultPrepDate} {dowLabel(defaultPrepDate)}{prepAfterLabel ? ` · ${prepAfterLabel}` : ""})</span>
-                  <span className="font-medium">무료</span>
-                </div>
-              )}
+        <>
+          {rangeData.status === "ok" && rangeData.holidayStatus === "unavailable" ? <HolidayUnavailableNotice className="mt-4" /> : null}
+          <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
+            <div className="border-b border-line bg-slate-50 px-4 py-2.5">
+              <span className="text-[15px] font-bold text-ink">예상 전시 공간 이용료</span>
             </div>
-            <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
-              <span className="text-sm font-bold text-slate-900">합계</span>
-              <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
+            <div className="px-4 py-3">
+              <div className="space-y-2">
+                {feeBreakdown.weekdays > 0 && (
+                  <div className="flex items-center justify-between text-sm text-ink-2">
+                    <span>평일 {feeBreakdown.weekdays}일 × {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
+                    <span className="font-semibold tabular-nums text-ink">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
+                  </div>
+                )}
+                {feeBreakdown.saturdays > 0 && (
+                  <div className="flex items-center justify-between text-sm text-ink-2">
+                    <span>토요일 {feeBreakdown.saturdays}일 × {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
+                    <span className="font-semibold tabular-nums text-ink">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
+                  </div>
+                )}
+                {feeBreakdown.prepDays > 0 && defaultPrepDate && (
+                  <div className="flex items-center justify-between text-sm text-ink-2">
+                    <span>준비일 {feeBreakdown.prepDays}일 ({defaultPrepDate} {dowLabel(defaultPrepDate)}{prepAfterLabel ? ` · ${prepAfterLabel}` : ""})</span>
+                    <span className="font-semibold">무료</span>
+                  </div>
+                )}
+              </div>
+              <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-soft px-4 py-3">
+                <span className="text-[15px] font-bold text-ink">합계</span>
+                <span className="text-2xl font-bold tabular-nums text-brand">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
+              </div>
+              <p className="mt-2 text-[13px] text-ink-3">※ 할인 및 바우처 적용 불가</p>
             </div>
-            <p className="mt-2 text-[11px] text-slate-400">※ 할인 및 바우처 적용 불가</p>
           </div>
-        </div>
+        </>
       )}
 
       <div className="mt-5">
-        <Button type="button" className="w-full" disabled={!canSubmit} onClick={goApply}>
+        <Button type="button" className="min-h-[48px] w-full text-base" disabled={!canSubmit} onClick={goApply}>
           전시 신청서 작성하기
         </Button>
+        {ctaReason ? <p className="mt-1.5 text-[13px] text-ink-3">{ctaReason}</p> : null}
       </div>
     </div>
   );

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import * as XLSX from "xlsx";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { pickFeeBasisSessions } from "@/lib/bundle";
 import { getRoomsByCategory, normalizeRoomCategory } from "@/lib/space";
@@ -42,9 +42,7 @@ function buildBatchMaps(all: RentalRequest[]) {
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) {
-    return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
-  }
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
   const url = new URL(req.url);

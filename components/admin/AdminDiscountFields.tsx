@@ -64,16 +64,16 @@ export default function AdminDiscountFields({
   return (
     <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
       <div className="md:col-span-12">
-        <div className="rounded-xl border bg-[rgb(var(--brand-primary)/0.03)] p-3 text-sm">
+        <div className="rounded-xl border bg-brand/[0.03] p-3 text-sm">
           <div className="flex flex-wrap items-center gap-3">
             <div>
-              <span className="text-gray-600">총 금액</span>: <b>{formatKRW(totalFeeKRW)}</b>
+              <span className="text-slate-600">총 금액</span>: <b>{formatKRW(totalFeeKRW)}</b>
             </div>
             <div>
-              <span className="text-gray-600">할인</span>: <b>{preview.discountRatePct.toFixed(2)}%</b> ({formatKRW(preview.discountAmountKRW)})
+              <span className="text-slate-600">할인</span>: <b>{preview.discountRatePct.toFixed(2)}%</b> ({formatKRW(preview.discountAmountKRW)})
             </div>
             <div>
-              <span className="text-gray-600">최종금액</span>: <b>{formatKRW(finalFee)}</b>
+              <span className="text-slate-600">최종금액</span>: <b>{formatKRW(finalFee)}</b>
             </div>
           </div>
         </div>

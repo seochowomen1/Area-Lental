@@ -17,6 +17,7 @@ import PrivacyModal from "@/components/PrivacyModal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import DatePickerCalendar from "@/components/DatePickerCalendar";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import Notice from "@/components/ui/Notice";
 import Checkbox from "@/components/ui/Checkbox";
@@ -842,7 +843,7 @@ export default function ApplyClient() {
                       {confirmData.electronicBoard && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">전자칠판</span>}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400">선택 없음</p>
+                    <p className="text-sm text-slate-500">선택 없음</p>
                   )
                 ) : (
                   confirmData.laptop || confirmData.projector || confirmData.audio ? (
@@ -852,7 +853,7 @@ export default function ApplyClient() {
                       {confirmData.audio && <span className="rounded-full bg-blue-50 border border-blue-200 px-3 py-1 text-sm text-blue-800">음향</span>}
                     </div>
                   ) : (
-                    <p className="text-sm text-slate-400">선택 없음</p>
+                    <p className="text-sm text-slate-500">선택 없음</p>
                   )
                 )}
               </div>
@@ -861,7 +862,7 @@ export default function ApplyClient() {
             {/* 예상 이용요금 */}
             <Card pad="lg">
               <h3 className={SECTION_TITLE}>예상 이용요금</h3>
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
+              <div className="mt-3 overflow-hidden rounded-xl border border-line bg-white">
                 <div className="px-4 py-3 space-y-2">
                   <div className="flex items-center justify-between text-sm text-slate-600">
                     <span>대관료{bundle.sessionCount > 1 ? ` (${bundle.sessionCount}회차)` : ""}</span>
@@ -878,9 +879,9 @@ export default function ApplyClient() {
                     <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
                   </div>
                 </div>
-                <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                <div className="mx-4 mb-3 flex items-center justify-between rounded-xl bg-brand/[0.06] px-4 py-3">
                   <span className="text-sm font-bold text-slate-900">총 금액</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{bundle.total.toLocaleString()}원</span>
+                  <span className="text-lg font-extrabold text-brand">{bundle.total.toLocaleString()}원</span>
                 </div>
               </div>
             </Card>
@@ -956,7 +957,7 @@ export default function ApplyClient() {
               {prefillLocked ? (
                 <Link
                   href={`/space/${encodeURIComponent(roomId)}`}
-                  className="text-xs font-semibold text-[rgb(var(--brand-primary))] hover:underline"
+                  className="text-xs font-semibold text-brand hover:underline"
                 >
                   시간/날짜 변경
                 </Link>
@@ -1016,7 +1017,7 @@ export default function ApplyClient() {
                 <div className="mt-3">
                   <button
                     type="button"
-                    className="flex w-full items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-4 py-3 text-left transition-colors hover:border-[rgb(var(--brand-primary))] hover:bg-[rgb(var(--brand-primary)/0.03)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex w-full items-center justify-between rounded-xl border border-dashed border-slate-300 bg-slate-50/50 px-4 py-3 text-left transition-colors hover:border-brand hover:bg-brand/[0.03] disabled:opacity-50 disabled:cursor-not-allowed"
                     disabled={!selectedDate}
                     onClick={() => {
                       if (!selectedDate) return;
@@ -1026,16 +1027,16 @@ export default function ApplyClient() {
                     }}
                   >
                     <div className="flex items-center gap-2.5">
-                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgb(var(--brand-primary)/0.08)] text-[rgb(var(--brand-primary))]">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-brand/[0.08] text-brand">
                         <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/></svg>
                       </span>
                       <div>
                         <div className="text-sm font-semibold text-slate-800">대관 일정 추가하기</div>
-                        <div className="text-[11px] text-slate-500">여러 날짜/시간을 한 번에 신청</div>
+                        <div className="text-xs text-slate-500">여러 날짜/시간을 한 번에 신청</div>
                       </div>
                     </div>
                     {extraSessions.length > 0 && (
-                      <span className="rounded-full bg-[rgb(var(--brand-primary))] px-2.5 py-1 text-xs font-bold text-white">
+                      <span className="rounded-full bg-brand px-2.5 py-1 text-xs font-bold text-white">
                         +{extraSessions.length}
                       </span>
                     )}
@@ -1051,17 +1052,17 @@ export default function ApplyClient() {
                             className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs"
                           >
                             <div className="flex items-center gap-2 min-w-0">
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">
+                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-500">
                                 {idx + 1}
                               </span>
                               <span className="font-semibold text-slate-900">{s.date}</span>
                               <span className="text-slate-600">{s.startTime}~{s.endTime}</span>
-                              {isBase && <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">기본</span>}
+                              {isBase && <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-xs font-semibold text-blue-700">기본</span>}
                             </div>
                             {!isBase ? (
                               <button
                                 type="button"
-                                className="shrink-0 rounded-md p-1 text-slate-400 hover:bg-red-50 hover:text-red-500"
+                                className="shrink-0 rounded-md p-1 text-slate-500 hover:bg-red-50 hover:text-red-500"
                                 onClick={() => removeExtraSession(s)}
                                 aria-label={`삭제: ${s.date}`}
                               >
@@ -1119,9 +1120,8 @@ export default function ApplyClient() {
             </div>
 
             {hourlyFee > 0 && bundle.sessionCount > 0 && bundle.totalDurationMin > 0 ? (
-              <div className="mt-3 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-                <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                  <span className="text-base">💰</span>
+              <div className="mt-3 overflow-hidden rounded-xl border border-line bg-white">
+                <div className="flex items-center gap-2 border-b border-line bg-slate-50 px-4 py-2.5">
                   <span className="text-sm font-bold text-slate-800">예상 대관료</span>
                 </div>
                 <div className="px-4 py-3">
@@ -1144,13 +1144,13 @@ export default function ApplyClient() {
                       </div>
                     ) : null}
                   </div>
-                  <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                  <div className="mt-3 flex items-center justify-between rounded-xl bg-brand/[0.06] px-4 py-3">
                     <span className="text-sm font-bold text-slate-900">합계</span>
-                    <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">
+                    <span className="text-lg font-extrabold text-brand">
                       {bundle.rentalSum.toLocaleString()}원
                     </span>
                   </div>
-                  <p className="mt-2 text-[11px] text-slate-400">
+                  <p className="mt-2 text-[13px] text-slate-500">
                     ※ 기자재 사용료 별도{bundle.sessionCount > 1 ? " (회차별 합산)" : ""}
                   </p>
                 </div>
@@ -1159,7 +1159,7 @@ export default function ApplyClient() {
 
             {isTueNight ? (
               <div className="mt-2">
-                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-800">
                   화요일 야간 운영시간입니다
                 </span>
               </div>
@@ -1201,7 +1201,7 @@ export default function ApplyClient() {
                       handleBirthSync(v, birthMonth, birthDay);
                     }}
                   />
-                  <span className="text-slate-400" aria-hidden="true">-</span>
+                  <span className="text-slate-500" aria-hidden="true">-</span>
                   <input
                     ref={birthMonthRef}
                     aria-label="월(2자리)"
@@ -1217,7 +1217,7 @@ export default function ApplyClient() {
                       handleBirthSync(birthYear, v, birthDay);
                     }}
                   />
-                  <span className="text-slate-400" aria-hidden="true">-</span>
+                  <span className="text-slate-500" aria-hidden="true">-</span>
                   <input
                     ref={birthDayRef}
                     aria-label="일(2자리)"
@@ -1374,9 +1374,8 @@ export default function ApplyClient() {
 
           <Card pad="lg">
             <h3 className={SECTION_TITLE}>이용요금 안내</h3>
-            <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-br from-blue-50/80 via-white to-white shadow-sm">
-              <div className="flex items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-2.5">
-                <span className="text-base">💰</span>
+            <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
+              <div className="flex items-center gap-2 border-b border-line bg-slate-50 px-4 py-2.5">
                 <span className="text-sm font-bold text-slate-800">대관료 및 장비 사용료</span>
               </div>
               <div className="px-4 py-3">
@@ -1398,11 +1397,11 @@ export default function ApplyClient() {
                     <span className="font-semibold text-slate-800 tabular-nums">{bundle.equipmentSum.toLocaleString()}원</span>
                   </div>
                 </div>
-                <div className="mt-3 flex items-center justify-between rounded-xl bg-[rgb(var(--brand-primary)/0.06)] px-4 py-3">
+                <div className="mt-3 flex items-center justify-between rounded-xl bg-brand/[0.06] px-4 py-3">
                   <span className="text-sm font-bold text-slate-900">총 금액</span>
-                  <span className="text-lg font-extrabold text-[rgb(var(--brand-primary))]">{bundle.total.toLocaleString()}원</span>
+                  <span className="text-lg font-extrabold text-brand">{bundle.total.toLocaleString()}원</span>
                 </div>
-                <p className="mt-2 text-[11px] text-slate-400">
+                <p className="mt-2 text-[13px] text-slate-500">
                   ※ 장비 사용료는 선택 항목에 따라 변동되며, 선택한 회차 수 기준으로 합산됩니다.
                 </p>
               </div>
@@ -1490,39 +1489,25 @@ export default function ApplyClient() {
         </form>
 
         {/* ── 추가 회차 모달 (리뉴얼) ── */}
-        {extraOpen ? (
-          <div
-            className="fixed inset-0 z-50 flex items-end sm:items-center justify-center"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="extra-session-modal-title"
-          >
-            <button
+        <Modal
+          open={extraOpen}
+          onClose={() => { setExtraOpen(false); setSessionError(null); }}
+          size="lg"
+          title="대관 일정 추가"
+          bodyClassName="!px-0 !py-0 sm:!px-0"
+          footer={
+            <Button
               type="button"
-              className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-              aria-label="모달 닫기"
+              variant="primary"
+              className="w-full py-2.5"
               onClick={() => { setExtraOpen(false); setSessionError(null); }}
-              tabIndex={-1}
-            />
-
-            <div className="relative w-full max-w-lg overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl">
-              {/* 헤더 */}
-              <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
-                <div>
-                  <h3 id="extra-session-modal-title" className="text-base font-bold text-slate-900">대관 일정 추가</h3>
-                  <p className="mt-0.5 text-xs text-slate-500">여러 회차를 한 번에 신청할 수 있습니다</p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
-                  className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                  aria-label="닫기"
-                >
-                  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M12 4L4 12M4 4l8 8" stroke="currentColor" strokeWidth="2" strokeLinecap="round" /></svg>
-                </button>
-              </div>
-
-              <div className="max-h-[70vh] overflow-auto">
+            >
+              완료 ({allSessions.length}회차)
+            </Button>
+          }
+        >
+              <p className="px-5 pt-3 text-[13px] text-slate-500">여러 회차를 한 번에 신청할 수 있습니다</p>
+              <div>
                 {/* 에러 */}
                 {sessionError ? (
                   <div className="px-5 pt-4">
@@ -1588,7 +1573,7 @@ export default function ApplyClient() {
                 <div className="border-t border-slate-100 bg-slate-50/80 px-5 py-4">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-xs font-bold text-slate-700">선택된 일정</span>
-                    <span className="rounded-full bg-[rgb(var(--brand-primary)/0.1)] px-2.5 py-0.5 text-xs font-bold text-[rgb(var(--brand-primary))]">
+                    <span className="rounded-full bg-brand/[0.1] px-2.5 py-0.5 text-xs font-bold text-brand">
                       {allSessions.length}회차
                     </span>
                   </div>
@@ -1603,7 +1588,7 @@ export default function ApplyClient() {
                             className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white px-3 py-2.5"
                           >
                             <div className="flex items-center gap-2.5 min-w-0">
-                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600">
+                              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-xs font-bold text-slate-600">
                                 {idx + 1}
                               </span>
                               <div className="text-xs">
@@ -1611,21 +1596,21 @@ export default function ApplyClient() {
                                 <span className="ml-1.5 text-slate-600">{s.startTime} ~ {s.endTime}</span>
                               </div>
                               {isBase && (
-                                <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-[10px] font-semibold text-blue-700">기본</span>
+                                <span className="rounded bg-blue-50 border border-blue-200 px-1.5 py-0.5 text-xs font-semibold text-blue-700">기본</span>
                               )}
                             </div>
 
                             {!isBase ? (
                               <button
                                 type="button"
-                                className="shrink-0 rounded-md border border-slate-200 bg-white p-1 text-slate-400 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
+                                className="shrink-0 rounded-md border border-slate-200 bg-white p-1 text-slate-500 transition-colors hover:border-red-200 hover:bg-red-50 hover:text-red-500"
                                 onClick={() => removeExtraSession(s)}
                                 aria-label={`삭제: ${s.date}`}
                               >
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M10.5 3.5l-7 7M3.5 3.5l7 7" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                               </button>
                             ) : (
-                              <span className="text-[10px] text-slate-400">기본</span>
+                              <span className="text-xs text-slate-500">기본</span>
                             )}
                           </div>
                         );
@@ -1639,20 +1624,7 @@ export default function ApplyClient() {
                 </div>
               </div>
 
-              {/* 하단 완료 버튼 */}
-              <div className="border-t border-slate-100 px-5 py-3">
-                <Button
-                  type="button"
-                  variant="primary"
-                  className="w-full py-2.5"
-                  onClick={() => { setExtraOpen(false); setSessionError(null); }}
-                >
-                  완료 ({allSessions.length}회차)
-                </Button>
-              </div>
-            </div>
-          </div>
-        ) : null}
+        </Modal>
 
         <PrivacyModal
           open={privacyOpen}

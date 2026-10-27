@@ -22,7 +22,7 @@ const CHIP_BASE =
   "inline-flex min-h-[44px] w-full items-center justify-between gap-1.5 rounded-full border px-3 py-1.5 text-sm font-semibold md:min-h-[36px] md:w-auto md:justify-start";
 const TONE = {
   amber: "border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100",
-  gray: "border-gray-200 bg-gray-50 text-gray-700 hover:bg-gray-100",
+  gray: "border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100",
   red: "border-red-200 bg-red-50 text-red-800 hover:bg-red-100",
 } as const;
 
@@ -39,12 +39,12 @@ export default function PaymentStatusChips({ summary, listHref, activeFocus = nu
   const { paymentWaiting, closeNeeded, closeNeededOverdue3d, autoCancelled, autoCancelledOverdue3d } = summary;
   if (paymentWaiting === 0 && closeNeeded === 0 && autoCancelled === 0) return null;
 
-  const ring = (f: PaymentFocus) => (activeFocus === f ? " ring-2 ring-[rgb(var(--brand-primary))] ring-offset-1" : "");
+  const ring = (f: PaymentFocus) => (activeFocus === f ? " ring-2 ring-brand ring-offset-1" : "");
 
   return (
-    <div className="rounded-xl border border-gray-200 bg-white px-4 py-3 shadow-sm">
+    <div className="rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
       <div className="flex flex-col gap-2 md:flex-row md:flex-wrap md:items-center">
-        <span className="text-xs font-semibold text-gray-500 md:mr-1">{label}</span>
+        <span className="text-xs font-semibold text-slate-500 md:mr-1">{label}</span>
 
         {paymentWaiting > 0 && (
           <Link href={withFocus(listHref, "payment-waiting")} className={`${CHIP_BASE} ${TONE.amber}${ring("payment-waiting")}`} title="목록에서 보기">
@@ -83,7 +83,7 @@ export default function PaymentStatusChips({ summary, listHref, activeFocus = nu
 
         <div className="flex items-center justify-end gap-3 md:ml-auto">
           {activeFocus && (
-            <Link href={listHref} className="text-xs text-gray-600 underline hover:text-gray-900">
+            <Link href={listHref} className="text-xs text-slate-600 underline hover:text-slate-900">
               전체 보기
             </Link>
           )}

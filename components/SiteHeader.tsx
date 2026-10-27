@@ -34,7 +34,7 @@ export default function SiteHeader({
           <div className="flex items-end justify-between gap-4">
             <div>
               <div className="flex items-center gap-2">
-                <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--brand-accent))]" />
+                <span className="inline-block h-2 w-2 rounded-full bg-accent" />
                 <h1 className="text-2xl font-bold tracking-tight">{title}</h1>
               </div>
             </div>

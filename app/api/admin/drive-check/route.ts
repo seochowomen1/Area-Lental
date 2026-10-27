@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { Readable } from "stream";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { getGoogleClient, getDriveUploadClient, ensureUploadFolderId } from "@/lib/google";
 import { isMockMode } from "@/lib/env";
 
@@ -26,7 +26,7 @@ function describeError(e: unknown) {
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, reason: auth.reason }, { status: auth.status ?? 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   if (isMockMode()) return NextResponse.json({ ok: true, mock: true, steps: [] });
 
   const steps: Step[] = [];

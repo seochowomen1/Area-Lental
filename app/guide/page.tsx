@@ -12,7 +12,7 @@ const CONTACT_EMAIL = "seochowomen1@naver.com";
 
 export default function GuidePage() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <SiteHeader title="대관 · 전시 이용 안내" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -189,7 +189,7 @@ export default function GuidePage() {
 function SectionTitle({ children }: { children: ReactNode }) {
   return (
     <h2 className="flex items-center gap-2 text-lg font-bold text-slate-900">
-      <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--brand-accent))]" />
+      <span className="inline-block h-2 w-2 rounded-full bg-accent" />
       {children}
     </h2>
   );
@@ -249,8 +249,8 @@ function LinkButton({ href, children, soft }: { href: string; children: ReactNod
       href={href}
       className={
         soft
-          ? "inline-flex items-center rounded-full border border-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-[rgb(var(--brand-primary))] transition hover:bg-[rgb(var(--brand-primary)/0.06)]"
-          : "inline-flex items-center rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+          ? "inline-flex items-center rounded-full border border-brand px-4 py-2 text-sm font-semibold text-brand transition hover:bg-brand/[0.06]"
+          : "inline-flex items-center rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
       }
     >
       {children}

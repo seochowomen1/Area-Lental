@@ -73,6 +73,8 @@ export function handleApplySuccess(
     token?: string;
     tokenExpiresAt?: number;
     estimatedFeeKRW?: number;
+    /** 갤러리만 — 신청 당시 공휴일 확인 상태(03_api 1-3) */
+    holidayCheck?: string;
   };
   const token = String(d.token ?? "");
   if (token) saveApplicantAccess(token, Number(d.tokenExpiresAt ?? 0) || undefined);
@@ -89,5 +91,7 @@ export function handleApplySuccess(
   if (Number.isFinite(count) && count > 1) qp.set("count", String(count));
   if (opts.category) qp.set("category", opts.category);
   if (Number.isFinite(fee)) qp.set("fee", String(fee));
+  // 공휴일 미확인으로 접수된 갤러리 건 — 완료 화면 금액 옆 안내(5-2)
+  if (d.holidayCheck === "unavailable") qp.set("hc", "unavailable");
   return `/success?${qp.toString()}`;
 }

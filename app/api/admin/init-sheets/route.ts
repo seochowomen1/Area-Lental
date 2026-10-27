@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getGoogleClient } from "@/lib/google";
 import { requireGoogleEnv } from "@/lib/env";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { ADMIN_SESSION_HEADERS, AUDIT_HEADERS, REQUEST_OPTIONAL_HEADERS } from "@/lib/sheets";
 
 export const runtime = "nodejs";
@@ -55,7 +55,7 @@ const SHEETS_CONFIG = [
 
 export async function POST(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
   try {
     const env = requireGoogleEnv();
     const { sheets } = getGoogleClient();

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { getRoom } from "@/lib/space";
 import type { RentalRequest } from "@/lib/types";
@@ -96,7 +96,7 @@ function placeOf(r: RentalRequest): string {
 
 export async function GET(req: Request) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const url = new URL(req.url);

@@ -14,12 +14,12 @@ export default function SingleStatusFields({ defaultStatus, defaultRejectReason 
   return (
     <>
       <div>
-        <label className="block text-sm font-semibold text-gray-700">처리 상태</label>
+        <label className="block text-sm font-semibold text-slate-700">처리 상태</label>
         <select
           name="status"
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="mt-1.5 w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300"
+          className="mt-1.5 w-full rounded-lg border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
         >
           <option value="접수">접수</option>
           <option value="승인">승인</option>
@@ -29,7 +29,7 @@ export default function SingleStatusFields({ defaultStatus, defaultRejectReason 
       </div>
 
       <div>
-        <label className="block text-sm font-semibold text-gray-700">
+        <label className="block text-sm font-semibold text-slate-700">
           반려 사유 (반려 시 필수)
         </label>
         <textarea
@@ -37,10 +37,10 @@ export default function SingleStatusFields({ defaultStatus, defaultRejectReason 
           defaultValue={defaultRejectReason}
           disabled={!isReject}
           required={isReject}
-          className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-300 ${
+          className={`mt-1.5 w-full rounded-lg border px-3 py-2.5 text-sm outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300 ${
             isReject
-              ? "border-gray-200 bg-white"
-              : "border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed"
+              ? "border-slate-200 bg-white"
+              : "border-slate-100 bg-slate-50 text-slate-500 cursor-not-allowed"
           }`}
           rows={2}
           placeholder={isReject ? "반려 사유를 입력해 주세요" : "반려를 선택하면 입력할 수 있습니다"}

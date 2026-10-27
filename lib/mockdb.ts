@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPatch } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPatch, GalleryFeeUpdate } from "@/lib/types";
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
@@ -415,6 +415,23 @@ export async function mock_updateRequestPayment(args: { requestId: string; patch
   }
   saveDb(db);
   return updated;
+}
+
+/** 갤러리 이용료 다시 계산 (Mock · audit-fix-2 R2) — 갤러리 1행만 */
+export async function mock_updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRequest> {
+  const db = ensureDb();
+  const i = db.requests.findIndex((r) => r.requestId === args.requestId);
+  if (i < 0) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  if (db.requests[i].roomId !== "gallery") throw new Error("갤러리 신청만 다시 계산할 수 있습니다.");
+  db.requests[i] = {
+    ...db.requests[i],
+    galleryWeekdayCount: args.weekdayCount,
+    gallerySaturdayCount: args.saturdayCount,
+    galleryExhibitionDayCount: args.exhibitionDayCount,
+    galleryAuditJson: args.galleryAuditJson,
+  };
+  saveDb(db);
+  return db.requests[i];
 }
 
 export async function mock_getClassSchedules(): Promise<ClassSchedule[]> {

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { cronAuthOk } from "@/lib/cronAuth";
 import { auditLog } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
@@ -15,7 +15,7 @@ async function handle(req: Request) {
   let trigger: "cron" | "admin" = "cron";
   if (!cronAuthOk(req)) {
     const auth = await assertAdminApiAuth(req);
-    if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
+    if (!auth.ok) return adminApiAuthFailure(auth);
     trigger = "admin";
   }
   if (!classroomSyncConfigured()) {

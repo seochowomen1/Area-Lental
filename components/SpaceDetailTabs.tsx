@@ -82,7 +82,7 @@ export default function SpaceDetailTabs({
    ─────────────────────────────────────────── */
 function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
-    <div className={cn(CARD_BASE, "p-5 text-sm text-gray-800")}>
+    <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>공간정보 및 시설안내</SectionTitle>
 
       {/* 기본 정보 */}
@@ -93,7 +93,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
           <div className="flex items-center justify-between gap-3 rounded-md bg-white px-3 py-2">
             <span className="shrink-0 text-xs font-semibold text-slate-600">전시 작품 수</span>
             <span className="text-right text-sm font-semibold text-slate-900">
-              액자형태 최대 15점<span className="block text-[11px] font-normal text-slate-400">(가로 60cm 기준)</span>
+              액자형태 최대 15점<span className="block text-xs font-normal text-slate-500">(가로 60cm 기준)</span>
             </span>
           </div>
           <InfoRow label="문의" value={room ? `${room.contactName} (${room.contactPhone})` : "-"} />
@@ -162,7 +162,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         {/* 신청 절차 */}
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">신청 및 승인 절차</h4>
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-slate-700">
             <li>이 화면에서 전시 기간을 선택하고 전시 신청서(전시 목적, 장르, 내용 등)를 온라인으로 작성합니다.</li>
             <li>같은 기간은 먼저 신청한 분이 우선이며, 이미 신청된 날짜는 달력에서 선택할 수 없습니다.</li>
             <li>센터는 3일 이내에 검토 후 승인/반려 결과를 이메일로 안내합니다.</li>
@@ -185,7 +185,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
   const isStudio = room?.category === "studio";
 
   return (
-    <div className={cn(CARD_BASE, "p-5 text-sm text-gray-800")}>
+    <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>공간정보 및 시설안내</SectionTitle>
 
       {/* 기본 정보 */}
@@ -256,7 +256,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
               {room.equipment.map((sec, idx) => (
                 <div key={`${sec.title}-${idx}`} className="rounded-md bg-slate-50 p-3">
                   <p className="text-xs font-bold text-slate-700">{sec.title}</p>
-                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+                  <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
                     {sec.items.map((it, j) => (
                       <li key={`${idx}-${j}`}>{it}</li>
                     ))}
@@ -265,7 +265,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
               ))}
             </div>
           ) : (
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-slate-700">
               비치물품 정보는 준비 중입니다. 자세한 사항은 센터로 문의해 주시기 바랍니다.
             </p>
           )}
@@ -290,7 +290,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         {/* 신청 절차 */}
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">신청 및 승인 절차</h4>
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-gray-700">
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm text-slate-700">
             <li>원하는 공간·일시를 선택하여 온라인으로 대관 신청합니다.</li>
             <li>센터는 신청 내용을 바탕으로 일정·안전·운영 적정성 등을 검토합니다.</li>
             <li>승인(또는 반려) 결과는 신청 시 입력한 연락처/이메일 등으로 안내됩니다.</li>
@@ -312,7 +312,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
    ─────────────────────────────────────────── */
 function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
-    <div className={cn(CARD_BASE, "p-5 text-sm text-gray-800")}>
+    <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>취소/환불규정</SectionTitle>
 
       <div className="mt-4 grid gap-4">
@@ -341,7 +341,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">환불 절차</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
             <li>센터 방문하여 환불신청서 작성 및 제출 (양식 별도 안내)</li>
             <li>우편, 메일 등 비대면 접수 불가</li>
           </ul>
@@ -349,7 +349,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">전시 취소(센터 사정) 및 이용 제한</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
             <li>천재지변, 시설 점검, 안전상 필요 등 불가피한 사유로 일정이 조정될 수 있습니다.</li>
             <li>시설물 훼손, 안전수칙 위반, 허위 신청 등 운영상 문제가 확인될 경우 이용이 제한될 수 있습니다.</li>
             <li>전시 진행 중 발견 시 바로 취소되며 이용료는 환불 불가합니다.</li>
@@ -358,7 +358,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border bg-slate-50 p-4">
           <h4 className="mb-2 text-sm font-semibold">문의</h4>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-slate-700">
             취소/환불 관련 문의: {room ? `${room.contactName} (${room.contactPhone})` : "센터 문의처"}
           </p>
         </div>
@@ -376,7 +376,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
    ─────────────────────────────────────────── */
 function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
-    <div className={cn(CARD_BASE, "p-5 text-sm text-gray-800")}>
+    <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>취소/환불규정</SectionTitle>
 
       <div className="mt-4 grid gap-4">
@@ -405,7 +405,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">환불 절차</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
             <li>센터 방문하여 환불신청서 작성 및 제출 (양식 별도 안내)</li>
             <li>우편, 메일 등 비대면 접수 불가</li>
           </ul>
@@ -413,7 +413,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border p-4">
           <h4 className="mb-2 text-sm font-semibold">대관 취소(센터 사정) 및 이용 제한</h4>
-          <ul className="list-disc space-y-1.5 pl-5 text-sm text-gray-700">
+          <ul className="list-disc space-y-1.5 pl-5 text-sm text-slate-700">
             <li>천재지변, 시설 점검, 안전상 필요 등 불가피한 사유로 일정이 조정될 수 있습니다.</li>
             <li>시설물 훼손, 안전수칙 위반, 허위 신청 등 운영상 문제가 확인될 경우 이용이 제한될 수 있습니다.</li>
             <li>대관 진행 중 발견 시 바로 취소되며 대관료는 환불 불가합니다.</li>
@@ -422,7 +422,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 
         <div className="rounded-lg border bg-slate-50 p-4">
           <h4 className="mb-2 text-sm font-semibold">문의</h4>
-          <p className="text-sm text-gray-700">
+          <p className="text-sm text-slate-700">
             취소/환불 관련 문의: {room ? `${room.contactName} (${room.contactPhone})` : "센터 문의처"}
           </p>
         </div>
@@ -442,7 +442,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
 function SectionTitle({ children }: { children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
-      <span className="inline-block h-2 w-2 rounded-full bg-[rgb(var(--brand-accent))]" />
+      <span className="inline-block h-2 w-2 rounded-full bg-accent" />
       <h3 className="text-base font-bold tracking-tight">{children}</h3>
     </div>
   );

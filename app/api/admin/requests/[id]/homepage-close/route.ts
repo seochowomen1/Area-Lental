@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { assertAdminApiAuth } from "@/lib/adminApiAuth";
+import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { getDatabase } from "@/lib/database";
 import { handleApiError, jsonError } from "@/lib/apiResponse";
 import { recordAudit } from "@/lib/auditLog";
@@ -19,7 +19,7 @@ export const revalidate = 0;
  */
 export async function POST(req: Request, { params }: { params: { id: string } }) {
   const auth = await assertAdminApiAuth(req);
-  if (!auth.ok) return NextResponse.json({ ok: false, message: "Unauthorized" }, { status: auth.status ?? 401 });
+  if (!auth.ok) return adminApiAuthFailure(auth);
 
   try {
     const body = await readJson(req);

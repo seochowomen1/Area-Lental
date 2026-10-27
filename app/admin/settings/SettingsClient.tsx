@@ -1,5 +1,6 @@
 "use client";
 
+import { adminErrorText, adminFetch, isAuthBusyError } from "@/lib/adminFetch";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -95,13 +96,14 @@ export default function SettingsClient(props: {
     );
   }
 
+  /** 관리자 API(adminFetch): 401 → 로그인 · 503 AUTH_STORE_BUSY → G-1 문구(로그인 유지) · 그 밖 → 서버 message */
   async function apiJson<T>(input: RequestInfo, init?: RequestInit): Promise<T> {
-    const res = await fetch(input, {
+    const res = await adminFetch(input, {
       ...init,
       headers: { "Content-Type": "application/json", ...(init?.headers ?? {}) }
     });
     const data = await res.json().catch(() => ({}));
-    if (!res.ok || data?.ok === false) {
+    if (data?.ok === false) {
       const msg = data?.message || `요청 실패 (${res.status})`;
       throw new Error(msg);
     }
@@ -239,7 +241,7 @@ export default function SettingsClient(props: {
 
   const highlightRowClass = (id: string) =>
     id === highlightId
-      ? "bg-[rgb(var(--brand-primary)/0.06)] ring-2 ring-[rgb(var(--brand-primary)/0.35)]"
+      ? "bg-brand/[0.06] ring-2 ring-brand/[0.35]"
       : "";
 
   return (
@@ -265,7 +267,7 @@ export default function SettingsClient(props: {
                 <p className="mt-0.5 text-xs text-slate-500">
                   등록된 시간에는 대관 신청이 차단됩니다
                   {syncedCount > 0 && (
-                    <span className="ml-2 text-slate-400">· 업무 시스템 자동 등록 {syncedCount}건{lastSyncedAt ? ` (${lastSyncedAt})` : ""}</span>
+                    <span className="ml-2 text-slate-500">· 업무 시스템 자동 등록 {syncedCount}건{lastSyncedAt ? ` (${lastSyncedAt})` : ""}</span>
                   )}
                 </p>
               </div>
@@ -286,7 +288,7 @@ export default function SettingsClient(props: {
                     onClick={() => setScheduleView("grid")}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                       scheduleView === "grid"
-                        ? "bg-slate-900 text-white"
+                        ? "bg-brand text-white"
                         : "text-slate-500 hover:text-slate-700"
                     }`}
                   >
@@ -297,7 +299,7 @@ export default function SettingsClient(props: {
                     onClick={() => setScheduleView("list")}
                     className={`rounded-full px-3 py-1.5 text-xs font-semibold transition ${
                       scheduleView === "list"
-                        ? "bg-slate-900 text-white"
+                        ? "bg-brand text-white"
                         : "text-slate-500 hover:text-slate-700"
                     }`}
                   >
@@ -308,7 +310,7 @@ export default function SettingsClient(props: {
                   <button
                     type="button"
                     onClick={() => setScheduleFormOpen((v) => !v)}
-                    className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
                   >
                     {scheduleFormOpen ? "닫기" : "+ 새 수업시간"}
                   </button>
@@ -369,9 +371,9 @@ export default function SettingsClient(props: {
                           </td>
                           <td className="px-5 py-3 tabular-nums">{s.startTime}~{s.endTime}</td>
                           <td className="px-5 py-3 text-slate-600">
-                            {s.title || <span className="text-slate-400">-</span>}
+                            {s.title || <span className="text-slate-500">-</span>}
                             {s.source === "classroom" && (
-                              <span className="ml-2 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-[10px] font-semibold text-sky-700 ring-1 ring-sky-200" title="업무 시스템 강의실 일정표에서 자동 등록 — 수정은 업무 시스템에서">
+                              <span className="ml-2 inline-flex rounded-full bg-sky-50 px-2 py-0.5 text-xs font-semibold text-sky-700 ring-1 ring-sky-200" title="업무 시스템 강의실 일정표에서 자동 등록 — 수정은 업무 시스템에서">
                                 자동
                               </span>
                             )}
@@ -392,7 +394,7 @@ export default function SettingsClient(props: {
                       ))
                     ) : (
                       <tr>
-                        <td className="px-5 py-8 text-center text-slate-400" colSpan={6}>등록된 수업시간이 없습니다.</td>
+                        <td className="px-5 py-8 text-center text-slate-500" colSpan={6}>등록된 수업시간이 없습니다.</td>
                       </tr>
                     )}
                   </tbody>
@@ -426,7 +428,7 @@ export default function SettingsClient(props: {
             <button
               type="button"
               onClick={() => setBlockFormOpen((v) => !v)}
-              className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
             >
               {blockFormOpen ? "닫기" : isGallery ? "+ 내부 전시 일정 추가" : "+ 새 차단시간"}
             </button>
@@ -474,7 +476,7 @@ export default function SettingsClient(props: {
                       ) : isDayBlock ? (
                         <span>
                           {b.date} ~ {b.endDate}
-                          <span className="ml-1.5 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700">일 단위</span>
+                          <span className="ml-1.5 inline-flex rounded-full border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-xs font-semibold text-amber-700">일 단위</span>
                         </span>
                       ) : (
                         <>
@@ -490,7 +492,7 @@ export default function SettingsClient(props: {
                           : renderBlockTime(b)}
                       </td>
                     )}
-                    <td className="px-5 py-3 text-slate-600">{b.reason || <span className="text-slate-400">-</span>}</td>
+                    <td className="px-5 py-3 text-slate-600">{b.reason || <span className="text-slate-500">-</span>}</td>
                     <td className="px-5 py-3 text-right">
                       <button
                         type="button"
@@ -506,7 +508,7 @@ export default function SettingsClient(props: {
                 })
               ) : (
                 <tr>
-                  <td className="px-5 py-8 text-center text-slate-400" colSpan={isGallery ? 4 : 5}>
+                  <td className="px-5 py-8 text-center text-slate-500" colSpan={isGallery ? 4 : 5}>
                     {isGallery ? "등록된 내부 전시 일정이 없습니다." : "등록된 차단시간이 없습니다."}
                   </td>
                 </tr>
@@ -548,11 +550,12 @@ function EmailTemplateSection({
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<{ text: string; busy: boolean } | null>(null);
   const [loaded, setLoaded] = useState(false);
 
   const loadTemplatesFn = useCallback(async () => {
     try {
-      const res = await fetch("/api/admin/email-templates");
+      const res = await adminFetch("/api/admin/email-templates");
       const data = await res.json();
       if (data.ok && data.templates) {
         setTemplates(data.templates);
@@ -582,9 +585,11 @@ function EmailTemplateSection({
   }, [selectedStatus, templates]);
 
   async function handleSave() {
+    if (saving) return;
     setSaving(true);
+    setSaveError(null);
     try {
-      const res = await fetch("/api/admin/email-templates", {
+      const res = await adminFetch("/api/admin/email-templates", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ status: selectedStatus, subject, body }),
@@ -594,10 +599,10 @@ function EmailTemplateSection({
         setTemplates((prev) => ({ ...prev, [selectedStatus]: { subject, body } }));
         onToast({ type: "success", message: `${selectedStatus} 메일 템플릿이 저장되었습니다.` });
       } else {
-        onToast({ type: "error", message: data.message || "저장 실패" });
+        setSaveError({ text: data.message || "저장하지 못했습니다. 잠시 후 다시 눌러 주세요.", busy: false });
       }
-    } catch {
-      onToast({ type: "error", message: "저장 중 오류가 발생했습니다." });
+    } catch (e) {
+      setSaveError({ text: adminErrorText(e, "저장하지 못했습니다. 잠시 후 다시 눌러 주세요."), busy: isAuthBusyError(e) });
     } finally {
       setSaving(false);
     }
@@ -616,7 +621,7 @@ function EmailTemplateSection({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="rounded-full bg-[rgb(var(--brand-primary))] px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
           >
             {open ? "닫기" : "템플릿 편집"}
           </button>
@@ -634,7 +639,7 @@ function EmailTemplateSection({
                 onClick={() => setSelectedStatus(st)}
                 className={`rounded-full px-4 py-1.5 text-sm font-semibold transition ${
                   selectedStatus === st
-                    ? "bg-slate-900 text-white"
+                    ? "bg-brand text-white"
                     : "border border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
                 }`}
               >
@@ -663,7 +668,7 @@ function EmailTemplateSection({
               rows={14}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm font-mono outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
             />
-            <p className="mt-1 text-xs text-slate-400">{TEMPLATE_VARS_HELP}</p>
+            <p className="mt-1 text-xs text-slate-500">{TEMPLATE_VARS_HELP}</p>
           </div>
 
           {/* 저장 버튼 */}
@@ -672,14 +677,17 @@ function EmailTemplateSection({
               type="button"
               onClick={handleSave}
               disabled={saving}
-              className="rounded-lg bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white hover:bg-black disabled:opacity-60"
+              className="inline-flex min-h-[44px] items-center whitespace-nowrap rounded-xl bg-brand px-5 py-2 text-[15px] font-semibold text-white hover:bg-brand-hover disabled:bg-slate-200 disabled:text-slate-500"
             >
-              {saving ? "저장 중..." : "템플릿 저장"}
+              {saving ? "저장 중…" : "템플릿 저장"}
             </button>
             <span className="text-xs text-slate-500">
               * 저장 후 해당 상태의 메일 발송 시 적용됩니다 (모든 공간 공통)
             </span>
           </div>
+          {saveError && (
+            <p role="alert" className={`text-[13px] font-semibold ${saveError.busy ? "text-amber-800" : "text-red-700"}`}>{saveError.text}</p>
+          )}
         </div>
       )}
     </section>

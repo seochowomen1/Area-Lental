@@ -20,7 +20,7 @@ type Props = {
  */
 export default function FormSubmitButton({
   idleText,
-  pendingText = "처리 중...",
+  pendingText = "처리 중…",
   className,
   variant = "primary",
   disabled = false,

@@ -15,7 +15,7 @@ export const metadata: Metadata = {
 
 export default function PrivacyPolicyPage() {
   return (
-    <div className="flex min-h-screen flex-col bg-gray-50">
+    <div className="flex min-h-screen flex-col bg-slate-50">
       <SiteHeader title="개인정보 처리방침" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
@@ -132,10 +132,10 @@ export default function PrivacyPolicyPage() {
           <Section number={9} title="개인정보 침해 구제">
             <p>정보주체는 개인정보침해로 인한 구제를 받기 위하여 개인정보분쟁조정위원회, 한국인터넷진흥원 개인정보침해신고센터 등에 분쟁해결이나 상담 등을 신청할 수 있습니다.</p>
             <ul className="mt-2 list-disc pl-5 space-y-1">
-              <li>개인정보분쟁조정위원회: (국번없이) 1833-6972 (<a href="https://www.kopico.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.kopico.go.kr</a>)</li>
-              <li>개인정보침해신고센터: (국번없이) 118 (<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">privacy.kisa.or.kr</a>)</li>
-              <li>대검찰청 사이버수사과: (국번없이) 1301 (<a href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">www.spo.go.kr</a>)</li>
-              <li>경찰청 사이버수사국: (국번없이) 182 (<a href="https://ecrm.cyber.go.kr" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">ecrm.cyber.go.kr</a>)</li>
+              <li>개인정보분쟁조정위원회: (국번없이) 1833-6972 (<a href="https://www.kopico.go.kr" target="_blank" rel="noopener noreferrer" className="text-brand underline-offset-2 hover:underline">www.kopico.go.kr</a>)</li>
+              <li>개인정보침해신고센터: (국번없이) 118 (<a href="https://privacy.kisa.or.kr" target="_blank" rel="noopener noreferrer" className="text-brand underline-offset-2 hover:underline">privacy.kisa.or.kr</a>)</li>
+              <li>대검찰청 사이버수사과: (국번없이) 1301 (<a href="https://www.spo.go.kr" target="_blank" rel="noopener noreferrer" className="text-brand underline-offset-2 hover:underline">www.spo.go.kr</a>)</li>
+              <li>경찰청 사이버수사국: (국번없이) 182 (<a href="https://ecrm.cyber.go.kr" target="_blank" rel="noopener noreferrer" className="text-brand underline-offset-2 hover:underline">ecrm.cyber.go.kr</a>)</li>
             </ul>
           </Section>
 
@@ -194,7 +194,7 @@ export default function PrivacyPolicyPage() {
             </Link>
             <Link
               href="/admin"
-              className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+              className="text-xs text-slate-500 hover:text-slate-600 transition-colors"
             >
               관리자
             </Link>
