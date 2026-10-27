@@ -632,7 +632,7 @@ export default function ApplyGalleryClient() {
           <Notice title="신청 전 확인" variant="info" pad="md">
             <ul className="list-disc space-y-1 pl-5">
               <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
-              <li>일요일·공휴일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. (날짜 선택 가능)</li>
+              <li>일요일·공휴일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. <span className="whitespace-nowrap">(날짜 선택 가능)</span></li>
               <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
               <li><b>철거</b>: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수입니다.</li>
               <li><b>준비</b>: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 가능합니다.</li>

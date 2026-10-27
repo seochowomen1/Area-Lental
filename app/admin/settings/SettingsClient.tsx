@@ -261,13 +261,13 @@ export default function SettingsClient(props: {
       {!isGallery && (
         <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
           <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-base font-bold text-slate-900">정규 수업시간</h2>
                 <p className="mt-0.5 text-xs text-slate-500">
                   등록된 시간에는 대관 신청이 차단됩니다
                   {syncedCount > 0 && (
-                    <span className="ml-2 text-slate-500">· 업무 시스템 자동 등록 {syncedCount}건{lastSyncedAt ? ` (${lastSyncedAt})` : ""}</span>
+                    <span className="ml-2 text-slate-500">· 업무 시스템 자동 등록 {syncedCount}건{lastSyncedAt ? <> <span className="whitespace-nowrap">({lastSyncedAt})</span></> : ""}</span>
                   )}
                 </p>
               </div>
@@ -277,7 +277,7 @@ export default function SettingsClient(props: {
                   onClick={onSyncClassroom}
                   disabled={submitting !== null}
                   title="서초센터 업무 시스템(강의실 일정표)의 강좌 일정을 가져와 자동 등록분을 갱신합니다. 매일 새벽에도 자동 실행됩니다."
-                  className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+                  className="shrink-0 whitespace-nowrap rounded-full border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
                 >
                   {submitting === "sync" ? "가져오는 중…" : "업무 시스템 가져오기"}
                 </button>
@@ -310,7 +310,7 @@ export default function SettingsClient(props: {
                   <button
                     type="button"
                     onClick={() => setScheduleFormOpen((v) => !v)}
-                    className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+                    className="shrink-0 whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
                   >
                     {scheduleFormOpen ? "닫기" : "+ 새 수업시간"}
                   </button>
@@ -414,7 +414,7 @@ export default function SettingsClient(props: {
       {/* 내부 전시(갤러리)/대관 일정 / 수동 차단 시간 섹션 */}
       <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
         <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <h2 className="text-base font-bold text-slate-900">
                 {isGallery ? "내부 전시 일정" : "내부 대관 일정 / 수동 차단"}
@@ -428,7 +428,7 @@ export default function SettingsClient(props: {
             <button
               type="button"
               onClick={() => setBlockFormOpen((v) => !v)}
-              className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+              className="shrink-0 whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
             >
               {blockFormOpen ? "닫기" : isGallery ? "+ 내부 전시 일정 추가" : "+ 새 차단시간"}
             </button>
@@ -611,7 +611,7 @@ function EmailTemplateSection({
   return (
     <section className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
       <div className="border-b border-slate-100 bg-slate-50/50 px-5 py-4">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-bold text-slate-900">메일 템플릿 (통합)</h2>
             <p className="mt-0.5 text-xs text-slate-500">
@@ -621,7 +621,7 @@ function EmailTemplateSection({
           <button
             type="button"
             onClick={() => setOpen((v) => !v)}
-            className="rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
+            className="shrink-0 whitespace-nowrap rounded-full bg-brand px-4 py-2 text-sm font-semibold text-white shadow-sm transition hover:opacity-95"
           >
             {open ? "닫기" : "템플릿 편집"}
           </button>

@@ -83,7 +83,7 @@ export default function SuccessClient() {
                 <div className="flex justify-between gap-3 py-2.5">
                   <span className="shrink-0 text-sm text-slate-500">{isGallery ? "예상 전시 공간 이용료" : "예상 이용료"}</span>
                   <span className="text-right text-sm font-semibold text-slate-900 tabular-nums">
-                    {estimatedFee.toLocaleString()}원 (담당자 승인 시 확정)
+                    {estimatedFee.toLocaleString()}원 <span className="whitespace-nowrap">(담당자 승인 시 확정)</span>
                     {holidayUnchecked ? <span className="block text-[13px] font-medium text-amber-800">(공휴일 미확인 · 승인 때 확정)</span> : null}
                   </span>
                 </div>

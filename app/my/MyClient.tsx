@@ -1,5 +1,6 @@
 "use client";
 
+import { fmtCreatedAt } from "@/lib/datetime";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
@@ -38,25 +39,6 @@ type MyListGroup = {
     status: string;
   }>;
 };
-
-/** ISO 날짜 → "YYYY.MM.DD HH:MM" (KST) */
-function fmtCreatedAt(iso: string): string {
-  if (!iso) return "-";
-  try {
-    // createdAt은 nowIsoSeoul()이 이미 KST 시각으로 저장한다 → 시차를 다시 더하지 않는다 (진단 #4)
-    const m0 = String(iso).match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
-    if (m0) return `${m0[1]}.${m0[2]}.${m0[3]} ${m0[4]}:${m0[5]}`;
-    const kst = new Date(iso);
-    const y = kst.getUTCFullYear();
-    const m = String(kst.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(kst.getUTCDate()).padStart(2, "0");
-    const h = String(kst.getUTCHours()).padStart(2, "0");
-    const min = String(kst.getUTCMinutes()).padStart(2, "0");
-    return `${y}.${m}.${d} ${h}:${min}`;
-  } catch {
-    return iso;
-  }
-}
 
 type ListOk = { ok: true; scope: "email" | "req"; email: string; current: MyListGroup[]; past: MyListGroup[]; cancelled: MyListGroup[] };
 

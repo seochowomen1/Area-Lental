@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { intakeChannelLabel, isOfflineIntake } from "@/lib/labels";
+import KeepText from "@/components/ui/KeepText";
 
 import PrintActions from "./PrintActions";
 
@@ -198,6 +199,7 @@ export default async function AdminRequestFormPage({
         }}
       />
 
+      <KeepText>
       <main className="mx-auto max-w-[800px] bg-white px-4 py-6 print:px-0 print:py-0">
         {/* ── 인쇄 버튼 ── */}
         <PrintActions />
@@ -236,7 +238,7 @@ export default async function AdminRequestFormPage({
                 </tr>
                 <tr>
                   <th className={TH}>연락처</th>
-                  <td className={TD}>{req.phone}</td>
+                  <td className={TD + " whitespace-nowrap"}>{req.phone}</td>
                   <th className={TH}>E-mail</th>
                   <td className={TD}>{req.email}</td>
                 </tr>
@@ -572,7 +574,7 @@ export default async function AdminRequestFormPage({
             <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
                 <p className="mt-0.5 text-slate-500">
-                  신청번호: {req.requestId} | 출력일: {printDate}
+                  <span className="whitespace-nowrap">신청번호: {req.requestId}</span> | <span className="whitespace-nowrap">출력일: {printDate}</span>
                 </p>
               )}
             </div>
@@ -607,7 +609,7 @@ export default async function AdminRequestFormPage({
                     {req.applicantName}
                   </td>
                   <th className={TH} style={{ width: "14%" }}>연락처</th>
-                  <td className={TD} style={{ width: "36%" }}>{req.phone}</td>
+                  <td className={TD + " whitespace-nowrap"} style={{ width: "36%" }}>{req.phone}</td>
                 </tr>
                 <tr>
                   <th className={TH}>E-mail</th>
@@ -876,7 +878,7 @@ export default async function AdminRequestFormPage({
             <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
                 <p className="mt-0.5 text-slate-500">
-                  신청번호: {req.requestId} | 출력일: {printDate}
+                  <span className="whitespace-nowrap">신청번호: {req.requestId}</span> | <span className="whitespace-nowrap">출력일: {printDate}</span>
                 </p>
               )}
             </div>
@@ -917,7 +919,7 @@ export default async function AdminRequestFormPage({
                 </tr>
                 <tr>
                   <th className={TH}>연락처</th>
-                  <td className={TD}>{req.phone}</td>
+                  <td className={TD + " whitespace-nowrap"}>{req.phone}</td>
                   <th className={TH}>E-mail</th>
                   <td className={TD}>{req.email}</td>
                 </tr>
@@ -1209,7 +1211,7 @@ export default async function AdminRequestFormPage({
             <div className="mt-4 border-t border-slate-300 pt-2 text-xs print:text-[11px] text-slate-600 print:mt-2 print:pt-1">
               {req.requestId && (
                 <p className="mt-0.5 text-slate-500">
-                  신청번호: {req.requestId} | 출력일: {printDate}
+                  <span className="whitespace-nowrap">신청번호: {req.requestId}</span> | <span className="whitespace-nowrap">출력일: {printDate}</span>
                 </p>
               )}
             </div>
@@ -1310,7 +1312,7 @@ export default async function AdminRequestFormPage({
                   <th className={TH} style={{ width: "14%" }}>
                     연락처
                   </th>
-                  <td className={TD}>{req.phone}</td>
+                  <td className={TD + " whitespace-nowrap"}>{req.phone}</td>
                 </tr>
                 <tr>
                   <th className={TH}>서약자</th>
@@ -1348,12 +1350,13 @@ export default async function AdminRequestFormPage({
           <div className="mt-2 text-xs print:text-[11px] text-slate-500">
             {req.requestId && (
               <p className="mt-0.5 text-slate-500">
-                신청번호: {req.requestId} | 출력일: {printDate}
+                <span className="whitespace-nowrap">신청번호: {req.requestId}</span> | <span className="whitespace-nowrap">출력일: {printDate}</span>
               </p>
             )}
           </div>
         </div>
       </main>
+      </KeepText>
     </>
   );
 }

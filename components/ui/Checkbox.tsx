@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import KeepText from "@/components/ui/KeepText";
 import { CHECKBOX_HELP, CHECKBOX_INPUT, CHECKBOX_TEXT, CHECKBOX_WRAP } from "@/components/ui/presets";
 
 export type CheckboxProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "type"> & {
@@ -26,7 +27,7 @@ const Checkbox = React.forwardRef<HTMLInputElement, Props>(
           {...props}
         />
         <span className="min-w-0">
-          <span className={CHECKBOX_TEXT}>{label}</span>
+          <span className={CHECKBOX_TEXT}><KeepText>{label}</KeepText></span>
           {error ? <div className="mt-1 text-xs leading-4 font-semibold text-red-600">{error}</div> : null}
           {!error && help ? <div className={CHECKBOX_HELP}>{help}</div> : null}
         </span>

@@ -1,5 +1,20 @@
 import { operatingNoticeLines } from "@/lib/operating";
 
+/**
+ * linebreak-fix: "토 9:00 ~ 13:00 (일요일·공휴일 휴관)"처럼 끝에 괄호 설명이 붙은 값은
+ * 시간(앞)과 괄호(뒤)를 각각 한 덩어리로 묶고 괄호 설명은 다음 줄로 내린다(문구는 그대로).
+ */
+function OperatingLineText({ text }: { text: string }) {
+  const m = text.match(/^(.*?)\s*(\([^()]*\))$/);
+  if (!m) return <span className="font-medium leading-6 whitespace-nowrap">{text}</span>;
+  return (
+    <span className="font-medium leading-6">
+      <span className="whitespace-nowrap">{m[1]}</span>{" "}
+      <span className="block whitespace-nowrap text-slate-500">{m[2]}</span>
+    </span>
+  );
+}
+
 export default function OperatingHoursNotice(props: { className?: string; variant?: "default" | "compact"; roomId?: string }) {
   const lines = operatingNoticeLines(props.roomId);
 
@@ -32,7 +47,7 @@ export default function OperatingHoursNotice(props: { className?: string; varian
                 <span className="inline-flex h-6 w-fit items-center justify-center rounded-md border border-brand/[0.14] bg-brand/[0.03] px-2 text-xs font-semibold text-brand/[0.85]">
                   {l.label}
                 </span>
-                <span className="font-medium leading-6">{l.text}</span>
+                <OperatingLineText text={l.text} />
               </div>
             ))}
           </div>

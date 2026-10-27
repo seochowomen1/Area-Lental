@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { CARD_BASE, BUTTON_BASE, BUTTON_VARIANT } from "@/components/ui/presets";
 import { getRoom } from "@/lib/space";
 import { PAYMENT_FLOW_TEXT } from "@/lib/policy";
+import KeepText from "@/components/ui/KeepText";
 
 type TabId = "status" | "info" | "rule";
 
@@ -82,6 +83,7 @@ export default function SpaceDetailTabs({
    ─────────────────────────────────────────── */
 function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
+    <KeepText>
     <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>공간정보 및 시설안내</SectionTitle>
 
@@ -175,6 +177,7 @@ function GalleryInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         </p>
       </div>
     </div>
+    </KeepText>
   );
 }
 
@@ -185,6 +188,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
   const isStudio = room?.category === "studio";
 
   return (
+    <KeepText>
     <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>공간정보 및 시설안내</SectionTitle>
 
@@ -304,6 +308,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
         </p>
       </div>
     </div>
+    </KeepText>
   );
 }
 
@@ -312,6 +317,7 @@ function LectureInfoTab({ room }: { room: ReturnType<typeof getRoom> }) {
    ─────────────────────────────────────────── */
 function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
+    <KeepText>
     <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>취소/환불규정</SectionTitle>
 
@@ -368,6 +374,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
         </p>
       </div>
     </div>
+    </KeepText>
   );
 }
 
@@ -376,6 +383,7 @@ function GalleryRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
    ─────────────────────────────────────────── */
 function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
   return (
+    <KeepText>
     <div className={cn(CARD_BASE, "p-5 text-sm text-slate-800")}>
       <SectionTitle>취소/환불규정</SectionTitle>
 
@@ -432,6 +440,7 @@ function LectureRuleTab({ room }: { room: ReturnType<typeof getRoom> }) {
         </p>
       </div>
     </div>
+    </KeepText>
   );
 }
 

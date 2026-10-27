@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { keepUnits } from "@/components/ui/KeepText";
 
 import AdminDiscountFields from "@/components/admin/AdminDiscountFields";
 import BatchActionSection from "@/components/admin/BatchActionSection";
@@ -317,7 +318,7 @@ export default async function AdminRequestDetail({
             <div>
               <span className={`text-sm font-semibold ${accent.text}`}>{categoryLabel}</span>
               <h1 className="text-lg font-bold text-slate-900">
-                {REQUEST_ID_LABEL} {req.requestId}
+                {REQUEST_ID_LABEL} <span className="whitespace-nowrap">{req.requestId}</span>
                 {isGallery && !isBatch && galleryExhibitionDayCount > 0 && (
                   <span className="ml-2 text-sm font-normal text-slate-500">
                     전시 {galleryExhibitionDayCount}일
@@ -504,7 +505,7 @@ export default async function AdminRequestDetail({
             ) : (
               <>
                 {!isBatch && (
-                  <InfoRow label="일시">{req.date} {req.startTime}~{req.endTime}</InfoRow>
+                  <InfoRow label="일시">{keepUnits(`${req.date} ${req.startTime}~${req.endTime}`)}</InfoRow>
                 )}
                 {isBatch && (
                   <InfoRow label="기간">

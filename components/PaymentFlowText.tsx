@@ -1,3 +1,4 @@
+import { keepUnits } from "@/components/ui/KeepText";
 import { PAYMENT_FLOW_EMPHASIS, type PaymentTarget } from "@/lib/policy";
 
 /** 굵게 표시할 부분 — long: "…안에 홈페이지에서 결제" · short: "…안에 결제해야 {예약이|전시가} 확정" (01_spec ③-L 9·10행) */
@@ -13,12 +14,12 @@ export function paymentFlowBold(target: PaymentTarget, variant: "long" | "short"
  */
 export default function PaymentFlowText({ text, bold }: { text: string; bold: string }) {
   const idx = bold ? text.indexOf(bold) : -1;
-  if (idx < 0) return <>{text}</>;
+  if (idx < 0) return <>{keepUnits(text)}</>;
   return (
     <>
-      {text.slice(0, idx)}
-      <b>{bold}</b>
-      {text.slice(idx + bold.length)}
+      {keepUnits(text.slice(0, idx))}
+      <b>{keepUnits(bold)}</b>
+      {keepUnits(text.slice(idx + bold.length))}
     </>
   );
 }

@@ -530,7 +530,7 @@ export default function SpaceBooking({
         <Notice variant="accent" title={`운영시간 안내 (${operatingSummary.label})`}>
           <div className="text-sm font-semibold text-slate-900">{operatingSummary.text}</div>
           <div className="mt-1 text-[13px] text-slate-600">
-            ※ 운영시간 외 시간은 선택할 수 없습니다. (30분 단위)
+            ※ 운영시간 외 시간은 선택할 수 없습니다. <span className="whitespace-nowrap">(30분 단위)</span>
           </div>
         </Notice>
 
@@ -598,7 +598,7 @@ export default function SpaceBooking({
             </div>
 
             <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] text-slate-700">
-              * 최소 <b>1시간</b>, 최대 <b>{durationLimitHours}시간</b>까지 선택할 수 있습니다. (30분 단위)
+              * 최소 <b>1시간</b>, 최대 <b>{durationLimitHours}시간</b>까지 선택할 수 있습니다. <span className="whitespace-nowrap">(30분 단위)</span>
             </div>
 
             {durationMinutes > 0 ? (

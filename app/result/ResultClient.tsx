@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { keepUnits } from "@/components/ui/KeepText";
 import { useSearchParams } from "next/navigation";
 import SiteHeader from "@/components/SiteHeader";
 import Card from "@/components/ui/Card";
@@ -8,6 +9,7 @@ import Button from "@/components/ui/Button";
 import Notice from "@/components/ui/Notice";
 import { FieldLabel, Input } from "@/components/ui/Field";
 import { formatKRW } from "@/lib/pricing";
+import { fmtCreatedAt } from "@/lib/datetime";
 import { cn } from "@/lib/cn";
 import {
   adoptTokenFromUrl,
@@ -420,7 +422,7 @@ export default function ResultClient() {
                           <div className="font-semibold text-slate-900">{data.roomName}</div>
                         </td>
                         <td className="px-3 py-5">
-                          <div className="font-semibold text-slate-900">{dateLabel}</div>
+                          <div className="font-semibold text-slate-900">{keepUnits(dateLabel)}</div>
                           {isGallery && (data.galleryWeekdayCount ?? 0) + (data.gallerySaturdayCount ?? 0) > 0 && (
                             <div className="mt-1 text-xs text-slate-600">
                               평일 {data.galleryWeekdayCount ?? 0}일 · 토 {data.gallerySaturdayCount ?? 0}일
@@ -428,7 +430,7 @@ export default function ResultClient() {
                             </div>
                           )}
                           {!isGallery && !isBatch && (
-                            <div className="mt-1 text-slate-700">
+                            <div className="mt-1 whitespace-nowrap text-slate-700">
                               {data.startTime} ~ {data.endTime}
                             </div>
                           )}
@@ -484,7 +486,7 @@ export default function ResultClient() {
                   <table className="w-full text-sm">
                     <tbody>
                       <Row label="신청번호" value={data.requestId} />
-                      <Row label="신청일시" value={data.createdAt || "-"} />
+                      <Row label="신청일시" value={fmtCreatedAt(data.createdAt || "")} />
                       <Row label="단체명" value={data.orgName || "-"} />
                       <Row label="성명" value={data.applicantName || "-"} />
                       <Row label="연락처" value={data.phone || "-"} />
@@ -626,7 +628,7 @@ export default function ResultClient() {
                           <tr key={s.requestId} className="border-t">
                             <td className="p-3">{s.seq || "-"}</td>
                             <td className="p-3">
-                              {isGallery ? `${s.date} (일 단위)` : `${s.date} ${s.startTime}-${s.endTime}`}
+                              {keepUnits(isGallery ? `${s.date} (일 단위)` : `${s.date} ${s.startTime}-${s.endTime}`)}
                             </td>
                             <td className="p-3">{s.status}</td>
                             <td className="p-3">{s.status === "반려" ? (s.rejectReason || "-") : "-"}</td>
@@ -731,7 +733,7 @@ function Row({ label, value }: { label: string; value: string }) {
   return (
     <tr className="border-b border-slate-200">
       <th className="w-48 bg-slate-50 px-4 py-4 text-left font-semibold">{label}</th>
-      <td className="px-4 py-4 text-slate-900">{value || ""}</td>
+      <td className="px-4 py-4 text-slate-900">{keepUnits(value || "")}</td>
     </tr>
   );
 }

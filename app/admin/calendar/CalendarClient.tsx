@@ -1,6 +1,7 @@
 "use client";
 
 import { adminFetch, isAuthBusyError } from "@/lib/adminFetch";
+import { keepUnits } from "@/components/ui/KeepText";
 import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -529,7 +530,7 @@ export default function CalendarClient({
               </label>
             </div>
 
-            <p className="text-xs text-slate-500">표시 범위: {range.from} ~ {range.to}</p>
+            <p className="text-xs text-slate-500">표시 범위: <span className="whitespace-nowrap">{range.from} ~ {range.to}</span></p>
           </div>
         </div>
 
@@ -688,7 +689,7 @@ export default function CalendarClient({
                     );
                   })}
                   {more > 0 ? (
-                    <div className="text-xs text-slate-500">+{more}건</div>
+                    <div className="whitespace-nowrap text-xs text-slate-500">+{more}건</div>
                   ) : null}
                 </div>
               </button>
@@ -799,7 +800,7 @@ export default function CalendarClient({
                           </span>
                         ) : null}
                       </div>
-                      <div className="mt-1 text-sm text-slate-800">{detailMain}</div>
+                      <div className="mt-1 text-sm text-slate-800">{keepUnits(detailMain)}</div>
                       {detailSub ? <div className="mt-0.5 text-xs text-slate-500">{detailSub}</div> : null}
                     </div>
                   </div>

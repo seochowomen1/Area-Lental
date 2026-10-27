@@ -1,6 +1,7 @@
 import Notice from "@/components/ui/Notice";
 
 import SettingsClient from "@/app/admin/settings/SettingsClient";
+import KeepText from "@/components/ui/KeepText";
 import DataRetentionPanel from "@/components/admin/DataRetentionPanel";
 
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
@@ -100,6 +101,7 @@ export default async function AdminSettingsPage({
 
       <Notice title="안내" variant="info">
         <ul className="list-disc pl-5 space-y-1">
+          <KeepText>
           {category === "gallery" ? (
             <>
               <li><b>내부 전시 일정</b>: 내부(강사·수강생) 전시 일정을 등록하면 해당 기간 동안 외부 전시 신청이 차단됩니다.</li>
@@ -116,6 +118,7 @@ export default async function AdminSettingsPage({
               <li><b>메일 템플릿</b>: 하단에서 접수/승인/반려/취소 시 발송되는 메일 내용을 수정할 수 있습니다 (모든 공간 공통).</li>
             </>
           )}
+          </KeepText>
         </ul>
       </Notice>
 

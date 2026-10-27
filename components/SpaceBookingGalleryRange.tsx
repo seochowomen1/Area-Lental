@@ -305,7 +305,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       <div className="rounded-lg border border-line bg-slate-50 p-4 text-[15px] text-slate-700">
         <p className="font-semibold">우리동네 갤러리(4층) 신청 안내</p>
         <ul className="mt-2 list-disc space-y-1 pl-5 text-sm">
-          <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. (시간 선택 없음)</li>
+          <li>우리동네 갤러리는 <span className="font-semibold">일 단위</span>로 신청합니다. <span className="whitespace-nowrap">(시간 선택 없음)</span></li>
           <li>일요일·공휴일은 휴관으로 자동 제외됩니다.</li>
           <li>준비(세팅)일 1일은 <span className="font-semibold">무료</span>로 포함됩니다. (시작 직전 운영일 · 신청서에서 변경 가능)</li>
           <li>전시 기간은 최대 30일까지 신청할 수 있습니다.</li>

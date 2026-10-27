@@ -1,3 +1,4 @@
+import KeepText from "@/components/ui/KeepText";
 import type { Metadata } from "next";
 import Link from "next/link";
 import SiteHeader from "@/components/SiteHeader";
@@ -19,6 +20,7 @@ export default function PrivacyPolicyPage() {
       <SiteHeader title="개인정보 처리방침" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto w-full max-w-4xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+        <KeepText>
         <div className="rounded-2xl border border-slate-200 bg-white px-6 py-8 shadow-sm sm:px-10 sm:py-10">
           <h2 className="text-xl font-bold text-slate-900">개인정보 처리방침</h2>
           <p className="mt-2 text-sm text-slate-600">
@@ -181,6 +183,7 @@ export default function PrivacyPolicyPage() {
             </table>
           </Section>
         </div>
+        </KeepText>
       </main>
 
       <footer className="border-t border-slate-200 bg-white">

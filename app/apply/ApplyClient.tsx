@@ -1166,7 +1166,7 @@ export default function ApplyClient() {
             ) : null}
 
             <FieldHelp className="mt-2">
-              ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다. (최소 1시간, 최대 6시간)
+              ※ 시간은 <b>30분 단위</b>로 선택할 수 있습니다. <span className="whitespace-nowrap">(최소 1시간, 최대 6시간)</span>
             </FieldHelp>
           </Card>
 

@@ -17,6 +17,22 @@ html, body {
 body {
   background: rgb(var(--brand-bg));
   font-family: var(--font-pretendard), "Pretendard Variable", Pretendard, -apple-system, "Malgun Gothic", sans-serif;
+  /* linebreak-fix: 한글은 어절(띄어쓰기) 단위로 줄바꿈.
+     어절 하나가 칸보다 길면(긴 URL·이메일·신청번호) 그때만 글자 단위로 끊어 넘침을 막는다.
+     anywhere 대신 break-word — 표 칸 최소 폭 계산에 영향을 주지 않아 좁은 칸이 한 글자 폭으로 쪼그라들지 않는다. */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* linebreak-fix: 문단 마지막 줄에 한 어절만 남는 고아 줄을 줄인다(지원 브라우저에서만 적용 · 미지원은 무시).
+   제목은 줄 길이를 고르게. 유틸리티 클래스가 덮어쓸 수 있게 base 레이어에 둔다. */
+@layer base {
+  p, li, dd, dt, td, th, label, figcaption, blockquote {
+    text-wrap: pretty;
+  }
+  h1, h2, h3, h4 {
+    text-wrap: balance;
+  }
 }
 
 /* 달력: 대관불가 표시(사선 패턴) */

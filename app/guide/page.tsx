@@ -1,3 +1,4 @@
+import KeepText, { KeepSegments, keepUnits } from "@/components/ui/KeepText";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import Link from "next/link";
@@ -16,6 +17,7 @@ export default function GuidePage() {
       <SiteHeader title="대관 · 전시 이용 안내" backHref="/" backLabel="홈으로" />
 
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-16 pt-8 sm:px-6 lg:px-8">
+        <KeepText>
         {/* 대관 시설 */}
         <section>
           <SectionTitle>대관 시설 (강의실 · E-스튜디오)</SectionTitle>
@@ -179,6 +181,7 @@ export default function GuidePage() {
             </dl>
           </Card>
         </section>
+        </KeepText>
       </main>
     </div>
   );
@@ -227,12 +230,12 @@ function FacilityCard({
           {floor}
         </span>
       </div>
-      <p className="mt-2 text-sm text-slate-600">{description}</p>
+      <p className="mt-2 text-sm text-slate-600">{keepUnits(description)}</p>
       <dl className="mt-4 space-y-2 text-sm">
         {rows.map(([k, v]) => (
           <div key={k} className="grid grid-cols-[72px_1fr] gap-2">
             <dt className="font-semibold text-slate-500">{k}</dt>
-            <dd className="text-slate-800">{v}</dd>
+            <dd className="text-slate-800"><KeepSegments text={v} /></dd>
           </div>
         ))}
       </dl>

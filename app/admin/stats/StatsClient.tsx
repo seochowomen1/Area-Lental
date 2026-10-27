@@ -1,6 +1,7 @@
 "use client";
 
 import { adminFetch, isAuthBusyError } from "@/lib/adminFetch";
+import KeepText from "@/components/ui/KeepText";
 import { AUTH_STORE_BUSY_MESSAGE } from "@/lib/adminConstants";
 import { useEffect, useMemo, useState } from "react";
 import { cn } from "@/lib/cn";
@@ -317,11 +318,13 @@ export default function StatsClient() {
           </div>
 
           <div className="rounded-lg border border-slate-200 bg-white p-4 text-xs text-slate-500 space-y-1">
+            <KeepText>
             <p><span className="font-semibold text-slate-700">실인원</span>: 해당 월 승인 완료된 개별 신청자 수 (이메일 기준 중복 제거)</p>
             <p><span className="font-semibold text-slate-700">연인원</span>: 해당 월 총 대관(전시) 일수 (회차 수)</p>
             <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.revenue}</span>: 해당 월 총 대관료(갤러리는 이용료) (승인 건 기준, 할인 적용 후)</p>
             <p><span className="font-semibold text-slate-700">{PAYMENT_LABELS.collected}</span>: 결제완료 건의 결제 금액 − 환불 금액 · 결제 미확인 건은 공란 · 2026년 11월 이용분부터 표시</p>
             <p><span className="font-semibold text-ink">강의실+E-스튜디오</span>: 강의실과 E-스튜디오의 합산 실적 (실인원은 이메일 기준 중복 제거)</p>
+            </KeepText>
           </div>
         </div>
       ) : null}
