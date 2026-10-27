@@ -242,3 +242,10 @@ describe("buildWelfareCopy — 강의실 묶음", () => {
     expect(text).toContain("유/무료구분: 무료");
   });
 });
+
+describe("buildProgramName 갤러리 단체명 칸 (2026-10-27)", () => {
+  it("갤러리는 단체명이 있어도 신청자 이름 가운데 마스킹", () => {
+    const r = { roomId: "gallery", roomName: "우리동네 갤러리", applicantName: "이정림", orgName: "이정림外10명", startDate: "2026-12-28", endDate: "2026-12-31", date: "2026-12-28" } as any;
+    expect(buildProgramName([r])).toBe("[전시]26.12.28.(월)~26.12.31.(목) 우리동네갤러리(이*림)");
+  });
+});

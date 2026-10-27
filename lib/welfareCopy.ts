@@ -126,7 +126,9 @@ export function buildProgramName(sessions: RentalRequest[]): string {
   const { from, to } = usageRange(list);
   const prefix = isGallery ? "[전시]" : "[대관]";
   const room = String(first.roomName || first.roomId).replace(/\s+/g, "");
-  return `${prefix}${formatShortRangeKo(from, to)} ${room}(${displayNameFor(first)})`;
+  // 갤러리(전시)는 단체명 칸에 "이정림外10명"처럼 적는 경우가 많아 신청자 이름 가운데 마스킹으로 통일 (2026-10-27 사용자 요청)
+  const who = isGallery ? maskNameMiddle(first.applicantName) || displayNameFor(first) : displayNameFor(first);
+  return `${prefix}${formatShortRangeKo(from, to)} ${room}(${who})`;
 }
 
 /** 이용 시작·종료일 — 갤러리 1행형은 startDate/endDate, 그 외 회차 날짜(준비일 제외) */

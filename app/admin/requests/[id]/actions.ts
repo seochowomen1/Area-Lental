@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { nowIsoSeoul } from "@/lib/datetime";
 
@@ -50,6 +51,14 @@ function sheetBusyUrl(r: RentalRequest) {
 }
 
 /** 단일 처리(승인/반려/취소 등) */
+/**
+ * 저장 성공 후 같은 상세 화면으로 redirect할 때, 브라우저 라우터 캐시에 남은 옛 화면을 버리게 한다.
+ * (2026-10-27: 승인 저장 후 '결제 안내·확인' 칸이 새로고침 전까지 "승인 후에…"로 남던 문제)
+ */
+function revalidateAdmin() {
+  revalidatePath("/admin", "layout");
+}
+
 export async function decideSingleAction(requestId: string, formData: FormData) {
   // ★ audit-fix-1 [7]: 서버 액션도 첫 줄에서 인증 (미들웨어 matcher가 바뀌어도 안전)
   await assertAdminAuth();
@@ -156,6 +165,7 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
   }
 
   const cat = categoryOf(current);
+  revalidateAdmin();
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(cat)}&saved=1`);
 }
 
@@ -246,6 +256,7 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
   }
 
   const catB = categoryOf(current);
+  revalidateAdmin();
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catB)}&saved=1`);
 }
 
@@ -319,6 +330,7 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
     },
   });
 
+  revalidateAdmin();
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
 }
 
@@ -345,6 +357,7 @@ export async function sendConfirmedEmailAction(requestId: string, formData: Form
     details: { to, subject },
   });
 
+  revalidateAdmin();
   redirect(`/admin/requests/${encodeURIComponent(requestId)}?mailed=1`);
 }
 
@@ -419,5 +432,6 @@ export async function recalcGalleryFeeAction(requestId: string, _formData?: Form
     },
   });
 
+  revalidateAdmin();
   redirect(`${backUrl}&saved=recalc`);
 }

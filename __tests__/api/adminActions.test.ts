@@ -8,6 +8,7 @@ jest.mock("next/headers", () => ({
   cookies: () => ({ get: (n: string) => (jar.has(n) ? { name: n, value: jar.get(n) } : undefined) }),
   headers: () => new Headers({ "x-forwarded-for": "10.1.1.1" }),
 }));
+jest.mock("next/cache", () => ({ revalidatePath: jest.fn() }));
 jest.mock("next/navigation", () => ({
   redirect: (url: string) => {
     throw new Error(`REDIRECT:${url}`);
