@@ -189,6 +189,20 @@ export async function middleware(req: NextRequest) {
   url.searchParams.set("next", pathname);
   if (check.reason === "legacy") url.searchParams.set("err", "session_upgraded");
   else if (check.reason === "activity_expired" || check.reason === "activity_missing") url.searchParams.set("err", "session_expired");
+
+  // 서버 액션(폼 [저장] 등 · Next-Action 헤더) 요청에 302를 주면 fetch가 로그인 HTML을 따라가 버려
+  // 화면에서는 "눌러도 아무 일도 없음"이 된다 (2026-10-27 갤러리 승인 저장 무반응 신고).
+  // → Next 클라이언트가 처리하는 x-action-redirect 헤더로 로그인 화면 이동을 지시한다. 액션 본문은 실행되지 않는다.
+  if (req.method === "POST" && req.headers.get("next-action")) {
+    return withSecurityHeaders(
+      clearCookies(
+        new NextResponse(null, {
+          status: 200,
+          headers: { "x-action-redirect": `${url.pathname}${url.search}` },
+        })
+      )
+    );
+  }
   return clearCookies(NextResponse.redirect(url));
 }
 
