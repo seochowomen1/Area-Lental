@@ -38,6 +38,7 @@ import {
 } from "./actions";
 import GalleryHolidayBanner from "@/components/admin/GalleryHolidayBanner";
 import { getGalleryRecalcView } from "@/lib/galleryRecalc";
+import { STALE_WRITE_MESSAGE } from "@/lib/writeExpect";
 
 export const runtime = "nodejs";
 
@@ -96,6 +97,8 @@ export default async function AdminRequestDetail({
           ? "처리 상태 값이 올바르지 않습니다. 저장되지 않았습니다."
           : searchParams?.formError === "sheetBusy"
             ? "시트 저장이 잠시 막혀(요청 한도) 아무것도 바뀌지 않았습니다. 1분 뒤 다시 눌러 주세요."
+            : searchParams?.formError === "stale"
+            ? STALE_WRITE_MESSAGE
             : searchParams?.formError === "noSelection"
               ? "처리할 회차를 1개 이상 선택하세요."
               : searchParams?.formError === "recalcNotAllowed"
@@ -199,6 +202,8 @@ export default async function AdminRequestDetail({
   const decideSingle = decideSingleAction.bind(null, req.requestId);
   const saveBundleMeta = saveBundleMetaAction.bind(null, req.requestId);
   const decideSelectedSessions = decideSelectedSessionsAction.bind(null, req.requestId);
+  /** 화면을 연 시점의 회차별 상태 — 저장 직전 재확인용(audit-fix-3 3-1 · 개인정보 없음) */
+  const viewedStatusesJson = JSON.stringify(Object.fromEntries(sessions.map((s) => [s.requestId, s.status])));
 
   const sessionSelectorRows = isBatch
     ? sessions.map((s, idx) => ({
@@ -765,6 +770,7 @@ export default async function AdminRequestDetail({
                     <p className="mt-1 text-xs text-slate-500">전시 기간 전체({sessions.length}일)를 일괄 처리합니다.</p>
 
                     <form action={decideSelectedSessions} className="mt-4 space-y-4">
+                      <input type="hidden" name="viewedStatuses" value={viewedStatusesJson} />
                       {/* 전체 세션을 hidden으로 전송 */}
                       {sessionSelectorRows.map((s) => (
                         <input key={s.requestId} type="hidden" name="selectedIds" value={s.requestId} />
@@ -788,6 +794,7 @@ export default async function AdminRequestDetail({
                     <h3 className="text-sm font-bold text-slate-800">회차별 승인 / 반려</h3>
 
                     <form action={decideSelectedSessions} className="mt-4 space-y-4">
+                      <input type="hidden" name="viewedStatuses" value={viewedStatusesJson} />
                       <BatchSessionSelector sessions={sessionSelectorRows} />
 
                       <BatchActionSection
@@ -818,6 +825,7 @@ export default async function AdminRequestDetail({
           ) : (
             /* ── 단일 건 처리 ── */
             <form action={decideSingle} className="space-y-5">
+              <input type="hidden" name="viewedStatuses" value={viewedStatusesJson} />
               <div className="grid gap-5 sm:grid-cols-2">
                 <SingleStatusFields
                   defaultStatus={req.status}

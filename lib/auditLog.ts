@@ -46,7 +46,12 @@ export type AuditAction =
   | "PAYMENT_REMINDER_SEND"
   | "REQUEST_DUPLICATE_AUTO_CANCEL"
   // 갤러리 이용료 다시 계산 (audit-fix-2 R2)
-  | "GALLERY_FEE_RECALC";
+  | "GALLERY_FEE_RECALC"
+  // 저장소 안전망 (audit-fix-3 3-1)
+  | "SHEET_BACKUP"
+  | "SHEET_BACKUP_FAIL"
+  | "SHEET_BACKUP_DELETE"
+  | "SCHEDULE_SYNC_START";
 
 /** 시트에 영구 저장할 작업(데이터 변경). 조회성 작업(PI_ACCESS·STATS_VIEW·EXPORT_*)은 로그 폭증 방지를 위해 제외 */
 const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
@@ -80,6 +85,10 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "ADMIN_LOGOUT",
   "REQUEST_DUPLICATE_AUTO_CANCEL",
   "GALLERY_FEE_RECALC",
+  "SHEET_BACKUP",
+  "SHEET_BACKUP_FAIL",
+  "SHEET_BACKUP_DELETE",
+  "SCHEDULE_SYNC_START",
 ]);
 
 /** 감사로그 시트의 작업명 한글 표기 */
@@ -113,7 +122,16 @@ const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   PAYMENT_DEADLINE_AUTO_CANCEL: "결제 기한 경과 자동 취소",
   PAYMENT_REMINDER_SEND: "결제 기한 리마인드",
   GALLERY_FEE_RECALC: "갤러리 이용료 다시 계산",
+  SHEET_BACKUP: "시트 백업",
+  SHEET_BACKUP_FAIL: "시트 백업 실패",
+  SHEET_BACKUP_DELETE: "백업 파일 삭제",
+  SCHEDULE_SYNC_START: "수업시간 동기화 시작",
 };
+
+/** 감사로그 시트에 쓰이는 작업명(한글 표기) — 감사로그를 다시 읽어 찾을 때 쓴다 (audit-fix-3 3-1) */
+export function auditActionLabel(action: AuditAction): string {
+  return ACTION_LABEL[action] ?? action;
+}
 
 export interface AuditEntry {
   action: AuditAction;

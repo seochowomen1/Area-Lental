@@ -4,11 +4,11 @@ import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch, GalleryFeeUpdate } from "@/lib/types";
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { ROOMS } from "@/lib/config";
+import { assertWriteExpect, type WriteExpect } from "@/lib/writeExpect";
 import {
   mock_getAllRequests,
   mock_getRequestById,
   mock_appendRequest,
-  mock_updateRequestStatus,
   mock_updateRequestPayment,
   mock_updateGalleryFee,
   mock_updateRequestsStatusBatch,
@@ -706,147 +706,13 @@ export async function appendRequestsBatch(
   return saved;
 }
 
-/**
- * requests 시트 원본을 읽어 requestId → 실제 행 번호(1-based)와 헤더명 → 열 인덱스(0-based)를 만든다.
- * 빈 행·정렬 변경이 있어도 정확한 행에 쓰기 위한 매핑.
- */
-async function locateRequestRows(): Promise<{ rowOf: Map<string, number>; col: Map<string, number> }> {
-  const env = requireGoogleEnv();
-  const { sheets } = getGoogleClient();
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_REQUESTS}!A:ZZ`
-  });
-  const rows = (res.data.values ?? []) as string[][];
-  const header = (rows[0] ?? []).map((v) => String(v ?? "").trim());
-  const col = new Map<string, number>();
-  header.forEach((h, i) => { if (h && !col.has(h)) col.set(h, i); });
-  const idCol = col.get("requestId");
-  if (idCol === undefined) throw new Error("requests 시트에 'requestId' 헤더가 없습니다.");
-  const rowOf = new Map<string, number>();
-  for (let i = 1; i < rows.length; i++) {
-    const id = String(rows[i]?.[idCol] ?? "").trim();
-    if (id && !rowOf.has(id)) rowOf.set(id, i + 1);
-  }
-  return { rowOf, col };
-}
-
-export async function updateRequestStatus(args: {
-  requestId: string;
-  status: RequestStatus;
-  adminMemo?: string;
-  rejectReason?: string;
-  decidedBy: string;
-  discountRatePct?: number;
-  discountAmountKRW?: number;
-  discountReason?: string;
-}): Promise<RentalRequest> {
-  if (isMockMode()) return mock_updateRequestStatus(args);
-
-  const env = requireGoogleEnv();
-
-  // optional 할인 컬럼이 없다면 헤더에 자동 추가
-  await ensureRequestOptionalHeaders();
-
-  const { sheets } = getGoogleClient();
-  const all = await getAllRequests();
-  const current = all.find(r => r.requestId === args.requestId);
-  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
-
-  // ★ 행 번호는 '필터링된 배열 인덱스'가 아니라 시트 원본에서 실측한다 (2026-10-07 진단 #1)
-  //   빈 행이 끼어 있으면 인덱스+2 방식은 다른 신청자 행에 덮어쓴다.
-  const loc = await locateRequestRows();
-  const rowNumber = loc.rowOf.get(args.requestId);
-  if (!rowNumber) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
-
-  const status = args.status;
-  const statusChanged = current.status !== status;
-  const decidedAt = statusChanged ? nowIsoSeoul() : (current.decidedAt || "");
-  const decidedBy = statusChanged ? args.decidedBy : (current.decidedBy || "");
-
-  // 상태·메모·사유·처리일·처리자: 헤더 이름으로 열을 찾아 갱신 (고정 X..AB 금지)
-  const statusCells: Array<[string, string]> = [
-    ["status", status],
-    ["adminMemo", args.adminMemo ?? ""],
-    ["rejectReason", args.rejectReason ?? ""],
-    ["decidedAt", decidedAt],
-    ["decidedBy", decidedBy],
-  ];
-  const statusData = statusCells.map(([name, value]) => {
-    const ci = loc.col.get(name);
-    if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
-    const letter = colToLetter(ci + 1);
-    return { range: `${SHEET_REQUESTS}!${letter}${rowNumber}:${letter}${rowNumber}`, values: [[value]] };
-  });
-
-  await sheets.spreadsheets.values.batchUpdate({
-    spreadsheetId: env.GOOGLE_SHEET_ID,
-    requestBody: { valueInputOption: "RAW", data: statusData }
-  });
-
-  // discount columns (있을 경우에만 업데이트)
-  // 할인은 '묶음' 단위로 적용되므로, batchId가 있으면 같은 묶음 전체에 동기화합니다.
-  const shouldUpdateDiscount =
-    typeof args.discountRatePct === "number" ||
-    typeof args.discountAmountKRW === "number" ||
-    typeof args.discountReason === "string";
-
-  if (shouldUpdateDiscount) {
-    const m = loc.col;
-
-    const idxRate0 = m.get("discountRatePct");
-    const idxAmt0 = m.get("discountAmountKRW");
-    const idxReason0 = m.get("discountReason");
-
-    const colRate = idxRate0 === undefined ? null : colToLetter(idxRate0 + 1);
-    const colAmt = idxAmt0 === undefined ? null : colToLetter(idxAmt0 + 1);
-    const colReason = idxReason0 === undefined ? null : colToLetter(idxReason0 + 1);
-
-    // 현재 행의 batchId를 기반으로 동기화 대상 행을 결정 (행 번호는 실측 매핑 사용)
-    const target = current;
-    const batchId = (target.batchId ?? "").trim();
-    const rowNumbers = batchId
-      ? all
-          .filter((r) => (r.batchId ?? "").trim() === batchId)
-          .map((r) => loc.rowOf.get(r.requestId) ?? 0)
-          .filter((n) => n > 0)
-      : [rowNumber];
-
-    const rateVal = typeof args.discountRatePct === "number" ? args.discountRatePct : (target.discountRatePct ?? 0);
-    const amtVal = typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (target.discountAmountKRW ?? 0);
-    const reasonVal = typeof args.discountReason === "string" ? args.discountReason : (target.discountReason ?? "");
-
-    const data: any[] = [];
-    for (const rn of rowNumbers) {
-      if (colRate && typeof args.discountRatePct === "number") {
-        data.push({ range: `${SHEET_REQUESTS}!${colRate}${rn}:${colRate}${rn}`, values: [[String(rateVal)]] });
-      }
-      if (colAmt && typeof args.discountAmountKRW === "number") {
-        data.push({ range: `${SHEET_REQUESTS}!${colAmt}${rn}:${colAmt}${rn}`, values: [[String(amtVal)]] });
-      }
-      if (colReason && typeof args.discountReason === "string") {
-        data.push({ range: `${SHEET_REQUESTS}!${colReason}${rn}:${colReason}${rn}`, values: [[reasonVal]] });
-      }
-    }
-
-    if (data.length) {
-      await sheets.spreadsheets.values.batchUpdate({
-        spreadsheetId: env.GOOGLE_SHEET_ID,
-        requestBody: { valueInputOption: "RAW", data }
-      });
-    }
-  }
-
-
-  const updated = await getRequestById(args.requestId);
-  if (!updated) throw new Error("업데이트 후 데이터를 다시 불러오지 못했습니다.");
-  return updated;
-}
+// ★ audit-fix-3 3-1: 단건 updateRequestStatus 삭제 — 모든 상태 변경은 updateRequestsStatusBatch(조건부 쓰기 1회)로.
+//   (단건 함수는 메모를 빼고 부르면 빈칸으로 덮었다)
 
 export type StatusUpdate = {
   requestId: string;
   status: RequestStatus;
-  /** 생략하면 기존 값 유지(단건 updateRequestStatus는 빈칸으로 덮는 것과 다름) */
+  /** 생략하면 기존 값 유지 */
   adminMemo?: string;
   /** 생략하면 기존 값 유지 */
   rejectReason?: string;
@@ -854,7 +720,10 @@ export type StatusUpdate = {
 };
 
 export type BatchDiscount = {
+  /** 묶음 ID — 있으면 그 묶음 전 행 */
   batchId: string;
+  /** batchId가 빈값(단건)일 때 이 1행에 적용 (audit-fix-3 3-1 · 단건 할인도 일괄 함수로) */
+  requestId?: string;
   discountRatePct: number;
   discountAmountKRW: number;
   discountReason: string;
@@ -867,13 +736,15 @@ export type BatchDiscount = {
  * - batchUpdate는 한 번의 요청이라 실패(429 등)하면 시트는 바뀌지 않는다(부분 반영 없음)
  * - discount가 있으면 그 batchId 전 행의 할인 3열도 같은 요청에서 갱신
  * - decidedAt/decidedBy는 상태가 바뀐 행만 갱신(단건과 같은 규칙)
+ * - expect(audit-fix-3 3-1): 방금 읽은 행이 기대와 다르면 쓰기 0 · StaleWriteError
  */
 export async function updateRequestsStatusBatch(
   updates: StatusUpdate[],
   discount?: BatchDiscount,
-  payment?: { requestId: string; patch: PaymentPatch }
+  payment?: { requestId: string; patch: PaymentPatch },
+  expect?: WriteExpect
 ): Promise<RentalRequest[]> {
-  if (isMockMode()) return mock_updateRequestsStatusBatch(updates, discount, payment);
+  if (isMockMode()) return mock_updateRequestsStatusBatch(updates, discount, payment, expect);
   if (!updates.length && !discount && !payment) return [];
 
   const env = requireGoogleEnv();
@@ -900,6 +771,10 @@ export async function updateRequestsStatusBatch(
     if (!byId.has(u.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${u.requestId}`);
     if (!rowOf.get(u.requestId)) throw new Error(`시트에서 해당 신청건의 행을 찾지 못했습니다: ${u.requestId}`);
   }
+  if (payment && !byId.has(payment.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${payment.requestId}`);
+  // 2) 저장 직전 상태 재확인 (조건부 쓰기 · audit-fix-3 3-1) — 어긋나면 아무것도 쓰지 않음
+  assertWriteExpect(all, updates.map((u) => u.requestId), payment?.requestId ?? updates[0]?.requestId, expect);
+
   const cellRange = (name: string, rn: number) => {
     const ci = col.get(name);
     if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
@@ -933,9 +808,12 @@ export async function updateRequestsStatusBatch(
     );
   }
 
-  if (discount && discount.batchId.trim()) {
+  if (discount && (discount.batchId.trim() || discount.requestId)) {
     const bid = discount.batchId.trim();
-    for (const r of all.filter((x) => (x.batchId ?? "").trim() === bid)) {
+    const discountRows = bid
+      ? all.filter((x) => (x.batchId ?? "").trim() === bid)
+      : all.filter((x) => x.requestId === discount.requestId);
+    for (const r of discountRows) {
       const rn = rowOf.get(r.requestId);
       if (!rn) continue;
       data.push(
@@ -1050,52 +928,15 @@ export async function addRevokedAdminSession(entry: { sid: string; exp: string }
 }
 
 /**
- * 결제 기록 필드 갱신 (2026-10-26)
+ * 결제 기록 필드 갱신 (2026-10-26 · audit-fix-3 3-1에서 일괄 함수로 통일)
  * - 묶음(batchId)이면 같은 묶음 전 행에 동일 값 기록(할인 필드와 같은 규칙)
  * - 열은 헤더 이름으로 찾는다(고정 열 금지). 없는 열은 ensureRequestOptionalHeaders가 끝에 추가.
  * - patch 값 null/"" → 빈칸(비움). undefined → 건드리지 않음.
+ * - 시트 호출: 읽기 1 + batchUpdate 1 (예전: 읽기 3) · expect가 어긋나면 쓰기 0 · StaleWriteError
  */
-export async function updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]> {
+export async function updateRequestPayment(args: { requestId: string; patch: PaymentPatch; expect?: WriteExpect }): Promise<RentalRequest[]> {
   if (isMockMode()) return mock_updateRequestPayment(args);
-
-  const env = requireGoogleEnv();
-  await ensureRequestOptionalHeaders();
-
-  const { sheets } = getGoogleClient();
-  const all = await getAllRequests();
-  const current = all.find((r) => r.requestId === args.requestId);
-  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
-
-  const loc = await locateRequestRows();
-  const batchId = (current.batchId ?? "").trim();
-  const targets = batchId ? all.filter((r) => (r.batchId ?? "").trim() === batchId) : [current];
-  const rowNumbers = targets.map((r) => loc.rowOf.get(r.requestId) ?? 0).filter((n) => n > 0);
-  if (!rowNumbers.length) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
-
-  const data: Array<{ range: string; values: string[][] }> = [];
-  for (const k of PAYMENT_FIELD_KEYS) {
-    if (!(k in args.patch)) continue;
-    const v = args.patch[k];
-    if (v === undefined) continue;
-    const ci = loc.col.get(k);
-    if (ci === undefined) throw new Error(`requests 시트에 '${k}' 헤더가 없습니다.`);
-    const letter = colToLetter(ci + 1);
-    const value = v === null ? "" : String(v);
-    for (const rn of rowNumbers) {
-      data.push({ range: `${SHEET_REQUESTS}!${letter}${rn}:${letter}${rn}`, values: [[value]] });
-    }
-  }
-
-  if (data.length) {
-    await sheets.spreadsheets.values.batchUpdate({
-      spreadsheetId: env.GOOGLE_SHEET_ID,
-      requestBody: { valueInputOption: "RAW", data },
-    });
-  }
-
-  const refreshed = await getAllRequests();
-  const ids = new Set(targets.map((t) => t.requestId));
-  return refreshed.filter((r) => ids.has(r.requestId));
+  return updateRequestsStatusBatch([], undefined, { requestId: args.requestId, patch: args.patch }, args.expect);
 }
 
 /**
@@ -1296,7 +1137,10 @@ export async function updateClassSchedule(id: string, updates: Partial<Omit<Clas
 }
 
 /**
- * 출처(source)가 같은 행을 모두 지우고 새 항목을 한 번에 추가한다 — 업무 시스템 동기화용.
+ * 출처(source)가 같은 행을 새 항목으로 갈아끼운다 — 업무 시스템 동기화용 (audit-fix-3 3-1: "추가하고 지움")
+ * 1) 옛 행의 id를 기억 → 2) 새 행 추가(실패하면 throw · 옛 행 그대로) → 3) 다시 읽어 옛 id 행만 아래부터 삭제.
+ * - 삭제는 행 번호가 아니라 id로 다시 찾는다(추가 중 행이 밀려도 다른 행을 지우지 않음).
+ * - 삭제가 실패하면 옛 행·새 행이 함께 남는다(차단이 겹칠 뿐 빠지지 않음) → 다음 동기화가 정리.
  * 수동 등록 행(source 빈칸)은 건드리지 않는다.
  */
 export async function replaceClassSchedulesBySource(
@@ -1312,42 +1156,58 @@ export async function replaceClassSchedulesBySource(
   const { sheets } = getGoogleClient();
   const header = await ensureScheduleHeaders();
   const sourceCol = header.indexOf("source");
+  const idCol = header.indexOf("id");
+  const range = `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`;
 
-  const res = await sheets.spreadsheets.values.get({
-    spreadsheetId: env.GOOGLE_SHEET_ID,
-    range: `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`
-  });
-  const rows = (res.data.values ?? []) as string[][];
-  const targets = rows
-    .map((r, i) => ({ i, src: String(r[sourceCol] ?? "").trim() }))
-    .filter((x) => x.i > 0 && x.src === source)
-    .map((x) => x.i)
-    .sort((a, b) => b - a); // 아래 행부터 지워야 인덱스가 밀리지 않음
+  const readRows = async () =>
+    ((await sheets.spreadsheets.values.get({ spreadsheetId: env.GOOGLE_SHEET_ID, range })).data.values ?? []) as string[][];
 
-  if (targets.length) {
-    const sheetId = await getSheetIdByTitle(SHEET_SCHEDULE);
-    await sheets.spreadsheets.batchUpdate({
-      spreadsheetId: env.GOOGLE_SHEET_ID,
-      requestBody: {
-        requests: targets.map((rowIndex) => ({
-          deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 } }
-        }))
-      }
-    });
-  }
+  // 1) 옛 행 id
+  const before = await readRows();
+  const oldIds = new Set(
+    before
+      .slice(1)
+      .filter((r) => String(r[sourceCol] ?? "").trim() === source)
+      .map((r) => String(r[idCol] ?? "").trim())
+      .filter(Boolean)
+  );
 
+  // 2) 새 행 추가 — 실패하면 여기서 throw(옛 행은 그대로)
   if (items.length) {
     const stamp = Date.now();
     const values = items.map((s, i) => scheduleToRow(header, { id: `CS-${stamp}-${String(i).padStart(3, "0")}`, ...s, source }));
     await sheets.spreadsheets.values.append({
       spreadsheetId: env.GOOGLE_SHEET_ID,
-      range: `${SHEET_SCHEDULE}!A:${colToLetter(header.length)}`,
+      range,
       valueInputOption: "RAW",
       requestBody: { values }
     });
   }
 
-  return { deleted: targets.length, added: items.length };
+  // 3) 옛 행 삭제 — 다시 읽어 id로 찾고 아래 행부터
+  let deleted = 0;
+  if (oldIds.size) {
+    const after = await readRows();
+    const targets = after
+      .map((r, i) => ({ i, id: String(r[idCol] ?? "").trim(), src: String(r[sourceCol] ?? "").trim() }))
+      .filter((x) => x.i > 0 && x.src === source && oldIds.has(x.id))
+      .map((x) => x.i)
+      .sort((a, b) => b - a);
+    if (targets.length) {
+      const sheetId = await getSheetIdByTitle(SHEET_SCHEDULE);
+      await sheets.spreadsheets.batchUpdate({
+        spreadsheetId: env.GOOGLE_SHEET_ID,
+        requestBody: {
+          requests: targets.map((rowIndex) => ({
+            deleteDimension: { range: { sheetId, dimension: "ROWS", startIndex: rowIndex, endIndex: rowIndex + 1 } }
+          }))
+        }
+      });
+      deleted = targets.length;
+    }
+  }
+
+  return { deleted, added: items.length };
 }
 
 async function getSheetIdByTitle(title: string): Promise<number> {
@@ -1679,7 +1539,11 @@ export async function appendAuditRow(row: {
   details: string;
   ip: string;
 }): Promise<void> {
-  if (isMockMode()) return;
+  if (isMockMode()) {
+    // audit-fix-3 3-1: 로컬 모의 모드에서도 백업 상태·동기화 잠금을 확인할 수 있게 .mockdb.json에 남긴다
+    const { mock_appendAuditRow } = await import("./mockdb");
+    return mock_appendAuditRow(row);
+  }
   await ensureAuditSheet();
   const env = requireGoogleEnv();
   const { sheets } = getGoogleClient();
@@ -1689,4 +1553,58 @@ export async function appendAuditRow(row: {
     valueInputOption: "RAW",
     requestBody: { values: [[row.timestamp, row.action, row.target, row.actor, row.summary, row.details, row.ip]] },
   });
+}
+
+/**
+ * 감사로그 끝부분 읽기(시각·작업명 2열만) — 백업 상태·동기화 잠금 판단용 (audit-fix-3 3-1)
+ * - 최신이 뒤. 탭이 없으면 빈 목록. 셀 값(요약·상세)은 읽지 않는다.
+ */
+export async function getAuditTail(maxRows = 2000): Promise<Array<{ timestamp: string; action: string; target: string }>> {
+  if (isMockMode()) {
+    const { mock_getAuditRows } = await import("./mockdb");
+    return (await mock_getAuditRows()).slice(-maxRows).map((r) => ({ timestamp: r.timestamp, action: r.action, target: r.target }));
+  }
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  let rows: string[][] = [];
+  try {
+    const res = await sheets.spreadsheets.values.get({ spreadsheetId: env.GOOGLE_SHEET_ID, range: `${SHEET_AUDIT}!A:C` });
+    rows = (res.data.values ?? []) as string[][];
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/Unable to parse range|not found/i.test(msg)) return [];
+    throw e;
+  }
+  return rows
+    .slice(1)
+    .slice(-maxRows)
+    .map((r) => ({ timestamp: String(r?.[0] ?? ""), action: String(r?.[1] ?? ""), target: String(r?.[2] ?? "") }));
+}
+
+/**
+ * 백업용 — 스프레드시트의 모든 탭을 값 그대로 읽는다 (audit-fix-3 3-1)
+ * - 시트 호출: spreadsheets.get 1(탭 목록) + values.batchGet 1
+ * - 반환 순서 = 시트 탭 순서. rows[0] = 헤더(시트 첫 행 그대로)
+ */
+export async function readAllTabsForBackup(): Promise<Array<{ title: string; rows: string[][] }>> {
+  if (isMockMode()) {
+    const { mock_exportTabs } = await import("./mockdb");
+    return mock_exportTabs();
+  }
+  const env = requireGoogleEnv();
+  const { sheets } = getGoogleClient();
+  const meta = await sheets.spreadsheets.get({ spreadsheetId: env.GOOGLE_SHEET_ID, fields: "sheets.properties.title" });
+  const titles = (meta.data.sheets ?? []).map((s) => s.properties?.title ?? "").filter(Boolean);
+  if (!titles.length) return [];
+  const quoted = titles.map((t) => `'${t.replace(/'/g, "''")}'`);
+  const res = await sheets.spreadsheets.values.batchGet({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    ranges: quoted,
+    valueRenderOption: "FORMATTED_VALUE",
+  });
+  const ranges = res.data.valueRanges ?? [];
+  return titles.map((title, i) => ({
+    title,
+    rows: ((ranges[i]?.values ?? []) as unknown[][]).map((r) => r.map((v) => (v === null || v === undefined ? "" : String(v)))),
+  }));
 }

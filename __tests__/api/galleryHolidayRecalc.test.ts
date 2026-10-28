@@ -62,7 +62,7 @@ async function seedGallery(audit: Record<string, unknown>, extra: Record<string,
     orgName: "개인", headcount: 10, equipment: { laptop: false, projector: false, audio: false }, purpose: "테스트",
     attachments: [], privacyAgree: true, pledgeAgree: true, pledgeDate: "2026-10-27", pledgeName: "홍가명",
   });
-  if (extra.status) await db().updateRequestStatus({ requestId: row.requestId, status: extra.status, decidedBy: "시설총무" });
+  if (extra.status) await db().updateRequestsStatusBatch([{ requestId: row.requestId, status: extra.status, decidedBy: "시설총무" }]);
   if (extra.patch) await db().updateRequestPayment({ requestId: row.requestId, patch: extra.patch });
   return row.requestId as string;
 }

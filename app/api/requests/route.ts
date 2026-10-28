@@ -23,7 +23,7 @@ import type { IntakeChannel, RentalRequest } from "@/lib/types";
 import type { RequestStatus } from "@/lib/types";
 import { REQUEST_LIMITS, TIME_CONSTANTS } from "@/lib/constants";
 import { getRoom } from "@/lib/space";
-import { bundleKey } from "@/lib/payment";
+import { bundleKey, DUPLICATE_CANCEL_DECIDED_BY, DUPLICATE_CANCEL_REASON } from "@/lib/payment";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
 import { recordAudit } from "@/lib/auditLog";
 
@@ -69,8 +69,8 @@ function nonexistentDateMessage(s: string) {
 
 const UNKNOWN_ROOM_MESSAGE = "신청할 수 없는 공간입니다. 공간 목록에서 다시 선택해 주세요.";
 /** [2] 동시 신청 중복 자동 취소 */
-const DUPLICATE_DECIDED_BY = "시스템";
-const DUPLICATE_REASON = "동시 신청 중복 — 먼저 접수된 신청이 있어 자동 취소";
+const DUPLICATE_DECIDED_BY = DUPLICATE_CANCEL_DECIDED_BY;
+const DUPLICATE_REASON = DUPLICATE_CANCEL_REASON;
 const SLOT_TAKEN_MESSAGE = {
   time: "방금 다른 분이 같은 시간을 먼저 신청했습니다. 신청은 접수되지 않았습니다. 달력에서 다른 시간을 골라 주세요.",
   period: "방금 다른 분이 같은 기간을 먼저 신청했습니다. 신청은 접수되지 않았습니다. 달력에서 다른 기간을 골라 주세요.",

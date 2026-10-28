@@ -14,6 +14,10 @@ export const PAYMENT_METHODS: readonly PaymentMethod[] = ["홈페이지 온라�
 /** 자동 취소 시 decidedBy 고정 문구 */
 export const AUTO_CANCEL_DECIDED_BY = "시스템(결제 기한 경과)";
 
+/** 동시 신청 중복 자동 취소(audit-fix-1 [2]) decidedBy·사유 고정 문구 — 신청 라우트와 재검토 기준 집계(3-1)가 같이 쓴다 */
+export const DUPLICATE_CANCEL_DECIDED_BY = "시스템";
+export const DUPLICATE_CANCEL_REASON = "동시 신청 중복 — 먼저 접수된 신청이 있어 자동 취소";
+
 /** 자동 취소 사유 고정 문구 */
 export function autoCancelReason(dueDate: string): string {
   return `결제 기한(${dueDate}) 경과로 자동 취소`;

@@ -113,3 +113,55 @@ test("대상 중 하나라도 없으면 아무것도 쓰지 않는다", async ()
   ).rejects.toThrow(/찾을 수 없습니다/);
   expect(calls.batchUpdate).toBe(0);
 });
+
+/* ── audit-fix-3 3-1: 조건부 쓰기 · 결제 단독 갱신도 같은 경로 ── */
+test("expect 불일치 → StaleWriteError · batchUpdate 0회", async () => {
+  sheetRows = makeRows(3, "BAT-T");
+  const statusCol = HEADER.indexOf("status");
+  sheetRows[2][statusCol] = "반려"; // 다른 창이 먼저 반려
+  await expect(
+    updateRequestsStatusBatch(
+      sheetRows.slice(1).map((r) => ({ requestId: r[0], status: "승인" as const, decidedBy: "관리자" })),
+      undefined,
+      undefined,
+      { statusById: { "REQ-T-1": "접수", "REQ-T-2": "접수", "REQ-T-3": "접수" } }
+    )
+  ).rejects.toMatchObject({ code: "STALE_WRITE" });
+  expect(calls.batchUpdate).toBe(0);
+});
+
+test("크론 조건: 결제완료 묶음은 쓰지 않음 · 미결제면 1회 쓰기", async () => {
+  sheetRows = makeRows(2, "BAT-T");
+  const psCol = HEADER.indexOf("paymentStatus");
+  const cron = { status: ["승인" as const], paymentStatus: ["" as const, "미결제" as const], autoCancelledAtEmpty: true };
+  for (const r of sheetRows.slice(1)) r[HEADER.indexOf("status")] = "승인";
+  for (const r of sheetRows.slice(1)) r[psCol] = "결제완료";
+  await expect(
+    updateRequestsStatusBatch([{ requestId: "REQ-T-1", status: "취소", decidedBy: "시스템" }], undefined, { requestId: "REQ-T-1", patch: { autoCancelledAt: "x" } }, cron)
+  ).rejects.toMatchObject({ code: "STALE_WRITE" });
+  expect(calls.batchUpdate).toBe(0);
+
+  for (const r of sheetRows.slice(1)) r[psCol] = "";
+  await updateRequestsStatusBatch([{ requestId: "REQ-T-1", status: "취소", decidedBy: "시스템" }], undefined, { requestId: "REQ-T-1", patch: { autoCancelledAt: "x" } }, cron);
+  expect(calls.batchUpdate).toBe(1);
+});
+
+test("updateRequestPayment = 읽기 1(+헤더) · batchUpdate 1 · 묶음 전 행", async () => {
+  sheetRows = makeRows(4, "BAT-T");
+  const { updateRequestPayment } = require("@/lib/sheets");
+  const out = await updateRequestPayment({ requestId: "REQ-T-2", patch: { paymentDueDate: "2026-11-03" } });
+  expect(calls.batchUpdate).toBe(1);
+  expect(calls.get.filter((g) => g === "requests!A:ZZ")).toHaveLength(1);
+  expect(out).toHaveLength(4);
+  expect(out.every((r: { paymentDueDate?: string }) => r.paymentDueDate === "2026-11-03")).toBe(true);
+});
+
+test("단건 할인(batchId 빈값) → 그 1행만", async () => {
+  sheetRows = makeRows(1, "");
+  const out = await updateRequestsStatusBatch(
+    [{ requestId: "REQ-T-1", status: "승인", decidedBy: "관리자" }],
+    { batchId: "", requestId: "REQ-T-1", discountRatePct: 50, discountAmountKRW: 10000, discountReason: "협약" }
+  );
+  expect(calls.batchUpdate).toBe(1);
+  expect(out[0]).toMatchObject({ status: "승인", discountRatePct: 50, discountAmountKRW: 10000, discountReason: "협약" });
+});

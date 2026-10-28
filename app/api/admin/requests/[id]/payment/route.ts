@@ -76,7 +76,15 @@ export async function POST(req: Request, { params }: { params: { id: string } })
       refundAmountKRW: null,
       refundReason: null,
     };
-    const updated = await db.updateRequestPayment({ requestId: loaded.current.requestId, patch });
+    // ★ audit-fix-3 3-1: 저장 직전 재확인 — 읽은 뒤 자동 취소(크론)나 다른 창이 먼저 저장했으면 쓰지 않고 409 STALE_WRITE
+    const updated = await db.updateRequestPayment({
+      requestId: loaded.current.requestId,
+      patch,
+      expect: {
+        paymentStatus: isUpdate ? [view.paymentStatus] : ["", "미결제"],
+        autoCancelledAtEmpty: true,
+      },
+    });
     const rep = updated.find((r) => r.requestId === loaded.current.requestId) ?? updated[0];
 
     const amountDiffKRW = approvedFeeKRW - amount;

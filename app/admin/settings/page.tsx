@@ -3,6 +3,9 @@ import Notice from "@/components/ui/Notice";
 import SettingsClient from "@/app/admin/settings/SettingsClient";
 import KeepText from "@/components/ui/KeepText";
 import DataRetentionPanel from "@/components/admin/DataRetentionPanel";
+import BackupStatusBar, { type BackupStatusProps } from "@/components/admin/BackupStatusBar";
+import { getBackupOverview, storageReviewStats } from "@/lib/backup";
+import { DUPLICATE_CANCEL_DECIDED_BY, DUPLICATE_CANCEL_REASON } from "@/lib/payment";
 
 import { getCategoryLabel, getRoomsByCategory, normalizeRoomCategory, type RoomCategory } from "@/lib/space";
 import { getDatabase } from "@/lib/database";
@@ -60,7 +63,27 @@ export default async function AdminSettingsPage({
   const allRooms = categoryRooms.length > 1
     ? [{ id: "all", name: "전체" }, ...categoryRooms]
     : categoryRooms;
-  const [schedules, blocks] = await Promise.all([db.getClassSchedules(), db.getBlocks()]);
+  const [schedules, blocks, allRequests] = await Promise.all([db.getClassSchedules(), db.getBlocks(), db.getAllRequests()]);
+
+  // audit-fix-3 3-1: 맨 위 백업 상태 줄 + 저장소 재검토 기준 줄 (드라이브·감사로그를 읽지 못해도 설정 화면은 열린다)
+  const review = storageReviewStats(allRequests, { decidedBy: DUPLICATE_CANCEL_DECIDED_BY, reason: DUPLICATE_CANCEL_REASON });
+  let backupProps: BackupStatusProps;
+  try {
+    const o = await getBackupOverview();
+    backupProps = {
+      configured: o.configured,
+      lastSuccessAt: o.lastSuccessAt,
+      lastFailureAt: o.lastFailureAt,
+      failedSinceSuccess: o.failedSinceSuccess,
+      count: o.count,
+      old: o.old.map(({ fileId, name }) => ({ fileId, name })),
+      folderUrl: o.folderUrl,
+      listError: o.listError,
+      ...review,
+    };
+  } catch {
+    backupProps = { configured: true, lastSuccessAt: null, lastFailureAt: null, failedSinceSuccess: false, count: 0, old: [], folderUrl: null, listError: true, ...review };
+  }
   let healthLine: ReturnType<typeof holidayHealthLine>;
   try {
     healthLine = holidayHealthLine(await getHolidayHealth());
@@ -70,6 +93,9 @@ export default async function AdminSettingsPage({
 
   return (
     <div className="mx-auto max-w-5xl pb-16 pt-2">
+      {/* audit-fix-3 3-1: 시트 백업 상태 줄 — 설정 화면 맨 위 */}
+      <BackupStatusBar {...backupProps} />
+
       {/* 카테고리 헤더 */}
       <div className={`rounded-xl border ${accent.border} ${accent.bg} p-4 mb-3`}>
         <div className="flex items-center gap-3">

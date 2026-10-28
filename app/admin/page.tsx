@@ -7,6 +7,8 @@ import { getDatabase } from "@/lib/database";
 import { summarizePaymentChips } from "@/lib/payment";
 import { getRoomsByCategory } from "@/lib/space";
 import { assertAdminAuth } from "@/lib/adminAuth";
+import { getBackupHealth } from "@/lib/backup";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -15,6 +17,8 @@ export default async function AdminHomePage() {
   await assertAdminAuth();
   const db = getDatabase();
   const allRequests = await db.getAllRequests();
+  // audit-fix-3 3-1: 마지막 백업 성공이 36시간을 넘으면 노란 띠 1줄 (감사로그만 읽음 · 5분 캐시 · 실패 시 띠 없음)
+  const backupHealth = await getBackupHealth();
 
   // 카테고리별 대기(접수) 건수
   const lectureRoomIds = new Set(getRoomsByCategory("lecture").map((r) => r.id));
@@ -46,6 +50,16 @@ export default async function AdminHomePage() {
 
   return (
     <div className="space-y-4">
+      {backupHealth.show && (
+        <p role="status" className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[15px] font-semibold text-amber-900">
+          <span>
+            {backupHealth.kind === "stale"
+              ? "시트 백업이 하루 넘게 되지 않았습니다. 설정에서 확인해 주세요."
+              : "시트 백업이 아직 한 번도 되지 않았습니다. 설정에서 확인해 주세요."}
+          </span>
+          <Link href="/admin/settings" className="underline underline-offset-2">설정으로 가기</Link>
+        </p>
+      )}
       {expiredCount > 0 && (
         <Notice title="개인정보 보존기한 만료 안내" variant="warn">
           <p>

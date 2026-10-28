@@ -2,10 +2,10 @@ import { NextResponse } from "next/server";
 import { getDatabase } from "@/lib/database";
 import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import { cronAuthOk } from "@/lib/cronAuth";
-import { auditLog } from "@/lib/auditLog";
+import { recordAudit } from "@/lib/auditLog";
 import { getClientIp } from "@/lib/rateLimit";
 import { handleApiError, jsonError } from "@/lib/apiResponse";
-import { classroomSyncConfigured, runClassroomSync } from "@/lib/classroomSync";
+import { acquireSyncSlot, classroomSyncConfigured, runClassroomSync, SYNC_RUNNING_MESSAGE } from "@/lib/classroomSync";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,17 +21,29 @@ async function handle(req: Request) {
   if (!classroomSyncConfigured()) {
     return jsonError("업무 시스템 연동이 설정되지 않았습니다. (CLASSROOM_SYNC_URL / CLASSROOM_SYNC_TOKEN)", 503, "NOT_CONFIGURED");
   }
+  const ip = getClientIp(req);
+
+  // ★ audit-fix-3 3-1: 동시 실행 방지 — 60초 안 재실행 거부(409 SYNC_RUNNING)
+  const slot = await acquireSyncSlot({
+    recordStart: () =>
+      recordAudit({ action: "SCHEDULE_SYNC_START", ip, actor: trigger === "cron" ? "시스템" : undefined, target: "classroom", details: { trigger } }),
+  });
+  if (!slot.ok) return jsonError(SYNC_RUNNING_MESSAGE, 409, "SYNC_RUNNING");
+
   try {
     const result = await runClassroomSync(getDatabase());
-    auditLog({
+    await recordAudit({
       action: "SCHEDULE_SYNC",
-      ip: getClientIp(req),
+      ip,
+      actor: trigger === "cron" ? "시스템" : undefined,
       target: `classroom:${result.quarters.join(",") || "-"}`,
       details: { trigger, received: result.received, produced: result.produced, deleted: result.deleted, added: result.added },
     });
     return NextResponse.json({ ok: true, result });
   } catch (e: unknown) {
     return handleApiError(e, "업무 시스템 동기화");
+  } finally {
+    slot.release();
   }
 }
 

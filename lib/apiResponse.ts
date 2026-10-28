@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { isStaleWriteError, STALE_WRITE_CODE, STALE_WRITE_MESSAGE } from "@/lib/writeExpect";
 
 /**
  * API 라우트 공통 응답/에러 유틸리티
@@ -36,6 +37,11 @@ export function jsonOk<T extends Record<string, unknown>>(data?: T): NextRespons
  * - 일관된 응답 형식
  */
 export function handleApiError(e: unknown, context: string): NextResponse {
+  // audit-fix-3 3-1: 조건부 쓰기 불일치 — 아무것도 쓰지 않았음을 알리는 409 (오류 로그 아님)
+  if (isStaleWriteError(e)) {
+    logger.warn(`${context}: 저장 직전 상태가 달라 쓰지 않음(STALE_WRITE)`, { mismatches: e.mismatches?.slice(0, 5) });
+    return jsonError(STALE_WRITE_MESSAGE, 409, STALE_WRITE_CODE);
+  }
   const err = e instanceof Error ? e : new Error(String(e));
   const errWithCode = e as { code?: string };
 

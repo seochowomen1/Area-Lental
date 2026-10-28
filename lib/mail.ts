@@ -558,9 +558,11 @@ export async function sendAdminPaymentDeadlineSummaryEmail(result: {
   candidates: number;
   cancelled: Array<{ key: string; requestIds: string[]; roomName: string; paymentDueDate: string; approvedCount: number; mailOk: boolean | null }>;
   skippedOverCap: number;
+  skippedStale?: number;
   reminders: { enabled: boolean; sent: number; failed: number };
   errors: Array<{ key: string; stage: string; message: string }>;
 }) {
+  const stale = result.skippedStale ?? 0;
   const smtp = getSmtpEnvOptional();
   const to = smtp?.ADMIN_NOTIFY_EMAIL ?? "admin@example.com";
   const base = getBaseEnv();
@@ -572,7 +574,8 @@ export async function sendAdminPaymentDeadlineSummaryEmail(result: {
 `결제 기한 경과 자동 취소 실행 결과입니다. (${result.today})
 
 - 대상 ${result.candidates}건 · 취소 ${result.cancelled.length}건 · 상한 초과로 다음 실행에 넘긴 건 ${result.skippedOverCap}건
-- 리마인드: ${result.reminders.enabled ? `발송 ${result.reminders.sent} · 실패 ${result.reminders.failed}` : "꺼짐"}
+${stale ? `- 묶음 안 회차끼리 결제 기한·기록이 달라 건너뛴 묶음 ${stale}건 — 상세 화면에서 기한을 다시 저장해 주세요
+` : ""}- 리마인드: ${result.reminders.enabled ? `발송 ${result.reminders.sent} · 실패 ${result.reminders.failed}` : "꺼짐"}
 
 [취소된 신청 — 복지종합시스템·홈페이지 강좌는 자동으로 닫히지 않습니다. 마감·미게시로 바꾼 뒤 상세 4단계를 눌러 주세요]
 ${lines.length ? lines.join("\n") : "  (없음)"}
@@ -591,4 +594,27 @@ export async function sendApplicantDecisionEmailBatch(reqs: RentalRequest[]) {
 /** 관리자가 수정한 내용으로 메일을 발송합니다 */
 export async function sendCustomDecisionEmail(to: string, subject: string, body: string) {
   await maybeSend({ to, subject, text: body });
+}
+
+/**
+ * 시트 백업 실패 관리자 알림 (audit-fix-3 3-1) — 오류 코드·시각만(셀 값·개인정보 없음)
+ */
+export async function sendAdminBackupFailEmail(args: { at: string; code: string; lastSuccessAt: string | null }) {
+  const smtp = getSmtpEnvOptional();
+  const to = smtp?.ADMIN_NOTIFY_EMAIL ?? "admin@example.com";
+  const base = getBaseEnv();
+  const subject = `[대관 앱] 시트 백업 실패 · ${args.at}`;
+  const text =
+`매일 새벽 시트 백업이 실패했습니다.
+
+- 시각: ${args.at}
+- 원인 코드: ${args.code}
+- 마지막 성공: ${args.lastSuccessAt ?? "없음"}
+
+관리자 화면 > 설정 맨 위에서 [지금 백업]을 눌러 다시 시도해 주세요.
+계속 실패하면 Google 드라이브 연결(첨부 업로드와 같은 설정)을 확인해야 합니다.
+
+관리자: ${base.APP_BASE_URL}/admin/settings
+`;
+  await maybeSend({ to, subject, text });
 }

@@ -160,7 +160,7 @@ describe("runPaymentDeadline — 묶음당 쓰기 1회", () => {
     else process.env.PAYMENT_AUTO_CANCEL_SINCE = prevSince;
   });
 
-  test("20회차 묶음 → updateRequestsStatusBatch 1회(취소+autoCancelledAt 합침) · 단건 쓰기 0회", async () => {
+  test("20회차 묶음 → updateRequestsStatusBatch 1회(취소+autoCancelledAt 합침) · 결제 단독 쓰기 0회", async () => {
     const { runPaymentDeadline } = require("@/lib/paymentDeadline");
     const bundle = Array.from({ length: 20 }, (_, i) =>
       req({ batchId: "BAT-CRON", batchSeq: i + 1, batchSize: 20, date: `2026-11-${String(i + 1).padStart(2, "0")}`, paymentDueDate: "2026-10-27" })
@@ -169,7 +169,6 @@ describe("runPaymentDeadline — 묶음당 쓰기 1회", () => {
     const fakeDb = {
       getAllRequests: async () => bundle,
       updateRequestsStatusBatch: async (...args: unknown[]) => { batchCalls.push(args); return []; },
-      updateRequestStatus: jest.fn(),
       updateRequestPayment: jest.fn(),
     };
     const result = await runPaymentDeadline(fakeDb, { todayYmd: "2026-10-28" });
@@ -180,7 +179,6 @@ describe("runPaymentDeadline — 묶음당 쓰기 1회", () => {
     expect(updates.every((u) => u.status === "취소")).toBe(true);
     expect(discount).toBeUndefined();
     expect(payment.patch.autoCancelledAt).toBeTruthy();
-    expect(fakeDb.updateRequestStatus).not.toHaveBeenCalled();
     expect(fakeDb.updateRequestPayment).not.toHaveBeenCalled();
   });
 });

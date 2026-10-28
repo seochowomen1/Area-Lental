@@ -129,8 +129,11 @@ export async function middleware(req: NextRequest) {
   // 토큰이 틀리면 라우트가 관리자 쿠키 검사로 넘어가 401을 돌려준다.
   // - 업무 시스템 동기화: /api/admin/class-schedules/sync
   // - 결제 기한 경과 자동 취소: /api/admin/payment-deadline/run (2026-10-26)
+  // - 시트 매일 백업: /api/admin/backup/run (audit-fix-3 3-1)
   if (
-    (pathname === "/api/admin/class-schedules/sync" || pathname === "/api/admin/payment-deadline/run") &&
+    (pathname === "/api/admin/class-schedules/sync" ||
+      pathname === "/api/admin/payment-deadline/run" ||
+      pathname === "/api/admin/backup/run") &&
     req.method === "GET" &&
     (req.headers.get("authorization") || "").startsWith("Bearer ")
   ) {

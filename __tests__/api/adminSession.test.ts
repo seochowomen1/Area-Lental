@@ -106,7 +106,7 @@ describe("[8] 삭제 API — 결제·환불·홈페이지 미마감 포함 시 �
         orgName: "가명", headcount: 5, equipment: { laptop: false, projector: false, audio: false }, purpose: "테스트",
         attachments: [], privacyAgree: true, pledgeAgree: true, pledgeDate: "2026-10-26", pledgeName: "홍가명",
       });
-      await db.updateRequestStatus({ requestId: saved.requestId, status: r.status, decidedBy: "관리자" });
+      await db.updateRequestsStatusBatch([{ requestId: saved.requestId, status: r.status, decidedBy: "관리자" }]);
       if (r.patch) await db.updateRequestPayment({ requestId: saved.requestId, patch: r.patch });
       ids.push(saved.requestId);
     }

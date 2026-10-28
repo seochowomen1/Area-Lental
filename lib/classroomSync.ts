@@ -179,3 +179,57 @@ export async function runClassroomSync(db: Database): Promise<SyncResult> {
     stats,
   };
 }
+
+/* ───────── 동시 실행 방지 (audit-fix-3 3-1) ─────────
+ * - 같은 인스턴스: 메모리 표식으로 즉시 거부
+ * - 다른 인스턴스(크론과 관리자 버튼이 동시에): 감사로그의 마지막 "수업시간 동기화 시작" 시각이 60초 안이면 거부
+ * - 감사로그를 읽지 못하면 메모리 표식만으로 진행(동기화를 막지 않음) — "추가하고 지움" 순서라 겹쳐도 수업이 빠지지 않는다
+ */
+export const SYNC_LOCK_MS = 60_000;
+export const SYNC_RUNNING_MESSAGE = "업무 시스템 가져오기가 방금 시작되었습니다. 1분 뒤 다시 눌러 주세요.";
+let inProcessStartedAt = 0;
+
+export type SyncSlot = { ok: true; release: () => void } | { ok: false; lastStartedAt: number };
+
+export async function acquireSyncSlot(opts: {
+  /** 이 실행의 시작을 감사로그에 남긴다(await) */
+  recordStart: () => Promise<void>;
+  /** 감사로그 끝부분 읽기 (기본: lib/auditQuery.readAuditTail) */
+  readTail?: () => Promise<Array<{ timestamp: string; action: string; target: string }>>;
+  now?: number;
+}): Promise<SyncSlot> {
+  const now = opts.now ?? Date.now();
+  if (inProcessStartedAt && now - inProcessStartedAt < SYNC_LOCK_MS) {
+    return { ok: false, lastStartedAt: inProcessStartedAt };
+  }
+  const prev = inProcessStartedAt;
+  inProcessStartedAt = now; // await 전에 먼저 표시(같은 인스턴스 동시 호출 차단)
+
+  try {
+    const { readAuditTail, lastOf } = await import("@/lib/auditQuery");
+    const tail = await (opts.readTail ?? (() => readAuditTail(500)))();
+    const last = lastOf(tail, "SCHEDULE_SYNC_START");
+    if (last && now - last.at >= 0 && now - last.at < SYNC_LOCK_MS) {
+      inProcessStartedAt = prev;
+      return { ok: false, lastStartedAt: last.at };
+    }
+  } catch (e) {
+    console.warn("[classroom-sync] 감사로그를 읽지 못해 메모리 표식만으로 진행", e instanceof Error ? e.message : String(e));
+  }
+
+  await opts.recordStart();
+  let released = false;
+  return {
+    ok: true,
+    release: () => {
+      if (released) return;
+      released = true;
+      if (inProcessStartedAt === now) inProcessStartedAt = 0;
+    },
+  };
+}
+
+/** 테스트 전용 — 메모리 표식 초기화 */
+export function __resetSyncSlotForTest() {
+  inProcessStartedAt = 0;
+}

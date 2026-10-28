@@ -15,6 +15,7 @@ import { recordAudit } from "@/lib/auditLog";
 import { sortSessions } from "@/lib/requestUtils";
 import { logger } from "@/lib/logger";
 import { getGalleryRecalcView, parseGalleryAudit } from "@/lib/galleryRecalc";
+import { isStaleWriteError, parseViewedStatuses } from "@/lib/writeExpect";
 
 function getIpFromHeaders(): string {
   const h = headers();
@@ -48,6 +49,27 @@ function categoryOf(r: RentalRequest) {
 /** 시트 일괄 저장 실패 → 배너 (01_spec ③-K) */
 function sheetBusyUrl(r: RentalRequest) {
   return `/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(categoryOf(r))}&formError=sheetBusy`;
+}
+
+/** 저장 직전 상태가 화면을 연 시점과 달라 쓰지 않음 → 배너 (audit-fix-3 3-1 · ③ STALE_WRITE) */
+function staleUrl(r: RentalRequest) {
+  return `/admin/requests/${encodeURIComponent(r.requestId)}?category=${encodeURIComponent(categoryOf(r))}&formError=stale`;
+}
+
+/** 저장 실패 종류 → 돌아갈 주소 (조건 불일치=stale · 그 밖=sheetBusy) */
+function writeFailUrl(r: RentalRequest, e: unknown) {
+  return isStaleWriteError(e) ? staleUrl(r) : sheetBusyUrl(r);
+}
+
+/**
+ * 화면을 연 시점의 회차별 상태(hidden `viewedStatuses`) — 없거나 형식이 틀리면 액션 시작 때 읽은 상태로 대신한다.
+ * 대신하는 경우에도 "읽은 뒤 ~ 쓰기 직전" 사이에 다른 처리가 끼면 막힌다.
+ */
+function expectedStatuses(formData: FormData, rows: RentalRequest[]): Record<string, RequestStatus> {
+  const viewed = parseViewedStatuses(formData.get("viewedStatuses"));
+  const out: Record<string, RequestStatus> = {};
+  for (const r of rows) out[r.requestId] = viewed?.[r.requestId] ?? r.status;
+  return out;
 }
 
 /** 단일 처리(승인/반려/취소 등) */
@@ -96,16 +118,35 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
   const prevReason = String(current.discountReason ?? "");
   const discountChanged = prevAmount !== nextAmount || prevReason !== nextReason;
 
-  await db.updateRequestStatus({
-    requestId: current.requestId,
-    status,
-    adminMemo,
-    rejectReason: status === "반려" ? rejectReason : "",
-    decidedBy: getDefaultDecidedBy(),
-    discountRatePct: nextRate,
-    discountAmountKRW: nextAmount,
-    discountReason: nextReason,
-  });
+  // ★ audit-fix-3 3-1: 단건도 일괄 함수 1회 쓰기 + 조건부 쓰기(화면을 연 시점의 상태와 같을 때만)
+  //   메모 칸이 폼에 없으면 기존 메모 유지(예전 단건 함수는 빈칸으로 덮었다)
+  let savedOne = true;
+  let failErr: unknown = null;
+  try {
+    await db.updateRequestsStatusBatch(
+      [{
+        requestId: current.requestId,
+        status,
+        ...(formData.has("adminMemo") ? { adminMemo } : {}),
+        rejectReason: status === "반려" ? rejectReason : "",
+        decidedBy: getDefaultDecidedBy(),
+      }],
+      {
+        batchId: (current.batchId ?? "").trim(),
+        requestId: current.requestId,
+        discountRatePct: nextRate,
+        discountAmountKRW: nextAmount,
+        discountReason: nextReason,
+      },
+      undefined,
+      { statusById: expectedStatuses(formData, [current]) }
+    );
+  } catch (e) {
+    savedOne = false;
+    failErr = e;
+    logger[isStaleWriteError(e) ? "warn" : "error"]("단건 처리 저장 실패", { requestId: current.requestId, stale: isStaleWriteError(e), error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!savedOne) redirect(writeFailUrl(current, failErr));
 
   const ip = getIpFromHeaders();
   const actor = getDefaultDecidedBy();
@@ -205,7 +246,9 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
   const prevMemoB = String(latest[0]?.adminMemo ?? "");
 
   // ★ audit-fix-1 [9]: 묶음 전 회차 메모 + 할인을 시트 쓰기 1회로 (부분 반영 없음)
+  // ★ audit-fix-3 3-1: 상태 열도 다시 쓰므로, 읽은 뒤 자동 취소 등으로 상태가 바뀌었으면 쓰지 않는다
   let savedB = true;
+  let failB: unknown = null;
   try {
     await db.updateRequestsStatusBatch(
       latest.map((s) => ({
@@ -220,13 +263,16 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
         discountRatePct: isGallery ? 0 : normalized.discountRatePct,
         discountAmountKRW: isGallery ? 0 : normalized.discountAmountKRW,
         discountReason: isGallery ? "" : discountReason,
-      }
+      },
+      undefined,
+      { statusById: Object.fromEntries(latest.map((s) => [s.requestId, s.status])) }
     );
   } catch (e) {
     savedB = false;
-    logger.error("묶음 메타 일괄 저장 실패", { batchId: current.batchId, error: e instanceof Error ? e.message : String(e) });
+    failB = e;
+    logger[isStaleWriteError(e) ? "warn" : "error"]("묶음 메타 일괄 저장 실패", { batchId: current.batchId, stale: isStaleWriteError(e), error: e instanceof Error ? e.message : String(e) });
   }
-  if (!savedB) redirect(sheetBusyUrl(current));
+  if (!savedB) redirect(writeFailUrl(current, failB));
 
   const discountChangedB = prevAmountB !== nextAmountB || prevReasonB !== nextReasonB;
   const memoChangedB = !!bundleMemo && bundleMemo !== prevMemoB;
@@ -290,24 +336,29 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
   if (effectiveSelected.length === 0) redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&formError=noSelection`);
 
   // ★ audit-fix-1 [9]: 선택 회차만 시트 쓰기 1회로 (Promise.all 동시 쓰기 → 쿼터 초과·부분 반영 방지)
+  // ★ audit-fix-3 3-1: 선택 회차가 화면을 연 시점의 상태 그대로일 때만 쓴다(다른 창·자동 취소가 먼저 저장했으면 stale)
+  const selectedRows = latest.filter((s) => effectiveSelected.includes(s.requestId));
   let savedS = true;
+  let failS: unknown = null;
   try {
     await db.updateRequestsStatusBatch(
-      latest
-        .filter((s) => effectiveSelected.includes(s.requestId))
-        .map((s) => ({
-          requestId: s.requestId,
-          status: actionStatus,
-          decidedBy: getDefaultDecidedBy(),
-          rejectReason: actionStatus === "반려" ? rejectReason : "",
-          adminMemo: adminMemo || (s.adminMemo ?? ""),
-        }))
+      selectedRows.map((s) => ({
+        requestId: s.requestId,
+        status: actionStatus,
+        decidedBy: getDefaultDecidedBy(),
+        rejectReason: actionStatus === "반려" ? rejectReason : "",
+        adminMemo: adminMemo || (s.adminMemo ?? ""),
+      })),
+      undefined,
+      undefined,
+      { statusById: expectedStatuses(formData, selectedRows) }
     );
   } catch (e) {
     savedS = false;
-    logger.error("묶음 선택 회차 일괄 처리 실패", { batchId: current.batchId, error: e instanceof Error ? e.message : String(e) });
+    failS = e;
+    logger[isStaleWriteError(e) ? "warn" : "error"]("묶음 선택 회차 일괄 처리 실패", { batchId: current.batchId, stale: isStaleWriteError(e), error: e instanceof Error ? e.message : String(e) });
   }
-  if (!savedS) redirect(sheetBusyUrl(current));
+  if (!savedS) redirect(writeFailUrl(current, failS));
 
   const selectedDates = latest.filter((s) => effectiveSelected.includes(s.requestId)).map((s) => s.date);
   await recordAudit({

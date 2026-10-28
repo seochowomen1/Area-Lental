@@ -21,6 +21,8 @@ npm-debug.log*
 
 # mock data
 .mockdb.json
+# 로컬 모의 백업 파일(개인정보 포함 가능 · audit-fix-3 3-1)
+.mock-backups/
 .vercel
 
 # 내부 진단 메모(저장소에 올리지 않음)

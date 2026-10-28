@@ -9,6 +9,7 @@ import type { RentalRequest } from "@/lib/types";
 import type { Database } from "@/lib/database";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { recordAudit, auditLog } from "@/lib/auditLog";
+import { isStaleWriteError } from "@/lib/writeExpect";
 import { maskName } from "@/lib/mask";
 import {
   AUTO_CANCEL_DECIDED_BY,
@@ -115,6 +116,8 @@ export type RunResult = {
   candidates: number;
   cancelled: CancelledItem[];
   skippedOverCap: number;
+  /** 읽은 뒤 관리자가 먼저 저장(결제 확인·기한 연장 등)해서 건너뛴 묶음 수 (audit-fix-3 3-1) */
+  skippedStale: number;
   reminders: { enabled: boolean; candidates: number; sent: number; failed: number };
   errors: RunError[];
 };
@@ -160,6 +163,7 @@ export async function runPaymentDeadline(
 
   const cancelled: CancelledItem[] = [];
   const errors: RunError[] = [];
+  let skippedStale = 0;
 
   for (const t of targets) {
     const first = t.sessions[0];
@@ -188,9 +192,22 @@ export async function runPaymentDeadline(
         })),
         undefined,
         // b. 묶음 전 행에 autoCancelledAt — 같은 쓰기 요청에 합침(묶음당 시트 읽기 1·쓰기 1)
-        { requestId: first.requestId, patch: { autoCancelledAt: ranAt } }
+        { requestId: first.requestId, patch: { autoCancelledAt: ranAt } },
+        // ★ audit-fix-3 3-1 저장 직전 재확인: 여전히 승인·미결제·자동 취소 기록 없음·같은 기한일 때만
+        {
+          status: ["승인"],
+          paymentStatus: ["", "미결제"],
+          autoCancelledAtEmpty: true,
+          paymentDueDate: t.paymentDueDate,
+        }
       );
     } catch (e) {
+      if (isStaleWriteError(e)) {
+        // 관리자가 먼저 결제 확인·기한 연장 등을 저장함 → 이 묶음은 건너뜀(오류 아님 · 메일·감사 없음)
+        skippedStale++;
+        console.warn("[payment-deadline] 저장 직전 상태가 달라 건너뜀", t.key);
+        continue;
+      }
       errors.push({ key: t.key, stage: "status", message: e instanceof Error ? e.message : String(e) });
       continue;
     }
@@ -277,12 +294,13 @@ export async function runPaymentDeadline(
     candidates,
     cancelled,
     skippedOverCap,
+    skippedStale,
     reminders,
     errors,
   };
 
-  // 관리자 요약 메일: 취소 ≥1 · 상한 초과 · 오류 (⑧-B-3) — dryRun 제외
-  if (!dryRun && (cancelled.length > 0 || skippedOverCap > 0 || errors.length > 0)) {
+  // 관리자 요약 메일: 취소 ≥1 · 상한 초과 · 건너뜀(저장 직전 확인 불일치) · 오류 (⑧-B-3) — dryRun 제외
+  if (!dryRun && (cancelled.length > 0 || skippedOverCap > 0 || skippedStale > 0 || errors.length > 0)) {
     try {
       await sendAdminPaymentDeadlineSummaryEmail(result);
     } catch (e) {

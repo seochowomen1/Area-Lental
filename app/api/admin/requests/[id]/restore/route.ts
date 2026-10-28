@@ -108,20 +108,23 @@ export async function POST(req: Request, { params }: { params: { id: string } })
 
     // 복구: 승인으로 되돌리고 결제 기한 재설정 · autoCancelledAt·리마인드 기록 비움
     const actor = getDefaultDecidedBy();
-    // 묶음 전 회차를 시트 쓰기 1회로 복구 (audit-fix-1 [9])
-    await db.updateRequestsStatusBatch(
+    // 묶음 전 회차 상태 + 결제 기한을 시트 쓰기 1회로 복구 (audit-fix-1 [9] · audit-fix-3 3-1에서 결제 필드도 같은 요청에 합침)
+    // 저장 직전 재확인: 복구할 회차가 여전히 "취소"일 때만
+    const updated = await db.updateRequestsStatusBatch(
       toRestore.map((s) => ({
         requestId: s.requestId,
         status: "승인" as const,
         adminMemo: s.adminMemo ?? "",
         rejectReason: "",
         decidedBy: actor,
-      }))
+      })),
+      undefined,
+      {
+        requestId: loaded.current.requestId,
+        patch: { autoCancelledAt: null, paymentDueDate: dueDate, paymentReminderSentAt: null },
+      },
+      { statusById: Object.fromEntries(toRestore.map((s) => [s.requestId, "취소" as const])) }
     );
-    const updated = await db.updateRequestPayment({
-      requestId: loaded.current.requestId,
-      patch: { autoCancelledAt: null, paymentDueDate: dueDate, paymentReminderSentAt: null },
-    });
     const rep = updated.find((r) => r.requestId === loaded.current.requestId) ?? updated[0];
 
     await recordAudit({

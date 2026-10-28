@@ -7,6 +7,7 @@
 
 import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch, GalleryFeeUpdate } from "./types";
 import { isMockMode } from "./env";
+import type { WriteExpect } from "./writeExpect";
 
 /**
  * 간단한 인메모리 TTL 캐시
@@ -44,28 +45,25 @@ export interface Database {
   appendRequest(input: Omit<RentalRequest, "requestId" | "createdAt" | "status" | "adminMemo" | "rejectReason" | "decidedAt" | "decidedBy" | "roomName">): Promise<RentalRequest>;
   /** 여러 회차를 한 번에 저장(시트 append를 1회로) */
   appendRequestsBatch(inputs: Array<Parameters<Database["appendRequest"]>[0]>): Promise<RentalRequest[]>;
-  updateRequestStatus(args: {
-    requestId: string;
-    status: RequestStatus;
-    adminMemo?: string;
-    rejectReason?: string;
-    decidedBy: string;
-    discountRatePct?: number;
-    discountAmountKRW?: number;
-    discountReason?: string;
-  }): Promise<RentalRequest>;
+  /*
+   * ★ audit-fix-3 3-1 쓰기 경로 단일화: 신청 행 변경은 아래 두 함수(시트 읽기 1·쓰기 1)만 쓴다.
+   *   단건 updateRequestStatus는 삭제했다(메모를 빼고 부르면 빈칸으로 덮던 함수).
+   *   expect를 넘기면 저장 직전에 읽은 행이 기대와 다를 때 아무것도 쓰지 않고 StaleWriteError(lib/writeExpect).
+   */
   /**
    * 여러 행 상태 일괄 변경 (audit-fix-1 [9]) — 시트 읽기 1·쓰기 1, 실패 시 throw(부분 반영 없음)
    * adminMemo·rejectReason을 생략하면 기존 값 유지
    */
   updateRequestsStatusBatch(
     updates: Array<{ requestId: string; status: RequestStatus; adminMemo?: string; rejectReason?: string; decidedBy: string }>,
-    discount?: { batchId: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
+    /** batchId가 있으면 묶음 전 행, 빈값이면 requestId 1행 */
+    discount?: { batchId: string; requestId?: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
     /** 같은 쓰기 요청에 결제 기록 필드도 합침(묶음 전 행 동일 값) */
-    payment?: { requestId: string; patch: PaymentPatch }
+    payment?: { requestId: string; patch: PaymentPatch },
+    expect?: WriteExpect
   ): Promise<RentalRequest[]>;
   /** 결제 기록 필드 갱신 — 묶음이면 전 행 동기화. 갱신된 행 전부 반환 (2026-10-26) */
-  updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]>;
+  updateRequestPayment(args: { requestId: string; patch: PaymentPatch; expect?: WriteExpect }): Promise<RentalRequest[]>;
   /** 갤러리 이용료 다시 계산 — 이 1행의 일수 3열 + galleryAuditJson만 (audit-fix-2 R2) */
   updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRequest>;
   /** 반려/취소된 신청건 삭제 */
@@ -108,10 +106,11 @@ class MockDatabase implements Database {
   async updateRequestsStatusBatch(
     updates: Parameters<Database["updateRequestsStatusBatch"]>[0],
     discount?: Parameters<Database["updateRequestsStatusBatch"]>[1],
-    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2]
+    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2],
+    expect?: WriteExpect
   ) {
     const { mock_updateRequestsStatusBatch } = await this.mockdb;
-    return mock_updateRequestsStatusBatch(updates, discount, payment);
+    return mock_updateRequestsStatusBatch(updates, discount, payment, expect);
   }
 
   async getRequestById(id: string) {
@@ -134,12 +133,7 @@ class MockDatabase implements Database {
     return mock_appendRequestsBatch(inputs);
   }
 
-  async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
-    const { mock_updateRequestStatus } = await this.mockdb;
-    return mock_updateRequestStatus(args);
-  }
-
-  async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
+  async updateRequestPayment(args: Parameters<Database["updateRequestPayment"]>[0]) {
     const { mock_updateRequestPayment } = await this.mockdb;
     return mock_updateRequestPayment(args);
   }
@@ -239,12 +233,13 @@ class SheetsDatabase implements Database {
   async updateRequestsStatusBatch(
     updates: Parameters<Database["updateRequestsStatusBatch"]>[0],
     discount?: Parameters<Database["updateRequestsStatusBatch"]>[1],
-    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2]
+    payment?: Parameters<Database["updateRequestsStatusBatch"]>[2],
+    expect?: WriteExpect
   ) {
     this.requestsCache.invalidate();
     const { updateRequestsStatusBatch } = await this.sheets;
     try {
-      return await updateRequestsStatusBatch(updates, discount, payment);
+      return await updateRequestsStatusBatch(updates, discount, payment, expect);
     } finally {
       this.requestsCache.invalidate();
     }
@@ -268,18 +263,10 @@ class SheetsDatabase implements Database {
     try { return await appendRequestsBatch(inputs); } finally { this.requestsCache.invalidate(); }
   }
 
-  async updateRequestStatus(args: Parameters<Database["updateRequestStatus"]>[0]) {
-    this.requestsCache.invalidate();
-    const { updateRequestStatus } = await this.sheets;
-    try { return await updateRequestStatus(args); } finally { this.requestsCache.invalidate(); }
-  }
-
-  async updateRequestPayment(args: { requestId: string; patch: PaymentPatch }) {
+  async updateRequestPayment(args: Parameters<Database["updateRequestPayment"]>[0]) {
     this.requestsCache.invalidate();
     const { updateRequestPayment } = await this.sheets;
-    const result = await updateRequestPayment(args);
-    this.requestsCache.invalidate();
-    return result;
+    try { return await updateRequestPayment(args); } finally { this.requestsCache.invalidate(); }
   }
 
   async updateGalleryFee(args: GalleryFeeUpdate) {

@@ -57,7 +57,7 @@ export default function DataRetentionPanel() {
       });
       const data = await res.json();
       if (data.ok) {
-        setMessage(`${data.purgedCount}건이 파기되었습니다.`);
+        setMessage(`${data.purgedCount}건이 파기되었습니다. 이전 백업에는 남아 있습니다. 30일 지난 백업 정리 때 함께 사라집니다.`);
         setResult(null);
       } else {
         setMessage(data.message ?? "파기 처리 실패");

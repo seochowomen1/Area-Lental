@@ -4,6 +4,7 @@ import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPat
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
+import { assertWriteExpect, type WriteExpect } from "@/lib/writeExpect";
 
 type EmailTemplateRow = {
   category: string;
@@ -19,7 +20,11 @@ type MockDB = {
   emailTemplates?: EmailTemplateRow[];
   /** 로그아웃으로 폐기된 관리자 세션 (audit-fix-1 [7]) */
   revokedSessions?: Array<{ sid: string; revokedAt: string; exp: string }>;
+  /** 감사로그(모의 · audit-fix-3 3-1) — 최근 2,000행만 보관 */
+  auditLog?: MockAuditRow[];
 };
+
+export type MockAuditRow = { timestamp: string; action: string; target: string; actor: string; summary: string; details: string; ip: string };
 
 // Vercel 서버리스에서는 process.cwd()가 읽기 전용이므로 /tmp 사용
 const DB_PATH = process.env.VERCEL
@@ -52,6 +57,7 @@ function ensureDb(): MockDB {
       // 재시작 시 이메일 템플릿·폐기 세션이 사라지지 않도록 보존
       ...(Array.isArray(data.emailTemplates) ? { emailTemplates: data.emailTemplates } : {}),
       ...(Array.isArray(data.revokedSessions) ? { revokedSessions: data.revokedSessions } : {}),
+      ...(Array.isArray(data.auditLog) ? { auditLog: data.auditLog } : {}),
     };
     memCache = db;
     return db;
@@ -253,68 +259,15 @@ export async function mock_appendRequestsBatch(
   return saved;
 }
 
-export async function mock_updateRequestStatus(args: {
-  requestId: string;
-  status: RequestStatus;
-  adminMemo?: string;
-  rejectReason?: string;
-  decidedBy: string;
-  discountRatePct?: number;
-  discountAmountKRW?: number;
-  discountReason?: string;
-}): Promise<RentalRequest> {
-  const db = ensureDb();
-  const idx = db.requests.findIndex(r => r.requestId === args.requestId);
-  if (idx < 0) throw new Error("해당 신청건을 찾을 수 없습니다.");
-
-  const current = db.requests[idx];
-  const statusChanged = current.status !== args.status;
-  const decidedAt = statusChanged ? nowIsoSeoul() : (current.decidedAt ?? "");
-  const decidedBy = statusChanged ? args.decidedBy : (current.decidedBy ?? "");
-
-  db.requests[idx] = {
-    ...current,
-    status: args.status,
-    adminMemo: args.adminMemo ?? "",
-    rejectReason: args.rejectReason ?? "",
-    discountRatePct: typeof args.discountRatePct === "number" ? args.discountRatePct : (current.discountRatePct ?? 0),
-    discountAmountKRW: typeof args.discountAmountKRW === "number" ? args.discountAmountKRW : (current.discountAmountKRW ?? 0),
-    discountReason: typeof args.discountReason === "string" ? args.discountReason : (current.discountReason ?? ""),
-    decidedAt,
-    decidedBy
-  };
-    // 할인 정보는 '묶음' 단위로 적용되므로, batchId가 있으면 같은 묶음 전체에 동기화합니다.
-  const shouldSyncDiscount =
-    (typeof args.discountRatePct === "number") ||
-    (typeof args.discountAmountKRW === "number") ||
-    (typeof args.discountReason === "string");
-
-  const batchId = db.requests[idx].batchId;
-  if (shouldSyncDiscount && batchId) {
-    for (let i = 0; i < db.requests.length; i++) {
-      if (db.requests[i].batchId === batchId) {
-        db.requests[i] = {
-          ...db.requests[i],
-          discountRatePct: db.requests[idx].discountRatePct ?? 0,
-          discountAmountKRW: db.requests[idx].discountAmountKRW ?? 0,
-          discountReason: db.requests[idx].discountReason ?? ""
-        };
-      }
-    }
-  }
-
-  saveDb(db);
-  return db.requests[idx];
-}
-
 /**
  * 여러 행 상태 일괄 변경 (Mock) — sheets.updateRequestsStatusBatch와 같은 규칙
  * 전부 확인 후 한 번에 반영 · 파일 저장 1회
  */
 export async function mock_updateRequestsStatusBatch(
   updates: Array<{ requestId: string; status: RequestStatus; adminMemo?: string; rejectReason?: string; decidedBy: string }>,
-  discount?: { batchId: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
-  payment?: { requestId: string; patch: PaymentPatch }
+  discount?: { batchId: string; requestId?: string; discountRatePct: number; discountAmountKRW: number; discountReason: string },
+  payment?: { requestId: string; patch: PaymentPatch },
+  expect?: WriteExpect
 ): Promise<RentalRequest[]> {
   const db = ensureDb();
   const idxOf = new Map(db.requests.map((r, i) => [r.requestId, i]));
@@ -322,6 +275,8 @@ export async function mock_updateRequestsStatusBatch(
     if (!idxOf.has(u.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${u.requestId}`);
   }
   if (payment && !idxOf.has(payment.requestId)) throw new Error(`해당 신청건을 찾을 수 없습니다: ${payment.requestId}`);
+  // 저장 직전 상태 재확인 (조건부 쓰기 · audit-fix-3 3-1) — 어긋나면 아무것도 바꾸지 않음
+  assertWriteExpect(db.requests, updates.map((u) => u.requestId), payment?.requestId ?? updates[0]?.requestId, expect);
   const now = nowIsoSeoul();
   const next = db.requests.slice();
   const touched = new Set<number>();
@@ -339,10 +294,10 @@ export async function mock_updateRequestsStatusBatch(
     };
     touched.add(i);
   }
-  if (discount && discount.batchId.trim()) {
+  if (discount && (discount.batchId.trim() || discount.requestId)) {
     const bid = discount.batchId.trim();
     next.forEach((r, i) => {
-      if ((r.batchId ?? "").trim() !== bid) return;
+      if (bid ? (r.batchId ?? "").trim() !== bid : r.requestId !== discount.requestId) return;
       next[i] = { ...r, discountRatePct: discount.discountRatePct, discountAmountKRW: discount.discountAmountKRW, discountReason: discount.discountReason };
       touched.add(i);
     });
@@ -390,31 +345,11 @@ export async function mock_addRevokedAdminSession(entry: { sid: string; exp: str
 
 /**
  * 결제 기록 필드 갱신 (Mock) — 묶음이면 같은 batchId 전 행 동기화
- * patch 값 null/"" → 필드 제거(비움), undefined → 유지
+ * patch 값 null/"" → 필드 제거(비움), undefined → 유지 · audit-fix-3 3-1: 일괄 함수로 통일(expect 지원)
  */
-export async function mock_updateRequestPayment(args: { requestId: string; patch: PaymentPatch }): Promise<RentalRequest[]> {
-  const db = ensureDb();
-  const current = db.requests.find(r => r.requestId === args.requestId);
-  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
-  const batchId = (current.batchId ?? "").trim();
-  const isTarget = (r: RentalRequest) => (batchId ? (r.batchId ?? "").trim() === batchId : r.requestId === current.requestId);
-
-  const updated: RentalRequest[] = [];
-  for (let i = 0; i < db.requests.length; i++) {
-    if (!isTarget(db.requests[i])) continue;
-    const next: Record<string, unknown> = { ...db.requests[i] };
-    for (const k of PAYMENT_FIELD_KEYS) {
-      if (!(k in args.patch)) continue;
-      const v = args.patch[k];
-      if (v === undefined) continue;
-      if (v === null || v === "") { delete next[k]; continue; }
-      next[k] = PAYMENT_NUMERIC_KEYS.has(k) ? Number(v) : v;
-    }
-    db.requests[i] = next as RentalRequest;
-    updated.push(db.requests[i]);
-  }
-  saveDb(db);
-  return updated;
+export async function mock_updateRequestPayment(args: { requestId: string; patch: PaymentPatch; expect?: WriteExpect }): Promise<RentalRequest[]> {
+  if (!ensureDb().requests.some((r) => r.requestId === args.requestId)) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  return mock_updateRequestsStatusBatch([], undefined, { requestId: args.requestId, patch: args.patch }, args.expect);
 }
 
 /** 갤러리 이용료 다시 계산 (Mock · audit-fix-2 R2) — 갤러리 1행만 */
@@ -462,18 +397,22 @@ export async function mock_deleteClassSchedule(id: string): Promise<void> {
   saveDb(db);
 }
 
-/** 출처(source)가 같은 항목을 전부 지우고 새 항목으로 갈아끼운다(동기화용) */
+/**
+ * 출처(source)가 같은 항목을 새 항목으로 갈아끼운다(동기화용 · audit-fix-3 3-1 "추가하고 지움")
+ * 새 목록을 먼저 만든 뒤 한 번에 바꿔 끼우므로, 중간에 실패하면 기존 목록이 그대로 남는다.
+ */
 export async function mock_replaceClassSchedulesBySource(
   source: string,
   items: Omit<ClassSchedule, "id">[]
 ): Promise<{ deleted: number; added: number }> {
   const db = ensureDb();
-  const before = db.schedules.length;
-  db.schedules = db.schedules.filter((s) => s.source !== source);
-  const deleted = before - db.schedules.length;
   const stamp = Date.now();
+  // 1) 추가할 행 먼저 생성
   const created: ClassSchedule[] = items.map((s, i) => ({ id: `CS-${stamp}-${i}`, ...s, source }));
-  db.schedules.push(...created);
+  // 2) 옛 행 제외 + 새 행 추가를 한 번에 반영
+  const kept = db.schedules.filter((s) => s.source !== source);
+  const deleted = db.schedules.length - kept.length;
+  db.schedules = [...kept, ...created];
   saveDb(db);
   return { deleted, added: created.length };
 }
@@ -530,4 +469,46 @@ export async function mock_saveEmailTemplate(
     db.emailTemplates.push({ category, status, subject, body });
   }
   saveDb(db);
+}
+
+/* ── 감사로그·백업 (Mock · audit-fix-3 3-1) ── */
+
+const MOCK_AUDIT_KEEP = 2000;
+
+export async function mock_appendAuditRow(row: MockAuditRow): Promise<void> {
+  const db = ensureDb();
+  const list = db.auditLog ?? [];
+  list.push(row);
+  db.auditLog = list.slice(-MOCK_AUDIT_KEEP);
+  saveDb(db);
+}
+
+export async function mock_getAuditRows(): Promise<MockAuditRow[]> {
+  return ensureDb().auditLog ?? [];
+}
+
+function cellText(v: unknown): string {
+  if (v === null || v === undefined) return "";
+  if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
+  if (typeof v === "object") return JSON.stringify(v);
+  return String(v);
+}
+
+function objectsToRows(items: Array<Record<string, unknown>>, fixedHeader?: readonly string[]): string[][] {
+  const header: string[] = fixedHeader ? [...fixedHeader] : [];
+  for (const it of items) for (const k of Object.keys(it)) if (!header.includes(k)) header.push(k);
+  return [header, ...items.map((it) => header.map((h) => cellText(it[h])))];
+}
+
+/** 시트 탭 이름과 같은 이름으로 모의 DB 전체를 표로 내보낸다(백업 파일 생성용) */
+export async function mock_exportTabs(): Promise<Array<{ title: string; rows: string[][] }>> {
+  const db = ensureDb();
+  return [
+    { title: "requests", rows: objectsToRows(db.requests as unknown as Array<Record<string, unknown>>, ["requestId", "createdAt"]) },
+    { title: "class_schedule", rows: objectsToRows(db.schedules as unknown as Array<Record<string, unknown>>, ["id", "roomId", "dayOfWeek", "startTime", "endTime", "title", "effectiveFrom", "effectiveTo"]) },
+    { title: "blocks", rows: objectsToRows(db.blocks as unknown as Array<Record<string, unknown>>, ["id", "roomId", "date", "startTime", "endTime", "reason", "endDate"]) },
+    { title: "email_templates", rows: objectsToRows((db.emailTemplates ?? []) as unknown as Array<Record<string, unknown>>, ["category", "status", "subject", "body"]) },
+    { title: "audit_log", rows: objectsToRows((db.auditLog ?? []) as unknown as Array<Record<string, unknown>>, ["timestamp", "action", "target", "actor", "summary", "details", "ip"]) },
+    { title: "admin_sessions", rows: objectsToRows((db.revokedSessions ?? []) as unknown as Array<Record<string, unknown>>, ["sid", "revokedAt", "exp"]) },
+  ];
 }

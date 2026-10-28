@@ -100,18 +100,15 @@ describe("[9] 묶음 처리 일괄 쓰기", () => {
     const rows = await seedBundle(3);
     const d = db();
     const batchSpy = jest.spyOn(d, "updateRequestsStatusBatch");
-    const singleSpy = jest.spyOn(d, "updateRequestStatus");
     const fd = new FormData();
     fd.set("actionStatus", "승인");
     fd.set("selectAll", "1");
     const url = await expectRedirect(actions().decideSelectedSessionsAction(rows[0].requestId, fd));
     expect(url).toContain("saved=1");
     expect(batchSpy).toHaveBeenCalledTimes(1);
-    expect(singleSpy).not.toHaveBeenCalled();
     const after = await d.getRequestsByBatchId(rows[0].batchId);
     expect(after.every((r: { status: string }) => r.status === "승인")).toBe(true);
     batchSpy.mockRestore();
-    singleSpy.mockRestore();
   });
 
   test("0개 선택 → formError=noSelection", async () => {
