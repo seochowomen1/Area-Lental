@@ -1,82 +1,28 @@
 "use client";
 
-import { useState, type ReactNode } from "react";
-import SpaceBooking from "@/components/SpaceBooking";
-import SpaceBookingGalleryRange from "@/components/SpaceBookingGalleryRange";
+/**
+ * 비치물품·이용 규정 (audit-fix-3 3-4 · 02_ui_apply §2-3)
+ * 예전 상세 탭 3개(신청현황 · 공간정보 및 시설안내 · 취소/환불규정) 중 신청현황은 2단계 달력이 대신하고,
+ * 나머지 두 탭 내용은 `비치물품·이용 규정 보기` 접힘 안에 순서대로 보여 준다(내용 원문 그대로).
+ */
+import { type ReactNode } from "react";
 import { cn } from "@/lib/cn";
-import { CARD_BASE, BUTTON_BASE, BUTTON_VARIANT } from "@/components/ui/presets";
+import { CARD_BASE } from "@/components/ui/presets";
 import { getRoom } from "@/lib/space";
 import { PAYMENT_FLOW_TEXT } from "@/lib/policy";
 import KeepText from "@/components/ui/KeepText";
 
-type TabId = "status" | "info" | "rule";
-
-type Slot = { start: string; end: string; available: boolean };
-
-type AvailabilityMeta = {
-  reasonCode: string | null;
-  reasonMessage: string | null;
-  totalSlots: number;
-  availableSlots: number;
-};
-
-type BookingState = {
-  selectedDate: string;
-  onSelectDate: (ymd: string) => void;
-  slots: Slot[];
-  busy: boolean;
-  meta?: AvailabilityMeta;
-};
-
-export default function SpaceDetailTabs({
-  roomId,
-  booking,
-}: {
-  roomId: string;
-  booking: BookingState;
-}) {
-  const [tab, setTab] = useState<TabId>("status");
+export default function RoomGuideContent({ roomId }: { roomId: string }) {
   const room = getRoom(roomId);
   const isGallery = roomId === "gallery";
-
   return (
-    <div>
-      <div className={cn(CARD_BASE, "p-2 flex flex-wrap justify-center gap-2")}>
-        <TabButton active={tab === "status"} onClick={() => setTab("status")}>
-          신청현황
-        </TabButton>
-        <TabButton active={tab === "info"} onClick={() => setTab("info")}>
-          공간정보 및 시설안내
-        </TabButton>
-        <TabButton active={tab === "rule"} onClick={() => setTab("rule")}>
-          취소/환불규정
-        </TabButton>
-      </div>
-
-      <div className="mt-6">
-        {tab === "status" ? (
-          roomId === "gallery" ? (
-            <SpaceBookingGalleryRange />
-          ) : (
-            <SpaceBooking
-              roomId={roomId}
-              selectedDate={booking.selectedDate}
-              onSelectDate={booking.onSelectDate}
-              slots={booking.slots}
-              busy={booking.busy}
-              meta={booking.meta}
-              durationLimitHours={room?.durationLimitHours ?? 6}
-            />
-          )
-        ) : tab === "info" ? (
-          isGallery ? <GalleryInfoTab room={room} /> : <LectureInfoTab room={room} />
-        ) : (
-          isGallery ? <GalleryRuleTab room={room} /> : <LectureRuleTab room={room} />
-        )}
-      </div>
+    <div className="space-y-4">
+      {isGallery ? <GalleryInfoTab room={room} /> : <LectureInfoTab room={room} />}
+      {isGallery ? <GalleryRuleTab room={room} /> : <LectureRuleTab room={room} />}
     </div>
   );
 }
+
 
 /* ───────────────────────────────────────────
    갤러리 - 공간정보 및 시설안내
@@ -463,25 +409,5 @@ function InfoRow({ label, value }: { label: string; value: string }) {
       <span className="text-xs font-semibold text-slate-600">{label}</span>
       <span className="text-sm font-semibold text-slate-900">{value}</span>
     </div>
-  );
-}
-
-function TabButton({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: ReactNode;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(BUTTON_BASE, active ? BUTTON_VARIANT.primary : BUTTON_VARIANT.outline, "rounded-full px-4 py-2.5 text-sm", active ? "shadow" : "")}
-    >
-      {children}
-    </button>
   );
 }

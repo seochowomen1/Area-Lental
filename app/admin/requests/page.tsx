@@ -403,15 +403,14 @@ export default async function AdminRequestsPage({
               검색
             </button>
             <ExcelDownloadButton href={exportUrl} label="엑셀 받기" className={TOOLBAR_SECONDARY} />
-            {isGalleryCategory && (
-              <Link
-                href={`/admin/requests/new?category=${encodeURIComponent(category)}`}
-                className={TOOLBAR_SECONDARY}
-                title="방문·이메일·팩스로 받은 종이 신청서를 대신 등록합니다"
-              >
-                + 서면 신청 등록
-              </Link>
-            )}
+            {/* 3-4 ⑧ Q6: 강의실·E-스튜디오·갤러리 모두 서면 등록 */}
+            <Link
+              href={`/admin/requests/new?category=${encodeURIComponent(category)}`}
+              className={TOOLBAR_SECONDARY}
+              title="방문·이메일·팩스로 받은 종이 신청서를 대신 등록합니다"
+            >
+              + 서면 신청 등록
+            </Link>
           </div>
         </form>
 

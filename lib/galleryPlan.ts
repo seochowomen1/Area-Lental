@@ -73,6 +73,29 @@ export function defaultPrepDate(startDate: string, holidays: ReadonlySet<string>
 }
 
 /**
+ * 시작일의 무료 준비일 확정 — 준비일은 반드시 있어야 한다(2026-10-28 사용자 "무조건 최소 전날").
+ * 기본 준비일(전날, 일·공휴일이면 더 앞)이 오늘 이후이고, 비어 있거나 앞 전시의 마지막 날이면 그 날.
+ * 아니면 null = 그 날은 시작일로 고를 수 없음.
+ */
+export function resolveGalleryPrep(
+  startDate: string,
+  ctx: {
+    holidays: ReadonlySet<string>;
+    booked: ReadonlySet<string>;
+    exhibitionEnds: ReadonlySet<string>;
+    prepOnly?: ReadonlySet<string>;
+    today: string;
+  }
+): { date: string; afterExhibition: boolean } | null {
+  if (!isYmd(startDate)) return null;
+  const prep = defaultPrepDate(startDate, ctx.holidays);
+  if (!isYmd(prep) || prep <= ctx.today) return null;
+  if (ctx.prepOnly?.has(prep)) return null;
+  if (ctx.booked.has(prep)) return ctx.exhibitionEnds.has(prep) ? { date: prep, afterExhibition: true } : null;
+  return { date: prep, afterExhibition: false };
+}
+
+/**
  * 준비일 후보 — 시작 전날부터 거꾸로, 일요일·공휴일 제외, 최대 count개
  * - todayYmd를 주면 오늘 이전 날짜는 뺀다(서버 getAvailablePrepDates는 주지 않음 = 기존 동작)
  */

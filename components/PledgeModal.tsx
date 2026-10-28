@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect } from "react";
-import Button from "@/components/ui/Button";
+/**
+ * 서약서 팝업 (02_ui_apply §0-5 (1)) — 조항 원문(lib/pledge.ts) 그대로, 글자 17.
+ * 버튼 라벨 `동의`·`비동의` → `동의합니다`·`동의하지 않습니다`.
+ */
+import ConsentDialog from "@/components/apply/ConsentDialog";
 import {
   PLEDGE_FOOTER,
   PLEDGE_INTRO,
@@ -12,7 +15,6 @@ import {
   GALLERY_PLEDGE_INTRO,
 } from "@/lib/pledge";
 import { operatingNoticeText } from "@/lib/operating";
-import { useFocusTrap } from "@/lib/useFocusTrap";
 
 type Props = {
   open: boolean;
@@ -27,96 +29,26 @@ export default function PledgeModal({ open, onClose, roomId, onAgree, onDisagree
   const sections = isGallery ? GALLERY_PLEDGE_SECTIONS : PLEDGE_SECTIONS;
   const pledgeTitle = isGallery ? GALLERY_PLEDGE_TITLE : PLEDGE_TITLE;
   const pledgeIntro = isGallery ? GALLERY_PLEDGE_INTRO : PLEDGE_INTRO;
-  const focusTrapRef = useFocusTrap(open);
-
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
 
   return (
-    <div
-      ref={focusTrapRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="pledge-modal-title"
-      aria-describedby="pledge-modal-desc"
-    >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="모달 닫기"
-        onClick={onClose}
-        tabIndex={-1}
-      />
-
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 id="pledge-modal-title" className="text-base font-semibold">{pledgeTitle}</h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-            aria-label="모달 닫기"
-          >
-            닫기
-          </button>
-        </div>
-
-        <div id="pledge-modal-desc" className="max-h-[60vh] overflow-auto px-5 py-4">
-          <p className="text-sm text-slate-700">
-            {pledgeIntro}
-          </p>
-
-          <p className="mt-2 text-sm text-slate-700">
-            <b>운영시간:</b> {operatingNoticeText(roomId)}
-          </p>
-
-          {/* PDF 원문 링크는 제거(모달 본문에 서약 내용 포함) */}
-
-          <div className="mt-4 space-y-4">
-            {sections.map((sec) => (
-              <section key={sec.title} className="rounded-xl border bg-slate-50 p-4">
-                <h4 className="text-sm font-semibold">{sec.title}</h4>
-                <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-slate-700">
-                  {sec.bullets.map((b, idx) => (
-                    <li key={idx}>{b}</li>
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-
-          <p className="mt-4 text-sm text-slate-700">{PLEDGE_FOOTER}</p>
-
-        </div>
-
-        <div className="flex items-center justify-end gap-2 border-t bg-white px-5 py-4">
-          <Button 
-            type="button" 
-            variant="outline" 
-            onClick={() => { onDisagree(); onClose(); }}
-            aria-label="서약에 동의하지 않고 닫기"
-          >
-            비동의
-          </Button>
-          <Button 
-            type="button" 
-            variant="primary" 
-            onClick={() => { onAgree(); onClose(); }}
-            aria-label="서약에 동의하고 진행하기"
-          >
-            동의
-          </Button>
-        </div>
+    <ConsentDialog open={open} title={pledgeTitle} onClose={onClose} onAgree={onAgree} onDisagree={onDisagree}>
+      <p>{pledgeIntro}</p>
+      <p className="mt-2">
+        <b>운영시간:</b> {operatingNoticeText(roomId)}
+      </p>
+      <div className="mt-4 space-y-4">
+        {sections.map((sec) => (
+          <section key={sec.title} className="rounded-xl border border-line bg-slate-50 p-4">
+            <h3 className="text-[17px] font-bold leading-7">{sec.title}</h3>
+            <ul className="mt-2 list-disc space-y-1.5 pl-5">
+              {sec.bullets.map((b, idx) => (
+                <li key={idx}>{b}</li>
+              ))}
+            </ul>
+          </section>
+        ))}
       </div>
-    </div>
+      <p className="mt-4">{PLEDGE_FOOTER}</p>
+    </ConsentDialog>
   );
 }

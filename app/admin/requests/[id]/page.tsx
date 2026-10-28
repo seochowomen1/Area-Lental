@@ -638,6 +638,7 @@ export default async function AdminRequestDetail({
 
             <BatchActionSection
               quiet
+              paid={paymentView.paymentState === "paid"}
               approveLabel="선택 승인"
               rejectLabel="선택 반려"
               cancelLabel="선택 취소(신청자 요청)"
@@ -701,6 +702,7 @@ export default async function AdminRequestDetail({
               ))}
               <BatchActionSection
                 quiet
+                paid={paymentView.paymentState === "paid"}
                 approveLabel={isBatch ? "전체 승인" : "승인"}
                 rejectLabel={isBatch ? "전체 반려" : "반려"}
                 cancelLabel={isBatch ? "전체 취소(신청자 요청)" : "취소(신청자 요청)"}

@@ -90,7 +90,7 @@ export function galleryForm(over: Record<string, string>): FormData {
     endDate: end,
     exhibitionTitle: "테스트 전시",
     galleryRemovalTime: "11:00",
-    galleryPrepDate: "",
+    // galleryPrepDate 미전송 = 서버가 전날 준비일 자동 계산(온라인은 준비일 필수 · 2026-10-28)
     applicantName: "홍가명",
     birth: "1990-01-01",
     address: "서울 서초구",

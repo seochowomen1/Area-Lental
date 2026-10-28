@@ -15,6 +15,8 @@ interface Props {
   note?: string;
   /** 화면의 주 버튼이 위 "다음 할 일" 카드에 있을 때 — 토글·제출을 보조 모양으로(채운 주 버튼은 화면에 1개 · audit-fix-3 3-2) */
   quiet?: boolean;
+  /** 결제완료 건 — 취소를 고르면 환불 기록 안내를 보인다(2026-10-28 사용자 결정) */
+  paid?: boolean;
 }
 
 /** 선택된 토글 모양 — quiet면 연한 바탕(채운 버튼은 카드 주 버튼 1개만) */
@@ -32,6 +34,7 @@ export default function BatchActionSection({
   children,
   note,
   quiet = false,
+  paid = false,
 }: Props) {
   const [intent, setIntent] = useState<Intent>("승인");
   const isReject = intent === "반려";
@@ -94,6 +97,12 @@ export default function BatchActionSection({
       </div>
 
       {children}
+
+      {isCancel && paid && (
+        <p role="note" className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900">
+          결제완료된 신청입니다. 취소한 뒤 환불도 처리 기록(결제 확인 줄의 [환불 기록])에 남겨 주세요.
+        </p>
+      )}
 
       <input type="hidden" name="actionStatus" value={intent} />
 

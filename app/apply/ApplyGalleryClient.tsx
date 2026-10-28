@@ -1,1135 +1,218 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GALLERY_RULES } from "@/lib/constants";
-import { useRouter, useSearchParams } from "next/navigation";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-
-import { GalleryRequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
-import { todayYmdSeoul } from "@/lib/datetime";
-import { addDays, dayOfWeek, diffDaysInclusive, dowLabel, isYmd } from "@/lib/rules/ymd";
-import SiteHeader from "@/components/SiteHeader";
-import PledgeModal from "@/components/PledgeModal";
-import PrivacyModal from "@/components/PrivacyModal";
-import OperatingHoursNotice from "@/components/OperatingHoursNotice";
-import Button from "@/components/ui/Button";
-import Modal, { MODAL_BTN_SECONDARY } from "@/components/ui/Modal";
-import Card from "@/components/ui/Card";
-import Notice from "@/components/ui/Notice";
-import Checkbox from "@/components/ui/Checkbox";
-import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
-import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
-import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
-import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
-import HolidayUnavailableNotice from "@/components/HolidayUnavailableNotice";
-import { PAYMENT_FLOW_SHORT } from "@/lib/policy";
-import { GALLERY_FEE_KRW } from "@/lib/constants";
-import { availablePrepDates, planGallery } from "@/lib/galleryPlan";
-import { useGalleryMonthData, galleryMonthsForRange, formatExcludedHolidays } from "@/lib/useGalleryMonthData";
-import { handleApplySuccess, parseApplyError } from "@/lib/applySubmit";
-
-// 갤러리 신청(B안): 기간(start/end) 선택 → 회차 자동 생성
-// - 회차·일수·이용료는 lib/galleryPlan.ts planGallery() 한 곳에서 계산(상세 달력·서버와 같은 함수 · audit-fix-1 [3])
-// - 일요일·공휴일 자동 제외(공휴일은 /api/booked-dates holidays)
-// - 준비(세팅)일 1일 무료: 후보 = availablePrepDates()(일요일·공휴일 제외)
-
-function formatPhoneKR(input: string) {
-  const digits = input.replace(/\D/g, "").slice(0, 11);
-  if (!digits) return "";
-
-  // 02 지역번호(서울)
-  if (digits.startsWith("02")) {
-    const rest = digits.slice(2);
-    if (rest.length <= 3) return `02-${rest}`;
-    if (rest.length <= 7) return `02-${rest.slice(0, 3)}-${rest.slice(3)}`;
-    return `02-${rest.slice(0, 4)}-${rest.slice(4, 8)}`;
-  }
-
-  // 휴대폰/기타(보통 3-3/4-4)
-  const a = digits.slice(0, 3);
-  const b = digits.slice(3);
-  if (b.length <= 4) return `${a}-${b}`;
-  if (b.length <= 7) return `${a}-${b.slice(0, 3)}-${b.slice(3)}`;
-  return `${a}-${b.slice(0, 4)}-${b.slice(4, 8)}`;
-}
-
-// 날짜 유틸(isYmd·addDays·dayOfWeek·dowLabel·diffDaysInclusive)은 lib/rules/ymd.ts 1벌 (3-3)
-
-// NOTE:
-// GalleryRequestInputSchema는 superRefine를 포함하므로(ZodEffects), .extend()가 불가능합니다.
-// 따라서 gallery 신청 폼은 base schema를 그대로 사용하고, 추가 검증(최대 30일)만 superRefine로 보강합니다.
-type GalleryApplyValues = GalleryRequestInput;
-
-const GalleryApplySchema = GalleryRequestInputSchema.superRefine((v, ctx) => {
-  // 기간 최대 30일(포함)
-  if (isYmd(v.startDate) && isYmd(v.endDate) && v.endDate >= v.startDate) {
-    const days = diffDaysInclusive(v.startDate, v.endDate);
-    if (days > 30) {
-      ctx.addIssue({ code: "custom", path: ["endDate"], message: "전시 기간은 최대 30일까지 신청할 수 있습니다." });
-    }
-  }
-});
-
 /**
- * 준비일 후보에서 예약 충돌이 있는 날짜를 만나면 해당 날짜 이후(과거 방향)를 모두 제거합니다.
- * 예: 후보=[2/11, 2/10, 2/9, 2/8, 2/7, 2/6, 2/5], 2/6 충돌
- *   → 결과=[2/11, 2/10, 2/9, 2/8, 2/7] (2/6 이후 전부 잘림)
+ * 3단계 전시 신청서 쓰기 — 우리동네 갤러리 (audit-fix-3 3-4 · 02_ui_apply §3 · G2)
+ * 기간·준비일은 2단계에서 고른 주소 값. 회차·금액 = planGallery(서버와 같은 함수).
+ * 화면에 "대관" 글자 없음. 서버로 보내는 데이터 형식은 3-4 전과 같다(lib/apply/form buildGalleryRaw).
  */
-function filterPrepDatesByConflict(candidates: string[], bookedDates: Set<string>, exhibitionEndDates: Set<string>): string[] {
-  // 준비·철거 규정(2026-10-19): 기존 전시의 마지막 날(철거일)은 철거 후 17:00(토 11:00) 이후 준비 가능
-  //   → 후보에 포함. 그 전시의 중간 날짜(마감)를 만나면 그 이전은 전부 제외
-  const result: string[] = [];
-  for (const d of candidates) {
-    if (bookedDates.has(d)) {
-      if (exhibitionEndDates.has(d)) {
-        result.push(d);
-        continue;
-      }
-      break;
-    }
-    result.push(d);
-  }
-  return result;
-}
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { getRoom } from "@/lib/space";
+import { addDays, formatKoDate, kstNow } from "@/lib/rules/ymd";
+import { availablePrepDates, planGallery, resolveGalleryPrep } from "@/lib/galleryPlan";
+import { galleryMonthsForRange, useGalleryMonthData } from "@/lib/useGalleryMonthData";
+import { galleryPrepAfterText } from "@/lib/galleryCalendar";
+import { birthLabel, parseBirth8 } from "@/lib/apply/birth";
+import { buildGalleryRaw, FIELD_LABELS, orderedErrorKeys, rawToFormData, validateApply } from "@/lib/apply/form";
+import { formatPeriod, spaceHrefWithPeriod } from "@/lib/apply/schedule";
+import { postApply, requestIdFromHref, saveDoneSummary, type ScheduleIssue } from "@/lib/apply/submit";
+import HolidayUnavailableNotice from "@/components/HolidayUnavailableNotice";
+import { NO_PREP_TEXT } from "@/components/apply/GalleryPeriodPicker";
+import ApplyFrame, { KEEP_TEXT } from "@/components/apply/ApplyFrame";
+import ApplicantFields from "@/components/apply/ApplicantFields";
+import ConfirmSheet from "@/components/apply/ConfirmSheet";
+import ConsentBlock from "@/components/apply/ConsentBlock";
+import ExhibitFields from "@/components/apply/ExhibitFields";
+import FeeSummary, { galleryFeeLines } from "@/components/apply/FeeSummary";
+import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
+import ResumeDraftBox from "@/components/apply/ResumeDraftBox";
+import ScheduleSummary from "@/components/apply/ScheduleSummary";
+import { useApplyForm } from "@/components/apply/useApplyForm";
+import { A_BTN_PRIMARY, A_H1, A_HELP } from "@/components/apply/ui";
 
-/** 직전 운영일에 전시가 있을 때 준비 가능 시작 시각 (평일 17:00 · 토요일 11:00) */
-function prepAfterStartTime(ymd: string): string {
-  return dayOfWeek(ymd) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY;
-}
-
-/** 전시 마지막 날 철거 완료 기한 (평일 16:00 · 토요일 11:00) */
-function teardownDeadline(ymd: string): string {
-  return dayOfWeek(ymd) === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
-}
-
-/** 09:00부터 기한까지 30분 간격 철수 시간 옵션 */
-function teardownTimeOptions(deadline: string): string[] {
-  const out: string[] = [];
-  const [dh, dm] = deadline.split(":").map((v) => parseInt(v, 10));
-  const limit = dh * 60 + dm;
-  for (let t = 9 * 60; t <= limit; t += 30) {
-    out.push(`${String(Math.floor(t / 60)).padStart(2, "0")}:${String(t % 60).padStart(2, "0")}`);
-  }
-  return out;
-}
-
-function composePurpose(fields: { exhibitionPurpose?: string; genreContent?: string; awarenessPath?: string; specialNotes?: string; galleryRemovalTime?: string; galleryPrepDate?: string }) {
-  // RequestInputSchema의 purpose(min 5) 충족 + 담당자 확인 편의
-  const lines: string[] = [];
-  if (fields.exhibitionPurpose?.trim()) lines.push(`전시 목적: ${fields.exhibitionPurpose.trim()}`);
-  if (fields.genreContent?.trim()) lines.push(`장르·내용: ${fields.genreContent.trim()}`);
-  if (fields.awarenessPath?.trim()) lines.push(`인지 경로: ${fields.awarenessPath.trim()}`);
-  if (fields.galleryPrepDate?.trim()) lines.push(`준비일: ${fields.galleryPrepDate.trim()}`);
-  if (fields.galleryRemovalTime?.trim()) lines.push(`철수 예정: 종료일 ${fields.galleryRemovalTime.trim()}`);
-  if (fields.specialNotes?.trim()) lines.push(`특이사항: ${fields.specialNotes.trim()}`);
-  const joined = lines.join("\n").trim();
-  return joined.length >= 5 ? joined : "전시 신청";
-}
-
-export default function ApplyGalleryClient() {
-  const searchParams = useSearchParams();
+export default function ApplyGalleryClient({ startDate, endDate, prepDate }: { startDate: string; endDate: string; prepDate: string | null }) {
   const router = useRouter();
+  const room = getRoom("gallery")!;
+  const form = useApplyForm("gallery", { period: { startDate, endDate } });
+  const { values, patch, errors, setErrors } = form;
+  const months = useMemo(() => galleryMonthsForRange(startDate, endDate), [startDate, endDate]);
+  const md = useGalleryMonthData(months);
+  const today = kstNow().ymd;
 
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [errorTitle, setErrorTitle] = useState("처리 중 오류가 발생했습니다");
-  const [batchError, setBatchError] = useState<string | null>(null);
-
-  const [privacyOpen, setPrivacyOpen] = useState(false);
-  const [pledgeOpen, setPledgeOpen] = useState(false);
-  const [galleryInfoOpen, setGalleryInfoOpen] = useState(false);
-  const [confirmData, setConfirmData] = useState<GalleryApplyValues | null>(null);
-
-  // 생년월일 3칸 입력
-  const [birthYear, setBirthYear] = useState("");
-  const [birthMonth, setBirthMonth] = useState("");
-  const [birthDay, setBirthDay] = useState("");
-  const birthMonthRef = useRef<HTMLInputElement>(null);
-  const birthDayRef = useRef<HTMLInputElement>(null);
-
-  const fixedPledgeDate = useMemo(() => todayYmdSeoul(), []);
-  const minStartDate = useMemo(() => addDays(todayYmdSeoul(), 1), []);
-
-  const qpStart = searchParams.get("startDate") ?? "";
-  const qpEnd = searchParams.get("endDate") ?? "";
-
-  const {
-    register,
-    handleSubmit,
-    watch,
-    setValue,
-    clearErrors,
-    formState: { errors, submitCount }
-  } = useForm<GalleryApplyValues>({
-    resolver: zodResolver(GalleryApplySchema),
-    defaultValues: {
-      // GalleryRequestInputSchema 필수값(갤러리 UI에서는 숨김/고정)
-      roomId: "gallery",
-      date: qpStart || "",
-      startTime: "09:00",
-      endTime: "18:00",
-      headcount: 1,
-      laptop: false,
-      projector: false,
-      audio: false,
-
-      // 서약/동의
-      pledgeDate: fixedPledgeDate,
-      privacyAgree: false,
-      pledgeAgree: false,
-
-      // 갤러리 기간
-      startDate: qpStart,
-      endDate: qpEnd,
-
-      // 철수시간
-      galleryRemovalTime: "",
-
-      // 준비일 (기본값은 startDate 설정 후 useEffect에서 채움)
-      galleryPrepDate: "",
-
-      // 전시 정보
-      exhibitionTitle: "",
-      exhibitionPurpose: "",
-      genreContent: "",
-      awarenessPath: "",
-      specialNotes: "",
-
-      // purpose는 전시 정보 필드에서 자동 구성(useEffect로 동기화)
-      purpose: "전시 신청",
+  // 준비일: 2단계 값이 후보 안이면 그대로, 아니면 기본 준비일(예전 신청서와 같은 판단)
+  const prep = useMemo(() => {
+    const ctx = { holidays: md.holidaySet, booked: md.booked, exhibitionEnds: md.exhibitionEnds, prepOnly: md.prepOnly, today };
+    // 주소의 준비일이 내일 이후 후보이고 비어 있으면(또는 앞 전시 마지막 날이면) 그대로
+    const candidates = availablePrepDates(startDate, md.holidaySet, 7, addDays(today, 1));
+    if (prepDate && candidates.includes(prepDate) && !md.prepOnly.has(prepDate)) {
+      if (!md.booked.has(prepDate)) return { date: prepDate, after: false };
+      if (md.exhibitionEnds.has(prepDate)) return { date: prepDate, after: true };
     }
-  });
+    // 아니면 기본 준비일(재검수 R-3) — 그것도 안 되면 준비일 없음 → 신청 불가 안내
+    const r = resolveGalleryPrep(startDate, ctx);
+    return r ? { date: r.date, after: r.afterExhibition } : { date: "", after: false };
+  }, [startDate, prepDate, md.holidaySet, md.booked, md.exhibitionEnds, md.prepOnly, today]);
+  const noPrep = md.status === "ok" && !prep.date;
 
-  // 생년월일 수동 입력 → RHF 동기화
-  const handleBirthSync = useCallback((y: string, m: string, d: string) => {
-    if (y.length === 4 && m.length >= 1 && d.length >= 1) {
-      const mm = m.padStart(2, "0");
-      const dd = d.padStart(2, "0");
-      setValue("birth", `${y}-${mm}-${dd}`, { shouldValidate: true, shouldDirty: true });
-    }
-  }, [setValue]);
-
-  // roomId는 항상 gallery로 고정
-  useEffect(() => {
-    setValue("roomId", "gallery", { shouldValidate: true, shouldDirty: true });
-  }, [setValue]);
-
-  // pledgeDate는 신청 당일로 고정
-  useEffect(() => {
-    setValue("pledgeDate", fixedPledgeDate, { shouldValidate: true });
-  }, [fixedPledgeDate, setValue]);
-
-  const startDate = watch("startDate");
-  const endDate = watch("endDate");
-  const privacyAgree = watch("privacyAgree");
-  const pledgeAgree = watch("pledgeAgree");
-  const applicantName = watch("applicantName");
-  const exhibitionTitle = watch("exhibitionTitle");
-  const exhibitionPurpose = watch("exhibitionPurpose");
-  const genreContent = watch("genreContent");
-  const awarenessPath = watch("awarenessPath");
-  const specialNotes = watch("specialNotes");
-  const galleryRemovalTime = watch("galleryRemovalTime");
-  const galleryPrepDate = watch("galleryPrepDate");
-
-  // ★ [3] 공휴일·예약 현황 — 준비일 후보 첫날이 속한 달 ~ 종료일이 속한 달(최대 3회 호출)
-  const monthKeys = useMemo(() => galleryMonthsForRange(startDate, endDate), [startDate, endDate]);
-  const monthData = useGalleryMonthData(monthKeys);
-  const holidaySet = monthData.holidaySet;
-  const prepBookedDates = monthData.booked;
-  const prepEndDates = monthData.exhibitionEnds;
-  const holidaysPending = monthData.status === "loading";
-
-  // 준비일 후보(일요일·공휴일·오늘 이전 제외) → 충돌 날짜를 만나면 거기서 잘림
-  const filteredPrepDates = useMemo(
-    () => (isYmd(startDate) ? filterPrepDatesByConflict(availablePrepDates(startDate, holidaySet, 7, todayYmdSeoul()), prepBookedDates, prepEndDates) : []),
-    [startDate, holidaySet, prepBookedDates, prepEndDates]
-  );
-  /** 선택한 준비일이 앞 전시의 마지막 날이면 철거 후(17:00/토 11:00) 이후 준비 */
-  const prepAfterExhibition = Boolean(galleryPrepDate && prepBookedDates.has(galleryPrepDate) && prepEndDates.has(galleryPrepDate));
-  const prepAfterLabel = prepAfterExhibition && galleryPrepDate ? `${prepAfterStartTime(galleryPrepDate)} 이후` : "";
-
-  // filteredPrepDates가 바뀌면 기본 준비일을 자동 선택 (현재 선택이 유효하면 유지)
-  useEffect(() => {
-    if (galleryPrepDate && filteredPrepDates.includes(galleryPrepDate)) return;
-    if (filteredPrepDates.length > 0) {
-      setValue("galleryPrepDate", filteredPrepDates[0], { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("galleryPrepDate", "", { shouldValidate: true, shouldDirty: true });
-    }
-  }, [filteredPrepDates, galleryPrepDate, setValue]);
-
-  // 편의: 신청자 성명 → 서약자 성명 자동 채움(기본값)
-  // - 서약자 성명을 직접 수정하면 이후에는 자동 동기화하지 않습니다.
-  const pledgeAutoFillRef = useRef<boolean>(true);
-
-  useEffect(() => {
-    if (!pledgeAutoFillRef.current) return;
-    if (!applicantName) return;
-    setValue("pledgeName", applicantName, { shouldValidate: true, shouldDirty: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [applicantName, setValue]);
-
-  // purpose를 전시 정보 필드에서 자동 구성 (스키마 validation 통과를 위해)
-  useEffect(() => {
-    const purpose = composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate });
-    setValue("purpose", purpose, { shouldValidate: true, shouldDirty: true });
-  }, [exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate, setValue]);
-
-  // ★ [3] 회차·일수·이용료 = planGallery() (상세 달력·서버와 같은 함수)
   const plan = useMemo(
-    () => planGallery({ startDate, endDate, prepDate: galleryPrepDate || null, prepAfterExhibition, holidays: holidaySet }),
-    [startDate, endDate, galleryPrepDate, prepAfterExhibition, holidaySet]
+    () => planGallery({ startDate, endDate, prepDate: prep.date || null, prepAfterExhibition: prep.after, holidays: md.holidaySet }),
+    [startDate, endDate, prep, md.holidaySet]
   );
-  const sessionsBundle = plan;
 
-  // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
-  useEffect(() => {
-    if (!isYmd(startDate)) return;
-    const dow = dayOfWeek(startDate);
-    if (dow === 0) return;
-    setValue("date", startDate, { shouldValidate: true, shouldDirty: true });
-    if (dow === 6) {
-      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
-      setValue("endTime", "13:00", { shouldValidate: true, shouldDirty: true });
-    } else if (dow === 2) {
-      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
-      setValue("endTime", "20:00", { shouldValidate: true, shouldDirty: true });
-    } else {
-      setValue("startTime", "09:00", { shouldValidate: true, shouldDirty: true });
-      setValue("endTime", "18:00", { shouldValidate: true, shouldDirty: true });
-    }
-  }, [startDate, setValue]);
+  const [view, setView] = useState<"input" | "confirm">("input");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [conflict, setConflict] = useState<{ message: string; issues: ScheduleIssue[] } | null>(null);
+  const [missing, setMissing] = useState<MissingField[]>([]);
 
-  function handleConfirm(values: GalleryApplyValues) {
-    // 기간은 맞게 들어왔지만 회차가 0(예: 일요일만)인 경우 — 요약(전시 기간)으로 안내하고 그 칸으로 이동
-    if (sessionsBundle.sessions.length === 0) {
-      const el = document.getElementById("startDate");
-      el?.scrollIntoView({ behavior: "smooth", block: "center" });
-      (el as HTMLElement | null)?.focus({ preventScroll: true });
+  const period = formatPeriod(startDate, endDate);
+  const sections = [
+    { title: `전시 기간 · ${plan.exhibitionDayCount}일`, lines: [{ key: "period", text: period }] },
+    ...(prep.date
+      ? [{ title: "준비일 · 무료", lines: [{ key: "prep", text: `${formatKoDate(prep.date)}${prep.after ? ` ${galleryPrepAfterText(prep.date)}` : ""}` }] }]
+      : []),
+  ];
+  const fee = (
+    <>
+      {md.status === "ok" && md.holidayStatus === "unavailable" ? <HolidayUnavailableNotice /> : null}
+      <FeeSummary title="예상 전시 공간 이용료" lines={galleryFeeLines(plan)} total={plan.totalFeeKRW} target="전시" />
+    </>
+  );
+  const changeHref = spaceHrefWithPeriod(startDate, endDate);
+
+  function raw() {
+    return buildGalleryRaw(values, { startDate, endDate, prepDate: prep.date, sessions: plan.sessions, pledgeDate: today });
+  }
+
+  function toConfirm() {
+    if (noPrep) {
+      window.scrollTo({ top: 0, behavior: "smooth" });
       return;
     }
-    setError(null);
-    setBatchError(null);
-    setConfirmData(values);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setConflict(null);
+    const errs = validateApply("gallery", values, raw());
+    setErrors(errs);
+    const items: MissingField[] = orderedErrorKeys(errs).map((k) => ({ key: k, label: FIELD_LABELS[k], targetId: k }));
+    setMissing(items);
+    if (items.length) return;
+    setSubmitError(null);
+    setView("confirm");
   }
 
-  async function submitConfirmed() {
-    if (!confirmData) return;
-    await onSubmit(confirmData);
-  }
-
-  async function onSubmit(values: GalleryApplyValues) {
-    setError(null);
-    setErrorTitle("처리 중 오류가 발생했습니다");
-    setBatchError(null);
+  async function submit() {
     setSubmitting(true);
-
-    try {
-      const fd = new FormData();
-
-      // RequestInputSchema 필드
-      Object.entries(values).forEach(([k, v]) => {
-        if (typeof v === "boolean") fd.set(k, v ? "true" : "false");
-        else fd.set(k, String(v));
-      });
-
-      // 갤러리: 장비 옵션은 UI/저장/계산 모두 금지(서버에서도 강제 예정)
-      fd.set("laptop", "false");
-      fd.set("projector", "false");
-      fd.set("audio", "false");
-
-      // 기존 저장 구조 호환: purpose 구성
-      fd.set(
-        "purpose",
-        composePurpose({ exhibitionPurpose, genreContent, awarenessPath, specialNotes, galleryRemovalTime, galleryPrepDate })
-      );
-
-      // 회차(서버는 기간으로 다시 만들고 검증한다)
-      fd.set("sessions", JSON.stringify(plan.sessions.map((s) => ({ date: s.date, startTime: s.startTime, endTime: s.endTime }))));
-
-      const res = await fetch("/api/requests", { method: "POST", body: fd });
-      if (!res.ok) {
-        const data = await res.json().catch(() => null);
-        // ★ [2][6] 409 BATCH_CONFLICT / SLOT_TAKEN · 400 SESSION_INVALID
-        const v = parseApplyError(data, true);
-        setErrorTitle(v.title);
-        if (v.issueLines.length) setBatchError(v.issueLines.join("\n"));
-        throw new Error(v.message);
-      }
-
-      const data = await res.json().catch(() => null);
-      // ★ [1][10] 토큰은 sessionStorage(60분)에만 · 주소창에 넣지 않음
-      router.push(handleApplySuccess(data, { category: "gallery", screenFeeKRW: monthData.status === "ok" ? plan.totalFeeKRW : null }));
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "신청 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
-    } finally {
-      setSubmitting(false);
+    setSubmitError(null);
+    const r = await postApply(rawToFormData(raw(), plan.sessions), { category: "gallery", screenFeeKRW: md.status === "ok" ? plan.totalFeeKRW : null });
+    if (r.kind === "ok") {
+      saveDoneSummary({ requestId: requestIdFromHref(r.href), roomName: room.name, schedule: period, feeLabel: "예상 전시 공간 이용료" });
+      form.finish();
+      router.push(r.href);
+      return;
     }
+    setSubmitting(false);
+    if (r.kind === "schedule") {
+      setConflict({ message: r.message, issues: r.issues });
+      setView("input");
+      window.setTimeout(() => {
+        window.scrollTo({ top: 0 });
+        document.getElementById("schedule-card")?.focus({ preventScroll: true });
+      }, 0);
+      return;
+    }
+    setSubmitError(r.message);
   }
 
-  const sessionCount = sessionsBundle.sessions.length;
-
-  // 이용료: planGallery 결과(평일·토 일수 × GALLERY_FEE_KRW · 준비일 무료)
-  const feeBreakdown = {
-    weekdays: plan.weekdayCount,
-    saturdays: plan.saturdayCount,
-    prepDays: plan.prepDate ? 1 : 0,
-    total: plan.totalFeeKRW,
-  };
-  const excludedHolidayText = formatExcludedHolidays(plan.excludedHolidays, monthData.holidayNames);
-
-  /**
-   * 빠진 항목 — [신청하기]는 항상 누를 수 있고(처리 중만 비활성), 누른 뒤 빠진 항목이 있으면 버튼 바로 위에 요약한다
-   * (audit-fix-2 ②-2-3 · 수용 4-4). 전시 기간·전시명·철수 시간 포함.
-   */
-  const missingFields: MissingField[] = (() => {
-    const out: MissingField[] = [];
-    const add = (key: string, label: string, targetId: string) => {
-      if (!out.some((x) => x.key === key)) out.push({ key, label, targetId });
-    };
-    if (submitCount > 0) {
-      if (sessionCount === 0 || errors.startDate || errors.endDate) add("period", "전시 기간", "startDate");
-      // 요약 순서 = 화면 순서(철수 시간이 전시명보다 위) — 첫 항목으로 포커스가 간다 (audit-fix-2 검수 P-1)
-      if (!galleryRemovalTime || errors.galleryRemovalTime) add("galleryRemovalTime", "철수 시간", isYmd(endDate) ? "galleryRemovalTime" : "endDate");
-      if (!exhibitionTitle || errors.exhibitionTitle) add("exhibitionTitle", "전시명", "exhibitionTitle");
-      if (errors.applicantName) add("applicantName", "성명", "applicantName");
-      if (errors.birth) add("birth", "생년월일", "birthYear");
-      if (errors.address) add("address", "주소", "address");
-      if (errors.phone) add("phone", "연락처", "phone");
-      if (errors.email) add("email", "이메일", "email");
-      if (errors.orgName) add("orgName", "단체명", "orgName");
-      if (errors.privacyAgree) add("privacyAgree", "개인정보 동의", "privacyAgreeBox");
-      if (errors.pledgeAgree) add("pledgeAgree", "서약 동의", "pledgeAgreeBox");
-      if (errors.pledgeName) add("pledgeName", "서약자 성명", "pledgeName");
-    }
-    return out;
-  })();
-
-  const hasSundayInRange = useMemo(() => {
-    if (!isYmd(startDate) || !isYmd(endDate) || endDate < startDate) return false;
-    let cur = startDate;
-    let cap = 0;
-    while (cur <= endDate) {
-      if (cap++ > 400) break;
-      if (dayOfWeek(cur) === 0) return true;
-      cur = addDays(cur, 1);
-    }
-    return false;
-  }, [startDate, endDate]);
-
-  // ─── 확인 화면 ───
-  if (confirmData) {
-    return (
-      <div>
-        <SiteHeader title="신청 내용 확인" backHref="/space?category=gallery" backLabel="목록" />
-        <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-          <div className="text-center">
-            <h2 className="text-2xl font-bold text-slate-900">신청 내용 확인</h2>
-            <p className="mt-2 text-sm text-slate-600">아래 내용을 확인하신 후 제출해 주세요.</p>
-          </div>
-
-          {error && (
-            <div className="mt-4">
-              <Notice variant="danger" title={errorTitle} pad="md">{error}</Notice>
-            </div>
-          )}
-          {batchError && (
-            <div className="mt-4">
-              <Notice variant="warn" title="일부 회차는 신청할 수 없습니다" pad="md">
-                <div className="whitespace-pre-line text-sm">{batchError}</div>
-              </Notice>
-            </div>
-          )}
-
-          <div className="mt-6 space-y-4">
-            {/* 전시 기간 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>전시 기간</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">공간</span>
-                  <span className="text-sm font-semibold text-slate-900">우리동네 갤러리</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">전시 기간</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmData.startDate} ~ {confirmData.endDate}</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">전시 준비일</span>
-                  <span className="text-sm font-semibold text-slate-900">
-                    {sessionsBundle.prepDate
-                      ? `${sessionsBundle.prepDate} (${dowLabel(sessionsBundle.prepDate)}) — 무료${prepAfterLabel ? ` · 앞 전시 철거 후 ${prepAfterLabel}` : ""}`
-                      : "없음"}
-                  </span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">철수 일시</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmData.endDate} {confirmData.galleryRemovalTime}</span>
-                </div>
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">총 회차</span>
-                  <span className="text-sm font-semibold text-slate-900">{sessionCount}회</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 신청자 정보 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>신청자 정보</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                {([
-                  ["성명", confirmData.applicantName],
-                  ["생년월일", confirmData.birth],
-                  ["주소", confirmData.address],
-                  ["연락처", confirmData.phone],
-                  ["이메일", confirmData.email],
-                  ["단체명", confirmData.orgName],
-                ] as const).map(([label, value]) => (
-                  <div key={label} className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500 shrink-0">{label}</span>
-                    <span className="text-sm font-semibold text-slate-900 text-right">{value}</span>
-                  </div>
-                ))}
-              </div>
-              <p className="mt-3 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                이메일은 전시 승인 여부 및 신청 조회 등에 활용되므로 반드시 정확히 입력해 주세요.
-              </p>
-            </Card>
-
-            {/* 전시 정보 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>전시 정보</h3>
-              <div className="mt-3 divide-y divide-slate-100">
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">전시명</span>
-                  <span className="text-sm font-semibold text-slate-900">{confirmData.exhibitionTitle}</span>
-                </div>
-                {confirmData.exhibitionPurpose && (
-                  <div className="py-2.5">
-                    <span className="text-sm text-slate-500">전시 목적</span>
-                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.exhibitionPurpose}</p>
-                  </div>
-                )}
-                {confirmData.genreContent && (
-                  <div className="py-2.5">
-                    <span className="text-sm text-slate-500">장르·내용</span>
-                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.genreContent}</p>
-                  </div>
-                )}
-                {confirmData.awarenessPath && (
-                  <div className="flex justify-between py-2.5">
-                    <span className="text-sm text-slate-500">인지 경로</span>
-                    <span className="text-sm font-semibold text-slate-900">{confirmData.awarenessPath}</span>
-                  </div>
-                )}
-                {confirmData.specialNotes && (
-                  <div className="py-2.5">
-                    <span className="text-sm text-slate-500">특이사항</span>
-                    <p className="mt-1.5 text-sm text-slate-900 whitespace-pre-line rounded-lg bg-slate-50 px-3 py-2">{confirmData.specialNotes}</p>
-                  </div>
-                )}
-              </div>
-            </Card>
-
-            {/* 예상 이용료 */}
-            <Card pad="lg">
-              <h3 className={SECTION_TITLE}>예상 전시 공간 이용료</h3>
-              {monthData.status === "ok" && monthData.holidayStatus === "unavailable" ? <HolidayUnavailableNotice className="mt-3" /> : null}
-              <div className="mt-3 overflow-hidden rounded-xl border border-line bg-white">
-                <div className="px-4 py-3 space-y-2">
-                  {feeBreakdown.weekdays > 0 && (
-                    <div className="flex items-center justify-between text-sm text-slate-600">
-                      <span>평일 {feeBreakdown.weekdays}일 x {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
-                    </div>
-                  )}
-                  {feeBreakdown.saturdays > 0 && (
-                    <div className="flex items-center justify-between text-sm text-slate-600">
-                      <span>토요일 {feeBreakdown.saturdays}일 x {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
-                      <span className="font-semibold text-slate-800 tabular-nums">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
-                    </div>
-                  )}
-                  {excludedHolidayText ? <p className="text-[13px] text-slate-500">{excludedHolidayText}</p> : null}
-                  {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
-                    <div className="flex items-center justify-between text-sm text-ink-2">
-                      <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
-                      <span className="font-medium">무료</span>
-                    </div>
-                  )}
-                </div>
-                <div className="mx-4 mb-3 flex items-center justify-between rounded-lg bg-brand-soft px-4 py-3">
-                  <span className="text-[15px] font-bold text-ink">합계</span>
-                  <span className="text-2xl font-bold tabular-nums text-brand">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
-                </div>
-              </div>
-            </Card>
-
-            {/* 버튼 */}
-            <div className="flex gap-3 pt-2">
-              <Button type="button" variant="outline" className="flex-1 py-3" onClick={() => setConfirmData(null)}>
-                수정하기
-              </Button>
-              <Button type="button" variant="primary" className="flex-1 py-3" disabled={submitting || holidaysPending} onClick={submitConfirmed}>
-                {submitting ? "제출 중…" : holidaysPending ? "공휴일 확인 중…" : "최종 제출"}
-              </Button>
-            </div>
-          </div>
-        </main>
-      </div>
-    );
-  }
-
-  return (
-    <div>
-      <SiteHeader title="우리동네 갤러리 전시 신청" backHref="/space?category=gallery" backLabel="목록" />
-
-      <main className="mx-auto max-w-6xl px-4 pb-16 pt-8">
-        <h2 className="text-2xl font-bold">우리동네 갤러리 전시 신청서 작성</h2>
-        <p className={SECTION_DESC}>온라인으로 신청서를 작성하면 담당자 검토/승인 절차를 거쳐 확정됩니다.</p>
-
-        <div className="mt-4">
-          <OperatingHoursNotice roomId="gallery" />
-        </div>
-
-        <div className="mt-5">
-          <Notice title="신청 전 확인" variant="info" pad="md">
-            <ul className="list-disc space-y-1 pl-5">
-              <li>우리동네 갤러리는 <b>일 단위</b>로 신청하며, 시간 선택 없이 기간만 지정합니다.</li>
-              <li>일요일·공휴일은 자동 제외되며, 준비(세팅)일 1일은 <b>무료</b>로 사용 가능합니다. <span className="whitespace-nowrap">(날짜 선택 가능)</span></li>
-              <li>전시 기간은 최대 <b>30일</b>까지 신청 가능합니다.</li>
-              <li><b>철거</b>: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수입니다.</li>
-              <li><b>준비</b>: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 가능합니다.</li>
-              <li><PaymentFlowText text={PAYMENT_FLOW_SHORT("전시")} bold={paymentFlowBold("전시", "short")} /></li>
-              <li>상세 화면의 &ldquo;공간정보 및 시설안내 / 취소·환불규정&rdquo;을 확인한 후 신청해 주세요.</li>
-            </ul>
-          </Notice>
-        </div>
-
-        <form onSubmit={handleSubmit(handleConfirm)} className="mt-6 space-y-8">
-          {/* hidden - roomId/date/start/end are driven by UI */}
-          <input type="hidden" {...register("roomId")} />
-          <input type="hidden" {...register("date")} />
-          <input type="hidden" {...register("startTime")} />
-          <input type="hidden" {...register("endTime")} />
-          <input type="hidden" value="false" {...register("laptop")} />
-          <input type="hidden" value="false" {...register("projector")} />
-          <input type="hidden" value="false" {...register("audio")} />
-
-          {error ? (
-            <Notice variant="danger" title={errorTitle} pad="md">
-              {error}
-            </Notice>
-          ) : null}
-
-          {batchError ? (
-            <Notice variant="warn" title="일부 회차는 신청할 수 없습니다" pad="md">
-              <div className="whitespace-pre-line text-sm">{batchError}</div>
-            </Notice>
-          ) : null}
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>전시 기간</h3>
-            <p className={SECTION_DESC}>기간을 선택하면 회차가 자동 생성됩니다.</p>
-
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="startDate">시작일 *</FieldLabel>
-                <Input id="startDate" type="date" min={minStartDate} {...register("startDate")} />
-                {errors.startDate?.message ? <FieldHelp className="text-red-600">{errors.startDate.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="endDate">종료일 *</FieldLabel>
-                <Input id="endDate" type="date" {...register("endDate")} />
-                {errors.endDate?.message ? <FieldHelp className="text-red-600">{errors.endDate.message}</FieldHelp> : null}
-              </div>
-            </div>
-
-            <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="text-sm text-slate-700">
-                  자동 생성 회차: <span className="font-semibold text-slate-900">{sessionCount || 0}회</span>
-                </div>
-                <button type="button" onClick={() => setGalleryInfoOpen(true)} className="text-sm font-semibold text-brand hover:underline">
-                  우리동네 갤러리 안내 보기
-                </button>
-              </div>
-              {isYmd(startDate) && filteredPrepDates.length > 0 && (
-                <div className="mt-3 rounded-lg border border-emerald-300 bg-emerald-50 px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-emerald-900">전시 준비일 (무료)</span>
-                  </div>
-                  <p className="mt-1 text-xs text-emerald-800">
-                    전시 시작 전 준비(세팅)를 위한 1일을 무료로 사용할 수 있습니다. 필요 없으면 &lsquo;준비일 없음&rsquo;을 선택하세요.
-                    그날 전시가 없으면 운영시간 내 언제든, 앞 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b> 준비 가능합니다.
-                  </p>
-                  <div className="mt-2">
-                    <Select
-                      id="galleryPrepDate"
-                      {...register("galleryPrepDate")}
-                    >
-                      {filteredPrepDates.map((d) => (
-                        <option key={d} value={d}>
-                          {d} ({dowLabel(d)}){prepBookedDates.has(d) && prepEndDates.has(d) ? ` · 앞 전시 철거 후 ${prepAfterStartTime(d)} 이후` : ""}
-                        </option>
-                      ))}
-                      <option value="">준비일 없음</option>
-                    </Select>
-                  </div>
-                  {prepAfterLabel ? (
-                    <FieldHelp className="text-emerald-800">선택한 준비일에는 앞 전시가 있어 철거 후 <b>{prepAfterLabel}</b>부터 입장·세팅할 수 있습니다.</FieldHelp>
-                  ) : null}
-                  {errors.galleryPrepDate?.message ? <FieldHelp className="text-red-600">{errors.galleryPrepDate.message}</FieldHelp> : null}
-                </div>
-              )}
-              {excludedHolidayText ? (
-                <p className="mt-2 text-xs text-slate-600">{excludedHolidayText}</p>
-              ) : hasSundayInRange ? (
-                <p className="mt-2 text-xs text-slate-600">선택한 기간의 일요일은 휴관이라 빠집니다.</p>
-              ) : null}
-              {monthData.status === "error" ? (
-                <div className="mt-3">
-                  <Notice variant="warn">
-                    공휴일 정보를 불러오지 못해 예상 이용료가 실제와 다를 수 있습니다.{" "}
-                    <button type="button" onClick={monthData.reload} className="font-semibold text-brand underline underline-offset-2">
-                      다시 불러오기
-                    </button>
-                  </Notice>
-                </div>
-              ) : null}
-            </div>
-
-            {/* 이용료 자동 계산 */}
-            {sessionCount > 0 && monthData.status === "ok" && monthData.holidayStatus === "unavailable" ? (
-              <HolidayUnavailableNotice className="mt-4" />
-            ) : null}
-            {sessionCount > 0 && (
-              <div className="mt-4 overflow-hidden rounded-xl border border-line bg-white">
-                <div className="border-b border-line bg-slate-50 px-4 py-2.5">
-                  <span className="text-[15px] font-bold text-ink">예상 전시 공간 이용료</span>
-                </div>
-                <div className="px-4 py-3">
-                  <div className="space-y-2">
-                    {feeBreakdown.weekdays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>평일 {feeBreakdown.weekdays}일 × {GALLERY_FEE_KRW.WEEKDAY.toLocaleString()}원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.weekdays * GALLERY_FEE_KRW.WEEKDAY).toLocaleString()}원</span>
-                      </div>
-                    )}
-                    {feeBreakdown.saturdays > 0 && (
-                      <div className="flex items-center justify-between text-sm text-slate-600">
-                        <span>토요일 {feeBreakdown.saturdays}일 × {GALLERY_FEE_KRW.SATURDAY.toLocaleString()}원</span>
-                        <span className="font-semibold text-slate-800">{(feeBreakdown.saturdays * GALLERY_FEE_KRW.SATURDAY).toLocaleString()}원</span>
-                      </div>
-                    )}
-                    {feeBreakdown.prepDays > 0 && sessionsBundle.prepDate && (
-                      <div className="flex items-center justify-between text-sm text-ink-2">
-                        <span>준비일 {feeBreakdown.prepDays}일 ({sessionsBundle.prepDate} {dowLabel(sessionsBundle.prepDate)})</span>
-                        <span className="font-medium">무료</span>
-                      </div>
-                    )}
-                  </div>
-                  <div className="mt-3 flex items-center justify-between rounded-lg bg-brand-soft px-4 py-3">
-                    <span className="text-[15px] font-bold text-ink">합계</span>
-                    <span className="text-2xl font-bold tabular-nums text-brand">{holidaysPending ? "공휴일 확인 중…" : `${feeBreakdown.total.toLocaleString()}원`}</span>
-                  </div>
-                  <p className="mt-2 text-[13px] text-ink-3">※ 할인 및 바우처 적용 불가</p>
-                </div>
-              </div>
-            )}
-
-            <FieldHelp className="mt-2">
-              ※ 일요일·공휴일은 휴관이라 회차와 이용료에서 자동으로 빠집니다.
-            </FieldHelp>
-
-            {/* 철수시간 설정 */}
-            {isYmd(endDate) && (
-              <div className="mt-5 rounded-xl border-2 border-orange-300 bg-orange-50 p-4">
-                <h4 className="text-sm font-bold text-orange-900">전시 철수 안내</h4>
-                <p className="mt-1 text-xs text-orange-800">
-                  전시 마지막 날({endDate} {dowLabel(endDate)}) <b>{teardownDeadline(endDate)}까지</b> 철거를 완료해야 합니다. (평일 16:00 · 토요일 11:00 이전) 철수 예정 시간을 설정해 주세요.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-4">
-                  <div>
-                    <FieldLabel>철수 일자</FieldLabel>
-                    <Input type="text" value={endDate} readOnly className="bg-white/70 text-slate-700" />
-                  </div>
-                  <div>
-                    <FieldLabel htmlFor="galleryRemovalTime">철수 시간 *</FieldLabel>
-                    <Select id="galleryRemovalTime" {...register("galleryRemovalTime")}>
-                      <option value="">선택해 주세요</option>
-                      {teardownTimeOptions(teardownDeadline(endDate)).map((t) => (
-                        <option key={t} value={t}>{t}</option>
-                      ))}
-                    </Select>
-                    {errors.galleryRemovalTime?.message ? <FieldHelp className="text-red-600">{errors.galleryRemovalTime.message}</FieldHelp> : null}
-                  </div>
-                </div>
-              </div>
-            )}
-          </Card>
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>신청자 정보</h3>
-            <p className={SECTION_DESC}>담당자에게 연락할 정보를 입력해 주세요.</p>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="applicantName">성명 *</FieldLabel>
-                <Input id="applicantName" {...register("applicantName")} placeholder="홍길동" />
-                {errors.applicantName?.message ? <FieldHelp className="text-red-600">{errors.applicantName.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="birthYear">생년월일 *</FieldLabel>
-                <input type="hidden" {...register("birth")} />
-                <div className="flex items-center gap-1">
-                  <input
-                    id="birthYear"
-                    className="w-20 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={4}
-                    placeholder="YYYY"
-                    inputMode="numeric"
-                    value={birthYear}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 4);
-                      setBirthYear(v);
-                      if (v.length === 4) birthMonthRef.current?.focus();
-                      handleBirthSync(v, birthMonth, birthDay);
-                    }}
-                  />
-                  <span className="text-slate-500">-</span>
-                  <input
-                    ref={birthMonthRef}
-                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={2}
-                    placeholder="MM"
-                    inputMode="numeric"
-                    value={birthMonth}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                      setBirthMonth(v);
-                      if (v.length === 2) birthDayRef.current?.focus();
-                      handleBirthSync(birthYear, v, birthDay);
-                    }}
-                  />
-                  <span className="text-slate-500">-</span>
-                  <input
-                    ref={birthDayRef}
-                    className="w-14 rounded-lg border border-slate-200 bg-white px-2.5 py-2 text-sm text-center outline-none focus:border-slate-400 focus:ring-1 focus:ring-slate-300"
-                    maxLength={2}
-                    placeholder="DD"
-                    inputMode="numeric"
-                    value={birthDay}
-                    onChange={(e) => {
-                      const v = e.target.value.replace(/\D/g, "").slice(0, 2);
-                      setBirthDay(v);
-                      handleBirthSync(birthYear, birthMonth, v);
-                    }}
-                  />
-                </div>
-                {errors.birth?.message ? <FieldHelp className="text-red-600">{errors.birth.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="address">주소 *</FieldLabel>
-                <Input id="address" {...register("address")} placeholder="서울특별시 서초구 서운로26길 3, 4층" />
-                {errors.address?.message ? <FieldHelp className="text-red-600">{errors.address.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="phone">연락처 *</FieldLabel>
-                <Input
-                  id="phone"
-                  placeholder="010-0000-0000"
-                  inputMode="numeric"
-                  autoComplete="tel"
-                  {...register("phone", {
-                    onChange: (e) => {
-                      const formatted = formatPhoneKR((e.target as HTMLInputElement).value);
-                      setValue("phone", formatted, { shouldDirty: true, shouldValidate: true });
-                    },
-                  })}
-                />
-                {errors.phone?.message ? <FieldHelp className="text-red-600">{errors.phone.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="email">이메일 *</FieldLabel>
-                <Input id="email" type="email" {...register("email")} placeholder="example@email.com" />
-                {errors.email?.message ? <FieldHelp className="text-red-600">{errors.email.message}</FieldHelp> : null}
-              </div>
-            </div>
-
-            <div className="mt-4">
-              <FieldLabel htmlFor="orgName">단체명 *</FieldLabel>
-              <Input id="orgName" {...register("orgName")} placeholder={`개인 신청 시 \u0027개인\u0027으로 입력`} />
-              {errors.orgName?.message ? <FieldHelp className="text-red-600">{errors.orgName.message}</FieldHelp> : null}
-            </div>
-          </Card>
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>전시 정보</h3>
-            <p className={SECTION_DESC}>전시 운영에 필요한 정보를 입력해 주세요.</p>
-
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="exhibitionTitle">전시명 *</FieldLabel>
-                <Input id="exhibitionTitle" placeholder="예: 2026 서초 작가전" {...register("exhibitionTitle")} />
-                {errors.exhibitionTitle?.message ? <FieldHelp className="text-red-600">{errors.exhibitionTitle.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="exhibitionPurpose">전시 목적</FieldLabel>
-                <Textarea id="exhibitionPurpose" rows={3} placeholder="예: 지역 주민 대상 문화예술 공유" {...register("exhibitionPurpose")} />
-                {errors.exhibitionPurpose?.message ? <FieldHelp className="text-red-600">{errors.exhibitionPurpose.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="genreContent">장르·내용</FieldLabel>
-                <Textarea id="genreContent" rows={3} placeholder="예: 사진/회화/공예 등, 주요 전시 내용" {...register("genreContent")} />
-                {errors.genreContent?.message ? <FieldHelp className="text-red-600">{errors.genreContent.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="awarenessPath">인지 경로</FieldLabel>
-                <Select id="awarenessPath" {...register("awarenessPath")}>
-                  <option value="">선택해 주세요</option>
-                  <option value="서초센터 홈페이지">서초센터 홈페이지</option>
-                  <option value="센터 내 홍보 리플릿">센터 내 홍보 리플릿</option>
-                  <option value="서초구청 홈페이지">서초구청 홈페이지</option>
-                  <option value="지인 소개">지인 소개</option>
-                  <option value="기타">기타</option>
-                </Select>
-                {errors.awarenessPath?.message ? <FieldHelp className="text-red-600">{errors.awarenessPath.message}</FieldHelp> : null}
-              </div>
-
-              <div className="md:col-span-2">
-                <FieldLabel htmlFor="specialNotes">특이사항</FieldLabel>
-                <Textarea id="specialNotes" rows={3} placeholder="예: 설치물/운영 인력/안전 관련 특이사항" {...register("specialNotes")} />
-                {errors.specialNotes?.message ? <FieldHelp className="text-red-600">{errors.specialNotes.message}</FieldHelp> : null}
-              </div>
-            </div>
-          </Card>
-
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>동의/서약</h3>
-            <div className="mt-4">
-              <input type="hidden" {...register("privacyAgree")} />
-              <Checkbox
-                checked={!!privacyAgree}
-                readOnly
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPrivacyOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPrivacyOpen(true);
-                  }
-                }}
-                id="privacyAgreeBox"
-                label="개인정보 수집·이용에 동의합니다. (필수)"
-                error={errors.privacyAgree?.message}
-              />
-              <FieldHelp className="mt-1">* 체크 시 안내 내용을 확인한 후 동의 여부가 반영됩니다.</FieldHelp>
-            </div>
-            <div className="mt-4">
-              <input type="hidden" {...register("pledgeAgree")} />
-              <Checkbox
-                checked={!!pledgeAgree}
-                readOnly
-                onClick={(e) => {
-                  e.preventDefault();
-                  setPledgeOpen(true);
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    setPledgeOpen(true);
-                  }
-                }}
-                id="pledgeAgreeBox"
-                label="서약 내용에 동의합니다. (필수)"
-                error={errors.pledgeAgree?.message}
-              />
-              <FieldHelp className="mt-1">
-                * 체크 시 서약서 내용을 확인한 후 동의 여부가 반영됩니다.
-              </FieldHelp>
-            </div>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <FieldLabel htmlFor="pledgeDate">서약 일자 *</FieldLabel>
-                <input type="hidden" {...register("pledgeDate")} />
-                <Input id="pledgeDate" type="text" value={fixedPledgeDate} readOnly className="bg-slate-50 text-slate-700" />
-                {errors.pledgeDate?.message ? <FieldHelp className="text-red-600">{errors.pledgeDate.message}</FieldHelp> : null}
-              </div>
-
-              <div>
-                <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>
-                <Input
-                  id="pledgeName"
-                  {...register("pledgeName", {
-                    onChange: (e) => {
-                      pledgeAutoFillRef.current = (e.target as HTMLInputElement).value.trim() === "";
-                    },
-                  })}
-                />
-                {errors.pledgeName?.message ? <FieldHelp className="text-red-600">{errors.pledgeName.message}</FieldHelp> : null}
-              </div>
-            </div>
-          </Card>
-
-          {sessionCount === 0 && (startDate || endDate) ? (
-            <Notice variant="warn">전시 기간(시작일·종료일)을 올바르게 입력해 주세요. 회차가 0회이면 신청할 수 없습니다.</Notice>
-          ) : null}
-          {sessionCount === 0 && !startDate && !endDate ? (
-            <Notice variant="warn">전시 기간(시작일·종료일)을 먼저 선택해 주세요.</Notice>
-          ) : null}
-          <MissingFieldsSummary items={missingFields} />
-          <Button type="submit" variant="primary" disabled={submitting} className="min-h-[48px] w-full py-3 text-base">
-            {submitting ? "신청 중…" : "신청하기"}
-          </Button>
-        </form>
-
-        <PrivacyModal
-          variant="gallery"
-          open={privacyOpen}
-          onClose={() => setPrivacyOpen(false)}
-          onAgree={() => {
-            setValue("privacyAgree", true, { shouldValidate: true, shouldDirty: true });
-            clearErrors("privacyAgree");
-          }}
-          onDisagree={() => {
-            setValue("privacyAgree", false, { shouldValidate: true, shouldDirty: true });
-          }}
-        />
-
-        <PledgeModal
-          roomId="gallery"
-          open={pledgeOpen}
-          onClose={() => setPledgeOpen(false)}
-          onAgree={() => {
-            setValue("pledgeAgree", true, { shouldValidate: true, shouldDirty: true });
-            clearErrors("pledgeAgree");
-          }}
-          onDisagree={() => {
-            setValue("pledgeAgree", false, { shouldValidate: true, shouldDirty: true });
-          }}
-        />
-
-        <GalleryInfoModal open={galleryInfoOpen} onClose={() => setGalleryInfoOpen(false)} />
-      </main>
-    </div>
+  const birth = parseBirth8(values.birthDigits);
+  const scheduleCard = (withChange: boolean) => (
+    <ScheduleSummary
+      roomName={room.name}
+      floor={room.floor}
+      image={room.image}
+      sections={sections}
+      changeHref={withChange ? changeHref : undefined}
+      changeLabel="전시 기간 바꾸기"
+      onBeforeChange={form.rememberForChange}
+      conflictMessage={withChange ? conflict?.message ?? null : null}
+    />
   );
-}
 
-/* 갤러리 안내 팝업 */
-function GalleryInfoModal({ open, onClose }: { open: boolean; onClose: () => void }) {
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      size="lg"
-      title="우리동네 갤러리 안내"
-      footer={
-        <button type="button" data-modal-cancel onClick={onClose} className={MODAL_BTN_SECONDARY}>
-          닫기
-        </button>
-      }
-    >
-        <div className="space-y-4 text-[15px] text-slate-800">
-          {/* 운영 시간 */}
-          <div>
-            <h4 className="font-semibold mb-2">운영 시간</h4>
-            <div className="overflow-hidden rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">시간</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr><td className="px-3 py-2">평일 (월/수~금)</td><td className="px-3 py-2">09:00 ~ 18:00</td></tr>
-                  <tr><td className="px-3 py-2">화요일</td><td className="px-3 py-2">09:00 ~ 20:00</td></tr>
-                  <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2">09:00 ~ 13:00</td></tr>
-                  <tr><td className="px-3 py-2 text-slate-500">일요일·공휴일</td><td className="px-3 py-2 text-slate-500">휴관</td></tr>
-                </tbody>
-              </table>
-            </div>
+    <ApplyFrame roomId="gallery" step1Href="/" step2Href={changeHref} modal={form.guard.modal}>
+      {view === "confirm" ? (
+        <ConfirmSheet
+          schedule={scheduleCard(false)}
+          cards={[
+            {
+              title: "신청하시는 분",
+              rows: [
+                { label: "이름", value: values.applicantName },
+                { label: "생년월일", value: birth.ok ? birthLabel(birth.ymd) : "" },
+                { label: "휴대폰 번호", value: values.phone },
+                { label: "이메일", value: values.email },
+                { label: "주소", value: values.address },
+              ],
+            },
+            {
+              title: "전시 정보",
+              rows: [
+                { label: "전시 이름", value: values.exhibitionTitle },
+                { label: "철수 시간", value: values.galleryRemovalTime ? `${formatKoDate(endDate)} ${values.galleryRemovalTime}` : "" },
+                { label: "단체 이름", value: values.orgName },
+                { label: "장르·내용", value: values.genreContent },
+                { label: "전시 목적", value: values.exhibitionPurpose },
+                { label: "알게 된 경로", value: values.awarenessPath },
+                { label: "특이사항", value: values.specialNotes },
+              ],
+            },
+            {
+              title: "동의",
+              rows: [
+                { label: "개인정보", value: "수집·이용에 동의함" },
+                { label: "서약", value: "전시 운영규정 서약서에 동의함" },
+              ],
+            },
+          ]}
+          fee={fee}
+          submitting={submitting}
+          error={submitError}
+          onSubmit={submit}
+          onEdit={() => {
+            setView("input");
+            window.setTimeout(() => window.scrollTo({ top: 0 }), 0);
+          }}
+        />
+      ) : (
+        <div className="space-y-8">
+          <div className="space-y-4">
+            <h1 className={A_H1}>전시 신청서 쓰기</h1>
+            {form.pendingDraft ? <ResumeDraftBox onResume={form.resume} onFresh={form.fresh} /> : null}
+            {scheduleCard(true)}
+            {noPrep ? (
+              <div role="alert" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-[17px] font-bold leading-7 text-amber-900">
+                {NO_PREP_TEXT} 위 [전시 기간 바꾸기]를 눌러 주세요.
+              </div>
+            ) : null}
+            {conflict ? <p className={A_HELP}>{KEEP_TEXT}</p> : null}
           </div>
-
-          {/* 이용료 */}
-          <div>
-            <h4 className="font-semibold mb-2">전시 공간 이용료 기준 (1일 기준)</h4>
-            <div className="overflow-hidden rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">구분</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">이용료</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr><td className="px-3 py-2">평일 (월~금)</td><td className="px-3 py-2 font-semibold">20,000원</td></tr>
-                  <tr><td className="px-3 py-2">토요일</td><td className="px-3 py-2 font-semibold">10,000원</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-1 text-xs text-slate-600">※ 할인 및 바우처 적용 불가 / 준비(세팅)일 1일 무료 지원</p>
-          </div>
-
-          {/* 전시 참고사항 */}
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-            <h4 className="font-semibold mb-2 text-blue-900">전시 참고사항</h4>
-            <ul className="list-disc space-y-1.5 pl-5 text-sm text-blue-800">
-              <li>신청자가 직접 설치(준비, 세팅) 및 철수 진행 (작품 보관·지원·관리 인력 제공 불가)</li>
-              <li>와이어 걸이(고리)를 활용한 형식의 작품만 전시 가능</li>
-              <li>액자 형태 작품: 가로/세로 최대 60cm, 최대 15점</li>
-              <li>작품 크기·무게에 따라 전시 불가 시 사전 담당자 상담 필요</li>
-              <li>철거: 전시 마지막 날 <b>평일 16:00 · 토요일 11:00 이전</b> 완료 필수</li>
-              <li>준비: 전날 전시가 없으면 운영시간 내 언제든, 전시가 있으면 철거 후 <b>평일 17:00 · 토요일 11:00 이후</b></li>
-              <li>홍보 콘텐츠 제작을 위해 준비일 이전에 전시 고리 사진 파일을 서초센터 메일로 공유 필요</li>
-            </ul>
-          </div>
-
-          {/* 환불 규정 */}
-          <div>
-            <h4 className="font-semibold mb-2">환불 규정</h4>
-            <div className="overflow-hidden rounded-md border">
-              <table className="w-full text-sm">
-                <thead className="bg-slate-50">
-                  <tr>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">취소 시점</th>
-                    <th className="px-3 py-2 text-left font-medium text-slate-700">환불 비율</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  <tr><td className="px-3 py-2">사용일 3일 전까지</td><td className="px-3 py-2 font-semibold text-green-700">전액 환불</td></tr>
-                  <tr><td className="px-3 py-2">사용일 2일 전까지</td><td className="px-3 py-2 font-semibold">90% 환불</td></tr>
-                  <tr><td className="px-3 py-2">사용일 1일 전까지</td><td className="px-3 py-2 font-semibold">80% 환불</td></tr>
-                  <tr><td className="px-3 py-2 text-red-600">사용일 당일 이후</td><td className="px-3 py-2 font-semibold text-red-600">환불 불가</td></tr>
-                </tbody>
-              </table>
-            </div>
-            <p className="mt-1 text-xs text-slate-600">※ 환불 절차: 센터 방문 → 환불신청서 작성 및 제출 (비대면 접수 불가)</p>
-          </div>
-
-          {/* 신청 제한 */}
-          <div>
-            <h4 className="font-semibold mb-2">신청 제한 사항</h4>
-            <ul className="list-disc space-y-1.5 pl-5 text-slate-700">
-              <li>부적절한 목적, 시설 훼손 우려, 종교 포교, 정치적 목적, 영리적 목적</li>
-              <li>작품 판매, 세미나, 퍼포먼스, 기타 판촉행사 등 부대행사 진행</li>
-              <li>전시 운영 규정 미진 시 전시 중 발견 시 즉시 취소 및 환불 불가</li>
-            </ul>
+          <ApplicantFields values={values} errors={errors} onChange={patch} />
+          <ExhibitFields values={values} errors={errors} onChange={patch} endDate={endDate} />
+          <ConsentBlock
+            roomId="gallery"
+            privacyAgree={values.privacyAgree}
+            pledgeAgree={values.pledgeAgree}
+            onChange={patch}
+            privacyError={errors.privacyAgree}
+            pledgeError={errors.pledgeAgree}
+          />
+          {fee}
+          <div className="space-y-3">
+            <MissingFieldsSummary items={missing.filter((m) => Boolean(errors[m.key as keyof typeof errors]))} />
+            <button type="button" className={A_BTN_PRIMARY} onClick={toConfirm}>
+              신청 내용 확인
+            </button>
           </div>
         </div>
-    </Modal>
+      )}
+    </ApplyFrame>
   );
 }

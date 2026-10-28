@@ -1,38 +1,40 @@
 "use client";
 
+/**
+ * 완료 `/success` (audit-fix-3 3-4 · 02_ui_apply §2-7)
+ * h1 `신청이 접수되었습니다` + 두 줄 → 카드(신청번호 · 공간 · 날짜 · 예상 이용료) → `다음 순서` → `처음 화면으로` · `내 신청 확인하기`
+ * 단계 표시 없음. 공용 PC 조회 기록 지우기 안내는 그대로(audit-fix-1 [10]).
+ */
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import SiteHeader from "@/components/SiteHeader";
-import Card from "@/components/ui/Card";
-import LinkButton from "@/components/ui/LinkButton";
-import Notice from "@/components/ui/Notice";
-import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
-import { SECTION_TITLE } from "@/components/ui/presets";
-import { PAYMENT_FLOW_TEXT } from "@/lib/policy";
+import PaymentFlowText from "@/components/PaymentFlowText";
+import { PAYMENT_FLOW_EMPHASIS, PAYMENT_FLOW_TEXT } from "@/lib/policy";
 import { adoptTokenFromUrl, clearApplicantAccess, purgeLegacyApplicantToken, readApplicantAccess } from "@/lib/applicantAccess";
+import { readDoneSummary, type DoneSummary } from "@/lib/apply/submit";
+import { A_BTN_PRIMARY, A_CARD, A_CARD_TITLE, A_H1, HelpPhoneLine, PublicHeader } from "@/components/apply/ui";
 
 export default function SuccessClient() {
   const sp = useSearchParams();
   const router = useRouter();
   const requestId = sp.get("requestId");
   const count = Number(sp.get("count") ?? "1");
-  // 갤러리 신청에서 넘어온 경우(category=gallery)에만 "전시" 용어 사용
   const isGallery = sp.get("category") === "gallery";
   const target = isGallery ? "전시" : "예약";
-  // 서버 공용 계산 금액(POST /api/requests 응답 estimatedFeeKRW)
   const feeRaw = sp.get("fee");
   const estimatedFee = feeRaw !== null && feeRaw !== "" && Number.isFinite(Number(feeRaw)) ? Number(feeRaw) : null;
   const holidayUnchecked = sp.get("hc") === "unavailable";
 
-  // ★ [10] 조회 권한은 sessionStorage(applicantAccess)에서만 읽는다. 주소창에는 토큰이 없다.
   const [hasAccess, setHasAccess] = useState(false);
+  const [summary, setSummary] = useState<DoneSummary | null>(null);
   useEffect(() => {
     purgeLegacyApplicantToken();
     adoptTokenFromUrl(); // 예전 형식 링크(?token=)로 들어온 경우만 — 주소에서 지운다
     setHasAccess(!!readApplicantAccess());
-  }, []);
+    setSummary(readDoneSummary(requestId));
+  }, [requestId]);
 
-  const resultHref = `/result${requestId ? `?requestId=${encodeURIComponent(requestId)}` : ""}`;
+  const myHref = hasAccess && requestId ? `/result?requestId=${encodeURIComponent(requestId)}` : "/my";
 
   function clearDeviceRecord() {
     clearApplicantAccess();
@@ -40,99 +42,75 @@ export default function SuccessClient() {
     router.push("/my?cleared=1");
   }
 
-  return (
-    <div>
-      <SiteHeader title={isGallery ? "전시신청" : "대관신청"} backHref={isGallery ? "/space?category=gallery" : "/space"} backLabel="목록" />
+  const rows: Array<{ label: string; value: React.ReactNode }> = [{ label: "신청번호", value: <span className="text-[18px] font-bold tabular-nums text-ink">{requestId ?? "-"}</span> }];
+  if (summary?.roomName) rows.push({ label: "공간", value: summary.roomName });
+  if (summary?.schedule) rows.push({ label: "날짜", value: summary.schedule });
+  else if (count > 1) rows.push({ label: "신청 건수", value: `${count}건` });
+  if (estimatedFee !== null)
+    rows.push({
+      label: isGallery ? "예상 전시 공간 이용료" : "예상 이용료",
+      value: (
+        <>
+          {estimatedFee.toLocaleString()}원
+          {holidayUnchecked ? <span className="block text-[15px] font-medium text-amber-800">(공휴일 미확인 · 승인 때 확정)</span> : null}
+        </>
+      ),
+    });
 
-      <main className="mx-auto max-w-2xl px-4 pb-16 pt-8">
-        {/* 성공 아이콘 + 제목 */}
-        <div className="text-center">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-emerald-50">
-            <svg className="h-8 w-8 text-emerald-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-            </svg>
-          </div>
-          <h2 className="mt-4 text-2xl font-bold text-slate-900">{isGallery ? "전시 신청이 완료되었습니다" : "대관 신청이 완료되었습니다"}</h2>
-          <p className="mt-2 text-sm text-slate-600">
-            담당자 검토 후 승인/반려 결과를 이메일로 안내드립니다.
+  return (
+    <div className="min-h-screen bg-slate-50">
+      <PublicHeader />
+      <main id="main-content" className="mx-auto w-full max-w-[720px] space-y-5 px-4 pb-16 pt-6 sm:px-6">
+        <div>
+          <h1 className={A_H1}>신청이 접수되었습니다</h1>
+          <p className="mt-2 text-[17px] leading-7 text-ink-2">
+            아직 예약이 확정된 것은 아닙니다.
+            <br />
+            담당자가 확인한 뒤 이메일로 결과를 알려 드립니다.
           </p>
         </div>
 
-        <div className="mt-8 space-y-4">
-          {/* 신청 정보 카드 */}
-          <Card pad="lg">
-            <h3 className={SECTION_TITLE}>신청 정보</h3>
-            <div className="mt-3 divide-y divide-slate-100">
-              <div className="flex justify-between gap-3 py-2.5">
-                <span className="text-sm text-slate-500">신청번호</span>
-                <span className="break-all text-right text-sm font-bold text-brand">{requestId ?? "-"}</span>
+        <section className={`${A_CARD} p-4 sm:p-5`} aria-label="신청 정보">
+          <dl className="grid grid-cols-[minmax(92px,auto)_1fr] gap-x-3 gap-y-1.5 sm:grid-cols-[140px_1fr]">
+            {rows.map((r) => (
+              <div key={r.label} className="contents">
+                <dt className="text-[17px] font-semibold leading-7 text-ink-3">{r.label}</dt>
+                <dd className="min-w-0 break-all text-[17px] font-semibold leading-7 text-ink">{r.value}</dd>
               </div>
-              {count > 1 && (
-                <div className="flex justify-between py-2.5">
-                  <span className="text-sm text-slate-500">신청 건수</span>
-                  <span className="text-sm font-semibold text-slate-900">{count}건</span>
-                </div>
-              )}
-              <div className="flex justify-between py-2.5">
-                <span className="text-sm text-slate-500">처리 상태</span>
-                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
-                  접수 대기
-                </span>
-              </div>
-              {estimatedFee !== null ? (
-                <div className="flex justify-between gap-3 py-2.5">
-                  <span className="shrink-0 text-sm text-slate-500">{isGallery ? "예상 전시 공간 이용료" : "예상 이용료"}</span>
-                  <span className="text-right text-sm font-semibold text-slate-900 tabular-nums">
-                    {estimatedFee.toLocaleString()}원 <span className="whitespace-nowrap">(담당자 승인 시 확정)</span>
-                    {holidayUnchecked ? <span className="block text-[13px] font-medium text-amber-800">(공휴일 미확인 · 승인 때 확정)</span> : null}
-                  </span>
-                </div>
-              ) : null}
-            </div>
-          </Card>
+            ))}
+          </dl>
+        </section>
 
-          {/* 안내 */}
-          <Notice variant="info" title="신청 후 절차 안내" pad="md">
-            <ul className="list-disc space-y-1.5 pl-5 text-sm">
-              <li>담당자가 신청 내용을 확인한 후 <b>승인 또는 반려</b> 결과를 이메일로 알려드립니다.</li>
-              <li>
-                <PaymentFlowText text={PAYMENT_FLOW_TEXT(target)} bold={paymentFlowBold(target, "long")} />
-              </li>
-              <li>아래 버튼으로 바로 신청 결과를 확인할 수 있습니다.</li>
-            </ul>
-          </Notice>
+        <section className={`${A_CARD} p-4 sm:p-5`} aria-labelledby="next-steps">
+          <h2 id="next-steps" className={A_CARD_TITLE}>
+            다음 순서
+          </h2>
+          <p className="mt-2 text-[17px] leading-7 text-ink">
+            <PaymentFlowText text={PAYMENT_FLOW_TEXT(target)} bold={PAYMENT_FLOW_EMPHASIS} />
+          </p>
+        </section>
 
-          {/* 버튼 그룹 */}
-          <div className="flex flex-col gap-3 sm:flex-row">
-            {hasAccess && requestId ? (
-              <LinkButton href={resultHref} variant="primary" className="flex-1 justify-center py-3">
-                신청 결과 바로 확인
-              </LinkButton>
-            ) : null}
-            <LinkButton href="/my" variant={hasAccess ? "outline" : "primary"} className="flex-1 justify-center py-3">
-              내 신청 조회
-            </LinkButton>
-            <LinkButton href="/" variant="outline" className="flex-1 justify-center py-3">
-              홈으로 돌아가기
-            </LinkButton>
-          </div>
+        <div className="space-y-3 text-center">
+          <Link href="/" className={A_BTN_PRIMARY}>
+            처음 화면으로
+          </Link>
+          <Link href={myHref} className="inline-flex min-h-[44px] items-center text-[17px] font-bold text-brand underline underline-offset-4">
+            내 신청 확인하기
+          </Link>
+        </div>
 
-          {/* ★ [10] 공용 PC 안내 + 조회 기록 지우기 */}
-          <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3">
-            <p className="text-sm leading-6 text-slate-700">
-              공용 PC라면 확인을 마친 뒤 [이 기기에서 조회 기록 지우기]를 누르거나 브라우저 창을 닫아 주세요. 이 화면의 조회 권한은 60분 뒤 자동으로 사라집니다.
-            </p>
-            <div className="mt-2 text-right">
-              <button
-                type="button"
-                onClick={clearDeviceRecord}
-                className="text-sm font-semibold text-brand underline-offset-2 hover:underline"
-              >
-                이 기기에서 조회 기록 지우기
-              </button>
-            </div>
+        {/* ★ [10] 공용 PC 안내 + 조회 기록 지우기 */}
+        <div className="rounded-xl border border-line bg-white px-4 py-3">
+          <p className="text-[15px] leading-6 text-ink-2">
+            공용 PC라면 확인을 마친 뒤 [이 기기에서 조회 기록 지우기]를 누르거나 브라우저 창을 닫아 주세요. 이 화면의 조회 권한은 60분 뒤 자동으로 사라집니다.
+          </p>
+          <div className="mt-1 text-right">
+            <button type="button" onClick={clearDeviceRecord} className="inline-flex min-h-[44px] items-center text-[15px] font-semibold text-brand underline-offset-2 hover:underline">
+              이 기기에서 조회 기록 지우기
+            </button>
           </div>
         </div>
+        <HelpPhoneLine />
       </main>
     </div>
   );

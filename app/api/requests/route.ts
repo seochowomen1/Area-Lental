@@ -163,12 +163,7 @@ export async function POST(req: Request) {
     if (isOffline) {
       const auth = await assertAdminApiAuth(req);
       if (!auth.ok) return adminApiAuthFailure(auth, { unauthorizedMessage: "서면 접수 등록은 관리자만 할 수 있습니다." });
-      if (raw.roomId !== "gallery") {
-        return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", message: "서면 접수 등록은 현재 우리동네 갤러리만 지원합니다." },
-          { status: 400 }
-        );
-      }
+      // 3-4(⑧ Q6): 강의실·E-스튜디오·갤러리 모두 서면 등록 가능(없는 공간은 아래 UNKNOWN_ROOM에서 거부)
       const ch = String(form.get("intakeChannel") ?? "").trim();
       const appliedAt = String(form.get("appliedAt") ?? "").trim();
       const intakeNote = String(form.get("intakeNote") ?? "").trim().slice(0, 500);
@@ -271,7 +266,12 @@ export async function POST(req: Request) {
 
       // 사용자가 선택한 준비일 사용 (빈 문자열이면 준비일 없음, 미전송 시 자동 계산)
       const customPrepDate = galleryInput?.galleryPrepDate;
-      const prepDateParam = customPrepDate !== undefined ? (customPrepDate || null) : undefined;
+      // 온라인 신청은 준비일 필수(2026-10-28) — 비어 오면 "준비일 없음"이 아니라 전날 자동 계산. 서면 등록만 "" = 준비일 없음 허용
+      const prepDateParam = isOffline
+        ? customPrepDate !== undefined
+          ? customPrepDate || null
+          : undefined
+        : customPrepDate || undefined;
       // ★ 회차 생성(공휴일 제외 판정)보다 먼저 공휴일을 로딩한다 (2026-10-07 진단 #3 — 콜드 인스턴스 409)
       //   준비일이 시작일 이전 달일 수 있으므로 시작 전월부터 종료월까지 로딩
       {
@@ -296,6 +296,18 @@ export async function POST(req: Request) {
       const prepProbe = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam).find((s) => s.isPrepDay)?.date;
       const prepAfterExhibition = prepProbe ? isPrepAfterExhibition(occForPrep, prepProbe) : false;
       sessions = buildGallerySessionsFromPeriod(startDate, endDate, prepDateParam, { prepAfterExhibition });
+      // 온라인 신청은 준비일 필수 · 내일 이후(2026-10-28 사용자 "무조건 최소 전날") — 서면 등록은 관리자 판단
+      const prepSession = sessions.find((s) => s.isPrepDay);
+      if (!isOffline && (!prepSession || prepSession.date <= todayStr || prepSession.date >= startDate)) {
+        return NextResponse.json(
+          {
+            ok: false,
+            code: "VALIDATION_ERROR",
+            message: "전시 시작 전날(운영일)에 준비일을 잡을 수 없어 신청할 수 없습니다. 전시 기간을 다시 골라 주세요.",
+          },
+          { status: 400 }
+        );
+      }
     } else {
       const rawSessions = String(form.get("sessions") ?? "").trim();
       if (rawSessions) {
@@ -682,6 +694,10 @@ export async function POST(req: Request) {
         batchId,
         batchSeq: batchId ? i + 1 : undefined,
         batchSize: batchId ? sessions.length : undefined,
+        // 서면 접수 등록 메타(온라인 신청은 undefined · 3-4 ⑧ Q6)
+        intakeChannel: offlineMeta?.intakeChannel,
+        appliedAt: offlineMeta?.appliedAt,
+        intakeNote: offlineMeta?.intakeNote,
         applicantName: input.applicantName,
         birth: input.birth,
         address: input.address,

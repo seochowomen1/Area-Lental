@@ -1,8 +1,11 @@
 "use client";
 
-import { useEffect } from "react";
-import Button from "@/components/ui/Button";
-import { useFocusTrap } from "@/lib/useFocusTrap";
+/**
+ * 개인정보 수집·이용 동의 팝업 (02_ui_apply §0-5 (1))
+ * 문구는 원문 그대로. 휴대폰(<640)은 3열 표 대신 항목 묶음 카드, PC는 표(셀 15).
+ * 체크는 [동의합니다]로만, [닫기]는 체크 상태를 바꾸지 않는다.
+ */
+import ConsentDialog from "@/components/apply/ConsentDialog";
 
 type PrivacyModalProps = {
   open: boolean;
@@ -14,131 +17,70 @@ type PrivacyModalProps = {
 };
 
 export default function PrivacyModal({ open, onClose, onAgree, onDisagree, variant = "rental" }: PrivacyModalProps) {
-  const focusTrapRef = useFocusTrap(open);
   const isGallery = variant === "gallery";
-
-  useEffect(() => {
-    if (!open) return;
-
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, [open, onClose]);
-
-  if (!open) return null;
+  const period = `수집일로부터 3년 및 ${isGallery ? "전시 목적" : "대관목적"} 달성 시 지체없이 해당정보 파기`;
+  const rows = [
+    {
+      purpose: `${isGallery ? "갤러리 전시 신청업무 처리 및" : "시설 대관 신청업무 처리 및"} 의사소통 경로 확보`,
+      items: isGallery
+        ? "성명(대표자 성명), 연락처, E-mail, 주소, 단체명, 인원 수, 사용 목적, 전시명, 전시 목적, 장르·내용, 서약자 성명"
+        : "성명(대표자 성명), 연락처, E-mail, 주소, 단체명, 인원 수, 사용 목적, 서약자 성명",
+      period,
+    },
+    { purpose: "신청자 확인 및 미성년자 보호자 동의 확인", items: "생년월일", period },
+  ];
 
   return (
-    <div
-      ref={focusTrapRef}
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="privacy-modal-title"
-      aria-describedby="privacy-modal-desc"
+    <ConsentDialog
+      open={open}
+      title="개인정보 수집·이용 동의"
+      bodyTitle="개인정보 수집 · 이용에 관한 안내 (* 필수항목)"
+      onClose={onClose}
+      onAgree={onAgree}
+      onDisagree={onDisagree}
     >
-      <button
-        type="button"
-        className="absolute inset-0 bg-black/40"
-        aria-label="모달 닫기"
-        onClick={onClose}
-        tabIndex={-1}
-      />
-
-      <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b px-5 py-4">
-          <h3 id="privacy-modal-title" className="text-base font-semibold">
-            개인정보 수집·이용 동의
-          </h3>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg px-2 py-1 text-sm text-slate-600 hover:bg-slate-100"
-            aria-label="모달 닫기"
-          >
-            닫기
-          </button>
-        </div>
-
-        <div id="privacy-modal-desc" className="max-h-[70vh] overflow-auto px-5 py-4 text-sm text-slate-700">
-          <h4 className="text-center text-sm font-bold text-slate-900">
-            개인정보 수집 · 이용에 관한 안내 (* 필수항목)
-          </h4>
-
-          <table className="mt-4 w-full border-collapse text-xs">
-            <caption className="sr-only">개인정보 수집·이용 항목 안내</caption>
-            <thead>
-              <tr>
-                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보 수집 · 이용 목적</th>
-                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">수집하려는 개인정보 항목</th>
-                <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보의 보유 및 이용 기간</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  {isGallery ? "갤러리 전시 신청업무 처리 및" : "시설 대관 신청업무 처리 및"}<br />의사소통 경로 확보
-                </td>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  성명(대표자 성명), 연락처,<br />E-mail, 주소, 단체명, 인원 수,<br />
-                  {isGallery ? (
-                    <>사용 목적, 전시명, 전시 목적,<br />장르·내용, 서약자 성명</>
-                  ) : (
-                    <>사용 목적, 서약자 성명</>
-                  )}
-                </td>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  수집일로부터 3년 및 {isGallery ? "전시 목적" : "대관목적"}<br />달성 시 지체없이 해당정보 파기
-                </td>
-              </tr>
-              <tr>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  신청자 확인 및<br />미성년자 보호자 동의 확인
-                </td>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">생년월일</td>
-                <td className="border border-slate-300 px-3 py-2 text-center leading-5">
-                  수집일로부터 3년 및 {isGallery ? "전시 목적" : "대관목적"}<br />달성 시 지체없이 해당정보 파기
-                </td>
-              </tr>
-            </tbody>
-          </table>
-
-          <p className="mt-2 text-xs leading-relaxed text-slate-600">※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.</p>
-
-          <p className="mt-3 text-xs text-slate-600 leading-relaxed">
-            ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 {isGallery ? "전시 신청·진행" : "대관 신청·진행"}에 일부 제한이 있습니다.
-          </p>
-
-          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
-            {isGallery ? "본 동의는 전시 신청을 위한 필수 사항입니다." : "본 동의는 시설물 대관신청을 위한 필수 사항입니다."}
-          </div>
-        </div>
-
-        <div className="flex flex-col-reverse gap-2 border-t bg-white px-5 py-4 sm:flex-row sm:justify-end">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              onDisagree();
-              onClose();
-            }}
-          >
-            동의하지 않습니다
-          </Button>
-          <Button
-            type="button"
-            variant="primary"
-            onClick={() => {
-              onAgree();
-              onClose();
-            }}
-          >
-            동의합니다
-          </Button>
-        </div>
+      {/* 휴대폰: 항목 묶음 카드 */}
+      <div className="mt-3 space-y-3 sm:hidden">
+        {rows.map((r) => (
+          <dl key={r.items} className="rounded-xl border border-line bg-slate-50 p-3.5">
+            <dt className="text-[15px] font-bold leading-6 text-ink-2">수집·이용 목적</dt>
+            <dd className="text-[17px] leading-7">{r.purpose}</dd>
+            <dt className="mt-2 text-[15px] font-bold leading-6 text-ink-2">수집 항목</dt>
+            <dd className="text-[17px] leading-7">{r.items}</dd>
+            <dt className="mt-2 text-[15px] font-bold leading-6 text-ink-2">보유·이용 기간</dt>
+            <dd className="text-[17px] leading-7">{r.period}</dd>
+          </dl>
+        ))}
       </div>
-    </div>
+
+      {/* PC: 표 */}
+      <table className="mt-3 hidden w-full border-collapse text-[15px] leading-6 sm:table">
+        <caption className="sr-only">개인정보 수집·이용 항목 안내</caption>
+        <thead>
+          <tr>
+            <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보 수집 · 이용 목적</th>
+            <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">수집하려는 개인정보 항목</th>
+            <th scope="col" className="border border-slate-300 bg-slate-50 px-3 py-2 text-center font-bold">개인정보의 보유 및 이용 기간</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.items}>
+              <td className="border border-slate-300 px-3 py-2 text-center">{r.purpose}</td>
+              <td className="border border-slate-300 px-3 py-2 text-center">{r.items}</td>
+              <td className="border border-slate-300 px-3 py-2 text-center">{r.period}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      <p className="mt-3">※ 생년월일은 신청 내역 조회 인증에 쓰지 않습니다.</p>
+      <p className="mt-2">
+        ※ 개인정보 수집이용에 대한 동의를 거부할 권리가 있으며, 거부 시 {isGallery ? "전시 신청·진행" : "대관 신청·진행"}에 일부 제한이 있습니다.
+      </p>
+      <div className="mt-3 rounded-xl border border-line bg-slate-50 p-3">
+        {isGallery ? "본 동의는 전시 신청을 위한 필수 사항입니다." : "본 동의는 시설물 대관신청을 위한 필수 사항입니다."}
+      </div>
+    </ConsentDialog>
   );
 }
