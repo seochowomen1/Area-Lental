@@ -7,7 +7,8 @@
 
 import type { RentalRequest, PaymentMethod, PaymentStatus } from "@/lib/types";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
-import { dayOfWeek, todayYmdSeoul } from "@/lib/datetime";
+import { todayYmdSeoul } from "@/lib/datetime";
+import { addDays, dowLabel, isYmd } from "@/lib/rules/ymd";
 
 export const PAYMENT_METHODS: readonly PaymentMethod[] = ["홈페이지 온라인", "현장 카드", "현장 현금", "계좌이체"];
 
@@ -26,30 +27,24 @@ export function autoCancelReason(dueDate: string): string {
 /** 결제 기한 기본값: 승인일 + 7일 */
 export const PAYMENT_DUE_DEFAULT_DAYS = 7;
 
-const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
-
-export function addDaysYmd(ymd: string, delta: number): string {
-  const [y, m, d] = ymd.split("-").map((v) => parseInt(v, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d + delta));
-  return dt.toISOString().slice(0, 10);
-}
+/** 날짜 더하기 — lib/rules/ymd.ts addDays 별칭(기존 import 호환 · 3-3) */
+export const addDaysYmd = addDays;
 
 /** "2026-10-27" → "2026-10-27(화)" */
 export function formatDueDateKo(ymd: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return ymd || "";
-  return `${ymd}(${WEEKDAY_KO[dayOfWeek(ymd)]})`;
+  if (!isYmd(ymd)) return ymd || "";
+  return `${ymd}(${dowLabel(ymd)})`;
 }
 
 /** "2026-10-27" → "10/27" */
 export function formatShortMd(ymd: string): string {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(ymd)) return "";
+  if (!isYmd(ymd)) return "";
   const [, m, d] = ymd.split("-");
   return `${parseInt(m, 10)}/${parseInt(d, 10)}`;
 }
 
-export function isYmdString(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+/** "YYYY-MM-DD" 모양 — lib/rules/ymd.ts isYmd 별칭(기존 import 호환 · 3-3) */
+export const isYmdString = isYmd;
 
 /** 결제 링크 허용 호스트 (PAYMENT_LINK_HOSTS · 기본 seochowomen.kr,www.seochowomen.kr) */
 export function allowedPaymentLinkHosts(): string[] {

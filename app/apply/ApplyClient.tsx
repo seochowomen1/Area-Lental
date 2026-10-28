@@ -26,7 +26,8 @@ import { SECTION_DESC, SECTION_TITLE } from "@/components/ui/presets";
 import PaymentFlowText, { paymentFlowBold } from "@/components/PaymentFlowText";
 import MissingFieldsSummary, { type MissingField } from "@/components/apply/MissingFieldsSummary";
 import { PAYMENT_FLOW_SHORT } from "@/lib/policy";
-import { computeBaseTotalKRW } from "@/lib/pricing";
+import { planLecture } from "@/lib/rules/lecturePlan";
+import { loadedHolidaySet } from "@/lib/holidays";
 import { handleApplySuccess, parseApplyError } from "@/lib/applySubmit";
 
 /** E-스튜디오 이용 인원 상한(01_spec ③-E) — 서버도 capacity로 다시 검사한다 */
@@ -591,33 +592,39 @@ export default function ApplyClient() {
       });
   }, [selectedDate, startTime, endTime, extraSessions]);
 
-  const bundle = useMemo(() => {
-    const sessions = allSessions;
-    const sessionCount = sessions.length;
-    let totalDurationMin = 0;
-    let rentalSum = 0;
-    let extraHeadcountSum = 0;
-    // [결3] 대관료(초과 인원 가산 포함)는 lib/pricing.ts computeBaseTotalKRW 한 곳에서 계산
-    const hc = isStudioRoom && Number.isFinite(headcountNum) ? headcountNum : undefined;
-    for (const s of sessions) {
-      const dur = toMinutes(s.endTime) - toMinutes(s.startTime);
-      if (!Number.isFinite(dur) || dur <= 0) continue;
-      totalDurationMin += dur;
-      const fee = computeBaseTotalKRW({
+  // ★ 3-3: 회차 규칙·요금은 lib/rules/lecturePlan.ts planLecture 1벌(서버 POST /api/requests와 같은 함수)
+  //   화면 표시는 그대로 — 아래 bundle 모양을 유지한다. plan.sessions[].issues는 3-4 신청 화면에서 쓴다.
+  const [eqLaptop, eqProjector, eqAudio] = equipment;
+  const [eqMirrorless, eqCamcorder, eqWirelessMic, eqPinMic, eqRodeMic, eqElectronicBoard] = studioEquip;
+  const lecturePlan = useMemo(
+    () =>
+      planLecture({
         roomId,
-        date: s.date,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        equipment: { laptop: false, projector: false, audio: false },
-        headcount: hc,
-      });
-      rentalSum += fee.rentalFeeKRW;
-      extraHeadcountSum += fee.extraHeadcountFeeKRW;
-    }
-    const equipmentSum = equipmentFee * sessionCount;
-    const total = rentalSum + equipmentSum;
-    return { sessionCount, totalDurationMin, rentalSum, extraHeadcountSum, baseRentalSum: rentalSum - extraHeadcountSum, equipmentSum, total };
-  }, [allSessions, equipmentFee, roomId, isStudioRoom, headcountNum]);
+        sessions: allSessions,
+        headcount: isStudioRoom && Number.isFinite(headcountNum) ? headcountNum : undefined,
+        equipment: {
+          laptop: !!eqLaptop, projector: !!eqProjector, audio: !!eqAudio,
+          mirrorless: !!eqMirrorless, camcorder: !!eqCamcorder, wirelessMic: !!eqWirelessMic,
+          pinMic: !!eqPinMic, rodeMic: !!eqRodeMic, electronicBoard: !!eqElectronicBoard,
+        },
+        holidays: loadedHolidaySet(),
+        todayYmd: todayYmdSeoul(),
+      }),
+    [allSessions, roomId, isStudioRoom, headcountNum, eqLaptop, eqProjector, eqAudio, eqMirrorless, eqCamcorder, eqWirelessMic, eqPinMic, eqRodeMic, eqElectronicBoard]
+  );
+
+  const bundle = useMemo(() => {
+    const p = lecturePlan;
+    return {
+      sessionCount: p.sessions.length,
+      totalDurationMin: p.totalDurationMin,
+      rentalSum: p.rentalFeeKRW,
+      extraHeadcountSum: p.extraHeadcountFeeKRW,
+      baseRentalSum: p.rentalFeeKRW - p.extraHeadcountFeeKRW,
+      equipmentSum: p.equipmentFeeKRW,
+      total: p.totalFeeKRW,
+    };
+  }, [lecturePlan]);
 
   /** E-스튜디오 추가 인원(기본 2명 초과분) */
   const studioBaseHeadcount = roomMeta?.baseHeadcount ?? 2;

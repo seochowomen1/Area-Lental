@@ -259,6 +259,11 @@ export function loadedHolidaySet(): ReadonlySet<string> {
   return holidayDateSet;
 }
 
+/** 지금까지 로딩된 공휴일 이름(읽기 전용 뷰) — lib/rules/lecturePlan.ts 문구("공휴일(개천절)…")용 */
+export function loadedHolidayNames(): ReadonlyMap<string, string> {
+  return holidayNameMap;
+}
+
 /** 테스트용: 공휴일을 API 없이 직접 등록 */
 export function _primeHolidaysForTest(items: Array<{ date: string; name: string }>): void {
   for (const h of items) {

@@ -6,6 +6,7 @@ import Modal from "@/components/ui/Modal";
 import OperatingHoursNotice from "@/components/OperatingHoursNotice";
 import type { SpaceRoom } from "@/lib/space";
 import { STUDIO_EQUIPMENT_FEE_KRW, STUDIO_EQUIPMENT_LABELS } from "@/lib/config";
+import { addDaysToDate } from "@/lib/rules/ymd";
 
 type Slot = { start: string; end: string; available: boolean };
 
@@ -24,9 +25,7 @@ function fmtYMD(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
 }
 
-function addDays(d: Date, delta: number) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta);
-}
+// Date 객체 날짜 더하기는 lib/rules/ymd.ts addDaysToDate (3-3)
 
 
 function nextValidDate(from: Date) {
@@ -34,7 +33,7 @@ function nextValidDate(from: Date) {
   const today = new Date();
   const todayYmd = fmtYMD(today);
   for (let i = 0; i < 60; i++) {
-    const cand = addDays(from, i);
+    const cand = addDaysToDate(from, i);
     const candYmd = fmtYMD(cand);
     if (candYmd < todayYmd) continue;
     if (cand.getDay() === 0) continue;

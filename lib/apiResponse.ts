@@ -62,11 +62,8 @@ export function handleApiError(e: unknown, context: string): NextResponse {
   return jsonError("서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.", 500, "SERVER_ERROR");
 }
 
-/** YYYY-MM-DD 형식 검증 (여러 라우트에서 중복 사용, 타입 가드) */
-export function isYmd(s: unknown): s is string {
-  if (typeof s !== "string") return false;
-  return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+/** YYYY-MM-DD 형식 검증 — lib/rules/ymd.ts isYmd 재수출(기존 import 호환 · 3-3) */
+export { isYmd } from "@/lib/rules/ymd";
 
 /** 이메일 정규화 (여러 라우트에서 중복 사용) */
 export function normalizeEmail(email: string): string {

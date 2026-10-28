@@ -7,6 +7,7 @@ import Notice from "@/components/ui/Notice";
 import { cn } from "@/lib/cn";
 import { isTuesdayNightOverlap, operatingRangesForDate } from "@/lib/operating";
 import { getRoom } from "@/lib/space";
+import { addDaysToDate } from "@/lib/rules/ymd";
 import { CARD_BASE, FIELD_CONTROL_BASE, FIELD_HELP, FIELD_LABEL } from "@/components/ui/presets";
 
 type Slot = { start: string; end: string; available: boolean };
@@ -51,16 +52,14 @@ function fmtDuration(mins: number) {
   return `${h}시간 ${m}분`;
 }
 
-function addDays(d: Date, delta: number) {
-  return new Date(d.getFullYear(), d.getMonth(), d.getDate() + delta);
-}
+// Date 객체 날짜 더하기는 lib/rules/ymd.ts addDaysToDate (3-3)
 
 function nextValidDate(from: Date) {
   // 규칙: 과거 날짜 불가, 일요일(0) 불가
   const today = new Date();
   const todayYmd = fmtYMD(today);
   for (let i = 0; i < 60; i++) {
-    const cand = addDays(from, i);
+    const cand = addDaysToDate(from, i);
     const candYmd = fmtYMD(cand);
     if (candYmd < todayYmd) continue;
     if (cand.getDay() === 0) continue;

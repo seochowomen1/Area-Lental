@@ -21,7 +21,7 @@
 
 import type { RentalRequest } from "@/lib/types";
 import { derivePaymentView, formatShortMd, latestApprovedDate, type PaymentView } from "@/lib/payment";
-import { dayOfWeek } from "@/lib/datetime";
+import { dowLabel, formatKoDate, isYmd } from "@/lib/rules/ymd";
 import { sortSessions } from "@/lib/requestUtils";
 
 /** 결제 4단계(payment-link-record) 배포일 — 이 날 전 승인·결제 기록 없음 = 이전 방식(⑧ Q8) */
@@ -69,25 +69,16 @@ export type WorkItem = {
   view: PaymentView;
 };
 
-const WEEKDAY_KO = ["일", "월", "화", "수", "목", "금", "토"] as const;
-
-function isYmd(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
+// isYmd·dowLabel·formatKoDate는 lib/rules/ymd.ts 1벌 (3-3)
 
 /** "2026-11-10" → "11/10(화)" */
 export function shortMdDow(ymd: string): string {
   if (!isYmd(ymd)) return "";
-  return `${formatShortMd(ymd)}(${WEEKDAY_KO[dayOfWeek(ymd)]})`;
+  return `${formatShortMd(ymd)}(${dowLabel(ymd)})`;
 }
 
-/** "2026-11-09" → "11월 9일(월)" */
-export function koMonthDayDow(ymd: string): string {
-  if (!isYmd(ymd)) return ymd || "";
-  const m = parseInt(ymd.slice(5, 7), 10);
-  const d = parseInt(ymd.slice(8, 10), 10);
-  return `${m}월 ${d}일(${WEEKDAY_KO[dayOfWeek(ymd)]})`;
-}
+/** "2026-11-09" → "11월 9일(월)" — lib/rules/ymd.ts formatKoDate 별칭 */
+export const koMonthDayDow = formatKoDate;
 
 /** 결제 필드가 하나도 없는가(이전 방식 판정용) */
 function hasNoPaymentRecord(v: PaymentView): boolean {

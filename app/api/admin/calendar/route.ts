@@ -7,6 +7,7 @@ import { ensureHolidaysLoaded, getHolidays } from "@/lib/holidays";
 import { ROOMS_BY_ID, getRoomsByCategory, normalizeRoomCategory, type FloorId } from "@/lib/space";
 import type { BlockedSlot, ClassSchedule, RentalRequest, RequestStatus } from "@/lib/types";
 import { handleApiError } from "@/lib/apiResponse";
+import { isYmd } from "@/lib/rules/ymd";
 
 /** galleryRemovalTime이 비어 있으면 galleryAuditJson에서 추출(구버전 데이터 호환) */
 function resolveGalleryRemovalTime(req: RentalRequest): string | undefined {
@@ -68,10 +69,6 @@ type CalendarResponse = {
   items: CalendarItem[];
   holidays?: Array<{ date: string; name: string }>;
 };
-
-function isYmd(v: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
 
 function ymdToUtcDate(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map((n) => parseInt(n, 10));

@@ -4,8 +4,17 @@ import { GalleryRequestInputSchema, RequestInputSchema, type GalleryRequestInput
 import { UPLOAD, ROOMS, validateFileMagicBytes } from "@/lib/config";
 import { getDatabase } from "@/lib/database";
 import { dayOfWeek, inRangeYmd, nowIsoSeoul, overlaps, todayYmdSeoul } from "@/lib/datetime";
-import { ensureHolidaysLoaded, ensureHolidaysForRange, type HolidayStatus } from "@/lib/holidays";
-import { validateOperatingHours as validateOperatingHoursShared } from "@/lib/operating";
+import { ensureHolidaysLoaded, ensureHolidaysForRange, loadedHolidayNames, loadedHolidaySet, type HolidayStatus } from "@/lib/holidays";
+import { diffDaysInclusive, isRealYmd, isYmd, kstNow } from "@/lib/rules/ymd";
+import {
+  invalidDateMessage,
+  overlapMessage,
+  planLecture,
+  selfOverlaps,
+  SUNDAY_CLOSED_MESSAGE,
+  type LecturePlan,
+  type LecturePlanIssue,
+} from "@/lib/rules/lecturePlan";
 import { buildGallerySessionsFromPeriod, buildGalleryOccupancy, galleryDateConflicts, isPrepAfterExhibition, validateGalleryOperatingHours } from "@/lib/gallery";
 import { getDriveUploadClient, ensureUploadFolderId } from "@/lib/google";
 import { isMockMode } from "@/lib/env";
@@ -21,7 +30,7 @@ import { rateLimit, getClientIp } from "@/lib/rateLimit";
 import { assertAdminApiAuth, adminApiAuthFailure } from "@/lib/adminApiAuth";
 import type { IntakeChannel, RentalRequest } from "@/lib/types";
 import type { RequestStatus } from "@/lib/types";
-import { REQUEST_LIMITS, TIME_CONSTANTS } from "@/lib/constants";
+import { REQUEST_LIMITS } from "@/lib/constants";
 import { getRoom } from "@/lib/space";
 import { bundleKey, DUPLICATE_CANCEL_DECIDED_BY, DUPLICATE_CANCEL_REASON } from "@/lib/payment";
 import { computeFeesForBundle, computeFeesForRequest } from "@/lib/pricing";
@@ -37,34 +46,17 @@ function roomName(roomId: string) {
   return ROOMS.find(r => r.id === roomId)?.name ?? roomId;
 }
 
-function validateOperatingHours(date: string, startTime: string, endTime: string) {
-  // ✅ 운영시간 규칙을 한 곳(lib/operating.ts)에서 관리하여
-  //    (시간 옵션 / 슬롯 생성 / 서버 검증) 모두 동일한 기준을 사용하도록 합니다.
-  return validateOperatingHoursShared(date, startTime, endTime);
-}
-
-function validateOperatingHoursForRoom(roomId: string, date: string, startTime: string, endTime: string) {
-  return roomId === "gallery" ? validateGalleryOperatingHours(date, startTime, endTime) : validateOperatingHours(date, startTime, endTime);
-}
-
 function conflictMessage(roomId: string, date: string, startTime: string, endTime: string) {
   return `해당 공간(${roomName(roomId)})은 ${date} ${startTime}-${endTime} 시간대에 신청이 불가합니다(일정 충돌).`;
 }
 
-function isYmd(s: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-
 /** YYYY-MM-DD 모양인데 달력에 없는 날짜(2026-11-31 등) */
 function isNonexistentYmd(s: string): boolean {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const [y, m, d] = s.split("-").map((v) => parseInt(v, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return !(dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d);
+  return isYmd(s) && !isRealYmd(s);
 }
 
 function nonexistentDateMessage(s: string) {
-  return `존재하지 않는 날짜입니다(${s}). 날짜를 다시 선택해 주세요.`;
+  return invalidDateMessage(s);
 }
 
 const UNKNOWN_ROOM_MESSAGE = "신청할 수 없는 공간입니다. 공간 목록에서 다시 선택해 주세요.";
@@ -76,36 +68,7 @@ const SLOT_TAKEN_MESSAGE = {
   period: "방금 다른 분이 같은 기간을 먼저 신청했습니다. 신청은 접수되지 않았습니다. 달력에서 다른 기간을 골라 주세요.",
 } as const;
 
-/** [6] 강의실·스튜디오 회차 시간 규칙 (RequestInputSchema와 같은 규칙을 회차마다 적용) */
-function sessionRuleIssues(s: { date: string; startTime: string; endTime: string }, maxHours: number): string[] {
-  const label = `${s.date} ${s.startTime}-${s.endTime}`;
-  if (!/^\d{2}:\d{2}$/.test(s.startTime) || !/^\d{2}:\d{2}$/.test(s.endTime)) {
-    return [`${label}: 시작/종료 시간이 올바르지 않습니다.`];
-  }
-  const sMin = toMinutesSafe(s.startTime);
-  const eMin = toMinutesSafe(s.endTime);
-  if (sMin >= eMin) return [`${label}: 종료 시간은 시작 시간보다 늦어야 합니다.`];
-  const out: string[] = [];
-  const step = TIME_CONSTANTS.TIME_SLOT_INTERVAL;
-  if (sMin % step !== 0 || eMin % step !== 0) out.push(`${label}: 시간은 30분 단위로만 선택할 수 있습니다.`);
-  const diff = eMin - sMin;
-  if (diff < TIME_CONSTANTS.MIN_RENTAL_MINUTES) out.push(`${label}: 최소 1시간 이상 선택해야 합니다.`);
-  const limitHours = maxHours > 0 ? maxHours : TIME_CONSTANTS.MAX_RENTAL_MINUTES / 60;
-  if (diff > limitHours * 60) out.push(`${label}: 한 회차는 최대 ${limitHours}시간까지 신청할 수 있습니다.`);
-  return out;
-}
-
-function toMinutesSafe(hhmm: string): number {
-  const [h, m] = hhmm.split(":").map((v) => parseInt(v, 10));
-  return h * 60 + m;
-}
-
-function diffDaysInclusive(startYmd: string, endYmd: string) {
-  const s = new Date(`${startYmd}T00:00:00+09:00`).getTime();
-  const e = new Date(`${endYmd}T00:00:00+09:00`).getTime();
-  if (!Number.isFinite(s) || !Number.isFinite(e)) return 0;
-  return Math.floor((e - s) / (24 * 60 * 60 * 1000)) + 1;
-}
+// [6] 강의실·스튜디오 회차 시간 규칙은 lib/rules/lecturePlan.ts(sessionRuleIssues·planLecture)로 옮김 (3-3)
 
 // buildGallerySessionsFromPeriod는 lib/gallery.ts에서 단일 기준으로 관리합니다.
 
@@ -263,8 +226,6 @@ export async function POST(req: Request) {
 
 
     // ✅ 여러 회차(날짜별로 시간 다르게) 묶음 신청 지원
-    const isYmd = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s);
-
     let sessions: SessionInput[] = [];
     /** 갤러리: 전시 기간에 걸친 달의 공휴일 조회 상태(가장 나쁜 값) — galleryAuditJson·응답에 기록 (audit-fix-2 R2) */
     let galleryHolidayCheck: { status: HolidayStatus; months: string[] } | null = null;
@@ -401,62 +362,8 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    // ★ [6] 회차별 시간 규칙(30분 단위·최소 1시간·공간 최대 시간) — sessions JSON 우회 차단
-    if (input.roomId !== "gallery") {
-      const ruleIssues: Array<{ date: string; startTime: string; endTime: string; code: string; message: string }> = [];
-      for (const s of sessions) {
-        for (const message of sessionRuleIssues(s, roomMeta.durationLimitHours)) {
-          ruleIssues.push({ date: s.date, startTime: s.startTime, endTime: s.endTime, code: "SESSION_INVALID", message });
-        }
-      }
-      if (ruleIssues.length) {
-        return NextResponse.json(
-          { ok: false, code: "SESSION_INVALID", message: ruleIssues[0].message, issues: ruleIssues },
-          { status: 400 }
-        );
-      }
-    }
-    // 강의실·E-스튜디오: 오늘 이전 날짜 신청 차단 (갤러리는 위에서 익일 이후로 별도 검증) — 진단 #2
-    if (input.roomId !== "gallery") {
-      const today = todayYmdSeoul();
-      const past = sessions.find((s) => s.date < today);
-      if (past) {
-        return NextResponse.json(
-          { ok: false, code: "VALIDATION_ERROR", message: `지난 날짜(${past.date})는 신청할 수 없습니다.` },
-          { status: 400 }
-        );
-      }
-    }
-    const sunday = sessions.find((s) => dayOfWeek(s.date) === 0);
-    if (sunday) {
-      return NextResponse.json(
-        { ok: false, code: "VALIDATION_ERROR", message: "일요일은 휴관일로 신청할 수 없습니다." },
-        { status: 400 }
-      );
-    }
-
-    // 같은 날짜 내 회차끼리 겹침 방지
-    const byDate = new Map<string, SessionInput[]>();
-    for (const s of sessions) {
-      const arr = byDate.get(s.date) ?? [];
-      arr.push(s);
-      byDate.set(s.date, arr);
-    }
-    for (const [date, arr] of byDate.entries()) {
-      const sorted = arr.slice().sort((a, b) => a.startTime.localeCompare(b.startTime));
-      for (let i = 1; i < sorted.length; i++) {
-        const prev = sorted[i - 1];
-        const cur = sorted[i];
-        if (overlaps(prev.startTime, prev.endTime, cur.startTime, cur.endTime)) {
-          return NextResponse.json(
-            { ok: false, code: "VALIDATION_ERROR", message: `같은 날짜(${date})에 겹치는 시간이 포함되어 있습니다.` },
-            { status: 400 }
-          );
-        }
-      }
-    }
-
     // 공휴일 데이터 사전 로딩 (회차별 운영시간 검증 전)
+    //   3-3: 강의실·E-스튜디오는 planLecture가 공휴일 집합을 인자로 받으므로 회차 검사보다 먼저 로딩한다(결과 문구·순서는 그대로)
     const uniqueMonths = new Set(sessions.map((s) => s.date.slice(0, 7)));
     await Promise.all(
       Array.from(uniqueMonths).map((ym) => {
@@ -464,6 +371,56 @@ export async function POST(req: Request) {
         return ensureHolidaysLoaded(parseInt(y, 10), parseInt(mo, 10));
       })
     );
+
+    // ★ 3-3 강의실·E-스튜디오 회차 규칙·요금 = lib/rules/lecturePlan.ts planLecture 1벌(신청서와 같은 함수)
+    //   검사 순서·HTTP 코드·문구는 3-3 이전과 같다. 새로 생긴 것: 오늘(KST) 이미 지난 시각 → SESSION_INVALID
+    let lecturePlan: LecturePlan | null = null;
+    if (input.roomId !== "gallery") {
+      const now = kstNow();
+      lecturePlan = planLecture({
+        roomId: input.roomId,
+        sessions,
+        headcount: input.headcount,
+        equipment: {
+          laptop: input.laptop, projector: input.projector, audio: input.audio,
+          mirrorless: input.mirrorless, camcorder: input.camcorder, wirelessMic: input.wirelessMic,
+          pinMic: input.pinMic, rodeMic: input.rodeMic, electronicBoard: input.electronicBoard,
+        },
+        holidays: loadedHolidaySet(),
+        holidayNames: loadedHolidayNames(),
+        todayYmd: now.ymd,
+        // 서면 접수(관리자 소급 등록)는 지난 날짜·시각도 등록할 수 있어야 한다 — 3-3 검수 #1
+        nowHm: isOffline ? undefined : now.hm,
+      });
+      const byCode = (code: LecturePlanIssue["code"]) => lecturePlan!.issues.filter((i) => i.code === code);
+
+      // ① 회차별 시간 규칙(30분 단위·최소 1시간·공간 최대 시간) + 오늘 지난 시각 — sessions JSON 우회 차단
+      const ruleIssues = byCode("SESSION_INVALID").map(({ date, startTime, endTime, code, message }) => ({ date, startTime, endTime, code, message }));
+      if (ruleIssues.length) {
+        return NextResponse.json(
+          { ok: false, code: "SESSION_INVALID", message: ruleIssues[0].message, issues: ruleIssues },
+          { status: 400 }
+        );
+      }
+      // ② 오늘 이전 날짜 (갤러리는 위에서 익일 이후로 별도 검증) — 진단 #2
+      const past = isOffline ? undefined : byCode("PAST_DATE")[0];
+      if (past) {
+        return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: past.message }, { status: 400 });
+      }
+    }
+    const sunday = sessions.find((s) => dayOfWeek(s.date) === 0);
+    if (sunday) {
+      return NextResponse.json(
+        { ok: false, code: "VALIDATION_ERROR", message: SUNDAY_CLOSED_MESSAGE },
+        { status: 400 }
+      );
+    }
+
+    // ③ 같은 날짜 내 회차끼리 겹침 방지 (강의실·스튜디오 = planLecture OVERLAP · 갤러리 = 같은 판정 함수)
+    const selfOverlap = lecturePlan ? lecturePlan.issues.find((i) => i.code === "OVERLAP") : selfOverlaps(sessions)[0];
+    if (selfOverlap) {
+      return NextResponse.json({ ok: false, code: "VALIDATION_ERROR", message: overlapMessage(selfOverlap.date) }, { status: 400 });
+    }
 
     // 운영시간/충돌 검증은 회차별로 수행 (캐시 우회 최신 목록)
     const all = await loadFresh();
@@ -473,10 +430,17 @@ export async function POST(req: Request) {
     const galleryOcc = buildGalleryOccupancy(all, blocks);
 
     const issues: Array<{ date: string; startTime: string; endTime: string; code: string; message: string }> = [];
-    for (const sess of sessions) {
-      const op = validateOperatingHoursForRoom(input.roomId, sess.date, sess.startTime, sess.endTime);
-      if (!op.ok) {
-        issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "OUT_OF_HOURS", message: op.message });
+    for (const [idx, sess] of sessions.entries()) {
+      // 운영시간·공휴일: 강의실·스튜디오 = planLecture(CLOSED_DAY·OUT_OF_HOURS) · 갤러리 = 갤러리 운영시간
+      //   응답 issue 코드는 예전대로 둘 다 "OUT_OF_HOURS"
+      const opMessage = lecturePlan
+        ? lecturePlan.issues.find((i) => i.index === idx && (i.code === "CLOSED_DAY" || i.code === "OUT_OF_HOURS"))?.message
+        : (() => {
+            const op = validateGalleryOperatingHours(sess.date, sess.startTime, sess.endTime);
+            return op.ok ? undefined : op.message;
+          })();
+      if (opMessage) {
+        issues.push({ date: sess.date, startTime: sess.startTime, endTime: sess.endTime, code: "OUT_OF_HOURS", message: opMessage });
         continue;
       }
 
@@ -838,9 +802,12 @@ export async function POST(req: Request) {
     }
 
     // 서버 공용 계산 금액(갤러리 공휴일·스튜디오 인원 가산 반영) — 화면 금액 검수용
-    const estimatedFeeKRW = savedList.length > 1
-      ? computeFeesForBundle(savedList).totalFeeKRW
-      : savedList[0] ? computeFeesForRequest(savedList[0]).totalFeeKRW : 0;
+    //   강의실·스튜디오 = planLecture 합계(신청서 화면과 같은 함수 · computeFeesForBundle 할인 0과 같은 값)
+    const estimatedFeeKRW = lecturePlan
+      ? lecturePlan.totalFeeKRW
+      : savedList.length > 1
+        ? computeFeesForBundle(savedList).totalFeeKRW
+        : savedList[0] ? computeFeesForRequest(savedList[0]).totalFeeKRW : 0;
 
     return NextResponse.json(
       {

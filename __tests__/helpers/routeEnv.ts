@@ -6,6 +6,7 @@
 import fs from "fs";
 import os from "os";
 import path from "path";
+import { addDays } from "@/lib/rules/ymd";
 
 /** 오늘(KST) YYYY-MM-DD */
 export function todayYmd(): string {
@@ -44,10 +45,8 @@ export function futureDate(dow: number, weeksAhead = 3): string {
   return base.toISOString().slice(0, 10);
 }
 
-export function addDays(ymd: string, n: number): string {
-  const [y, m, d] = ymd.split("-").map(Number);
-  return new Date(Date.UTC(y, m - 1, d + n)).toISOString().slice(0, 10);
-}
+/** 날짜 더하기 — lib/rules/ymd.ts 1벌 (3-3) */
+export { addDays };
 
 /** 강의실·스튜디오 기본 신청 폼 */
 export function lectureForm(over: Record<string, string>): FormData {

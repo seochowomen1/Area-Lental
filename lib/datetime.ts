@@ -1,3 +1,5 @@
+import { todayYmdKst } from "@/lib/rules/ymd";
+
 export function toMinutes(hhmm: string): number {
   const [h, m] = hhmm.split(":").map(v => parseInt(v, 10));
   return h * 60 + m;
@@ -9,11 +11,8 @@ export function overlaps(aStart: string, aEnd: string, bStart: string, bEnd: str
   return a1 < b2 && b1 < a2;
 }
 
-export function dayOfWeek(dateYmd: string): number {
-  const [y, m, d] = dateYmd.split("-").map(v => parseInt(v, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d));
-  return dt.getUTCDay();
-}
+// 날짜 유틸 1벌은 lib/rules/ymd.ts (audit-fix-3 3-3) — 기존 import 경로 호환용 별칭
+export { dayOfWeek } from "@/lib/rules/ymd";
 
 export function nowIsoSeoul(): string {
   const now = new Date();
@@ -22,9 +21,7 @@ export function nowIsoSeoul(): string {
 }
 
 export function todayYmdSeoul(): string {
-  const now = new Date();
-  const k = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return k.toISOString().slice(0, 10);
+  return todayYmdKst();
 }
 
 export function inRangeYmd(date: string, from?: string, to?: string): boolean {

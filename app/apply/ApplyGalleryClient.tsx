@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 
 import { GalleryRequestInputSchema, type GalleryRequestInput } from "@/lib/schema";
 import { todayYmdSeoul } from "@/lib/datetime";
+import { addDays, dayOfWeek, diffDaysInclusive, dowLabel, isYmd } from "@/lib/rules/ymd";
 import SiteHeader from "@/components/SiteHeader";
 import PledgeModal from "@/components/PledgeModal";
 import PrivacyModal from "@/components/PrivacyModal";
@@ -53,42 +54,12 @@ function formatPhoneKR(input: string) {
   return `${a}-${b.slice(0, 4)}-${b.slice(4, 8)}`;
 }
 
-const ymdRegex = /^\d{4}-\d{2}-\d{2}$/;
-
-function isYmd(s: string) {
-  return ymdRegex.test(s);
-}
-
-function toDateLocal(ymd: string) {
-  // YYYY-MM-DD는 브라우저에서 로컬 타임존 기준으로 처리(사용자=Seoul)
-  return new Date(`${ymd}T00:00:00`);
-}
-
-function addDays(ymd: string, days: number) {
-  const d = toDateLocal(ymd);
-  d.setDate(d.getDate() + days);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const dd = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${dd}`;
-}
-
-function dayOfWeekLocal(ymd: string) {
-  return toDateLocal(ymd).getDay();
-}
+// 날짜 유틸(isYmd·addDays·dayOfWeek·dowLabel·diffDaysInclusive)은 lib/rules/ymd.ts 1벌 (3-3)
 
 // NOTE:
 // GalleryRequestInputSchema는 superRefine를 포함하므로(ZodEffects), .extend()가 불가능합니다.
 // 따라서 gallery 신청 폼은 base schema를 그대로 사용하고, 추가 검증(최대 30일)만 superRefine로 보강합니다.
 type GalleryApplyValues = GalleryRequestInput;
-
-function diffDaysInclusive(startYmd: string, endYmd: string) {
-  const s = toDateLocal(startYmd).getTime();
-  const e = toDateLocal(endYmd).getTime();
-  if (!Number.isFinite(s) || !Number.isFinite(e)) return 0;
-  const days = Math.floor((e - s) / (24 * 60 * 60 * 1000)) + 1;
-  return days;
-}
 
 const GalleryApplySchema = GalleryRequestInputSchema.superRefine((v, ctx) => {
   // 기간 최대 30일(포함)
@@ -99,11 +70,6 @@ const GalleryApplySchema = GalleryRequestInputSchema.superRefine((v, ctx) => {
     }
   }
 });
-
-const DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
-function dowLabel(ymd: string): string {
-  return DOW_LABELS[dayOfWeekLocal(ymd)] ?? "";
-}
 
 /**
  * 준비일 후보에서 예약 충돌이 있는 날짜를 만나면 해당 날짜 이후(과거 방향)를 모두 제거합니다.
@@ -129,12 +95,12 @@ function filterPrepDatesByConflict(candidates: string[], bookedDates: Set<string
 
 /** 직전 운영일에 전시가 있을 때 준비 가능 시작 시각 (평일 17:00 · 토요일 11:00) */
 function prepAfterStartTime(ymd: string): string {
-  return dayOfWeekLocal(ymd) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY;
+  return dayOfWeek(ymd) === 6 ? GALLERY_RULES.PREP_AFTER.SATURDAY : GALLERY_RULES.PREP_AFTER.WEEKDAY;
 }
 
 /** 전시 마지막 날 철거 완료 기한 (평일 16:00 · 토요일 11:00) */
 function teardownDeadline(ymd: string): string {
-  return dayOfWeekLocal(ymd) === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
+  return dayOfWeek(ymd) === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
 }
 
 /** 09:00부터 기한까지 30분 간격 철수 시간 옵션 */
@@ -321,7 +287,7 @@ export default function ApplyGalleryClient() {
   // 서버의 기본 스키마(date/start/end) 요구를 만족하기 위해: 전시 시작일의 시간을 기본값으로 동기화
   useEffect(() => {
     if (!isYmd(startDate)) return;
-    const dow = dayOfWeekLocal(startDate);
+    const dow = dayOfWeek(startDate);
     if (dow === 0) return;
     setValue("date", startDate, { shouldValidate: true, shouldDirty: true });
     if (dow === 6) {
@@ -448,7 +414,7 @@ export default function ApplyGalleryClient() {
     let cap = 0;
     while (cur <= endDate) {
       if (cap++ > 400) break;
-      if (dayOfWeekLocal(cur) === 0) return true;
+      if (dayOfWeek(cur) === 0) return true;
       cur = addDays(cur, 1);
     }
     return false;

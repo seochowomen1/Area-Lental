@@ -10,18 +10,12 @@ import { cn } from "@/lib/cn";
 import { CARD_BASE } from "@/components/ui/presets";
 import { GALLERY_FEE_KRW } from "@/lib/constants";
 import { todayYmdSeoul } from "@/lib/datetime";
+import { addDays, dayOfWeek, diffDaysInclusive, dowLabel, isYmd } from "@/lib/rules/ymd";
 import { countGallerySelectableDays, galleryBaseDayState, galleryPrepAfterText } from "@/lib/galleryCalendar";
 import { defaultPrepDate as computeDefaultPrepDate, planGallery } from "@/lib/galleryPlan";
 import { formatExcludedHolidays, galleryMonthsForRange, useGalleryMonthData } from "@/lib/useGalleryMonthData";
 
-function isYmd(v: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
-
-function toDateLocal(ymd: string) {
-  const [y, m, d] = ymd.split("-").map((n) => parseInt(n, 10));
-  return new Date(y, (m ?? 1) - 1, d ?? 1);
-}
+// 날짜 유틸(isYmd·addDays·dayOfWeek·dowLabel·diffDaysInclusive)은 lib/rules/ymd.ts 1벌 (3-3)
 
 function dateToYmdLocal(dt: Date) {
   const y = dt.getFullYear();
@@ -42,25 +36,8 @@ function getMonthLabel(dt: Date) {
   return `${dt.getFullYear()}.${String(dt.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function dayOfWeekLocal(ymd: string): number {
-  // local timezone 기준
-  return toDateLocal(ymd).getDay();
-}
-
 function inRange(dateYmd: string, startYmd: string, endYmd: string) {
   return startYmd <= dateYmd && dateYmd <= endYmd;
-}
-
-const DOW_LABELS = ["일", "월", "화", "수", "목", "금", "토"] as const;
-function dowLabel(ymd: string): string {
-  return DOW_LABELS[dayOfWeekLocal(ymd)] ?? "";
-}
-
-function diffDaysInclusive(startYmd: string, endYmd: string) {
-  const s = toDateLocal(startYmd).getTime();
-  const e = toDateLocal(endYmd).getTime();
-  if (!Number.isFinite(s) || !Number.isFinite(e)) return 0;
-  return Math.floor((e - s) / (24 * 60 * 60 * 1000)) + 1;
 }
 
 export default function SpaceBookingGalleryRange({ className }: { className?: string }) {
@@ -207,7 +184,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
   function onPickDay(dateYmd: string) {
     if (!isYmd(dateYmd)) return;
     // 일요일은 자동 제외 대상이므로 시작/종료 선택에서 제외(안내)
-    if (dayOfWeekLocal(dateYmd) === 0) {
+    if (dayOfWeek(dateYmd) === 0) {
       setError("일요일은 전시일로 선택할 수 없습니다. (일요일은 자동 제외됩니다)");
       return;
     }
@@ -283,9 +260,7 @@ export default function SpaceBookingGalleryRange({ className }: { className?: st
       let guard = 0;
       while (cur < ymd && guard++ < 40) {
         if (prepOnlyDates.has(cur)) return true;
-        const d = toDateLocal(cur);
-        d.setDate(d.getDate() + 1);
-        cur = dateToYmdLocal(d);
+        cur = addDays(cur, 1);
         if (cur <= ymd && bookedDates.has(cur)) return true;
       }
     }

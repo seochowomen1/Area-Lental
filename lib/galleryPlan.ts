@@ -7,7 +7,8 @@
  * - 요금: 평일 20,000 · 토 10,000 · 준비일 무료 (GALLERY_FEE_KRW)
  */
 
-import { dayOfWeek, toMinutes } from "@/lib/datetime";
+import { toMinutes } from "@/lib/datetime";
+import { addDays, dayOfWeek, isYmd } from "@/lib/rules/ymd";
 import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
 
 export type GalleryWindow = { startTime: string; endTime: string };
@@ -35,14 +36,8 @@ const EMPTY_PLAN: GalleryPlan = {
   totalFeeKRW: 0,
 };
 
-function isYmd(s: unknown): s is string {
-  return typeof s === "string" && /^\d{4}-\d{2}-\d{2}$/.test(s);
-}
-
-export function addDaysYmd(dateYmd: string, deltaDays: number): string {
-  const [y, m, d] = dateYmd.split("-").map((v) => parseInt(v, 10));
-  return new Date(Date.UTC(y, m - 1, d + deltaDays)).toISOString().slice(0, 10);
-}
+// 날짜 유틸은 lib/rules/ymd.ts 1벌 (3-3) — addDaysYmd는 기존 import 호환 별칭
+export const addDaysYmd = addDays;
 
 /** 운영시간 창 — 일요일·공휴일은 null */
 export function galleryOperatingWindowFor(dateYmd: string, holidays: ReadonlySet<string>): GalleryWindow | null {

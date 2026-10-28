@@ -10,28 +10,12 @@ import Card from "@/components/ui/Card";
 import { FieldHelp, FieldLabel, Input, Select, Textarea } from "@/components/ui/Field";
 import { GALLERY_FEE_KRW, GALLERY_RULES } from "@/lib/constants";
 import { INTAKE_CHANNEL_OPTIONS } from "@/lib/labels";
+import { addDays, dayOfWeek, dowLabel, isYmd, todayYmdKst } from "@/lib/rules/ymd";
 
-/* ───────── 날짜 유틸(클라이언트 · KST 벽시계 문자열 기준) ───────── */
-function isYmd(v: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
-function dow(ymd: string) {
-  const [y, m, d] = ymd.split("-").map((n) => parseInt(n, 10));
-  return new Date(y, m - 1, d).getDay();
-}
-function addDays(ymd: string, n: number) {
-  const [y, m, d] = ymd.split("-").map((v) => parseInt(v, 10));
-  const dt = new Date(y, m - 1, d + n);
-  return `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, "0")}-${String(dt.getDate()).padStart(2, "0")}`;
-}
-function todayYmd() {
-  const t = new Date();
-  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
-}
-const DOW = ["일", "월", "화", "수", "목", "금", "토"];
-function dowLabel(ymd: string) {
-  return isYmd(ymd) ? DOW[dow(ymd)] : "";
-}
+/* ───────── 날짜 유틸은 lib/rules/ymd.ts 1벌 (3-3) ───────── */
+const dow = dayOfWeek;
+/** 오늘 — 서버(접수일 검사 todayYmdSeoul)와 같은 KST 기준 */
+const todayYmd = todayYmdKst;
 function teardownDeadline(ymd: string) {
   return dow(ymd) === 6 ? GALLERY_RULES.TEARDOWN_DEADLINE.SATURDAY : GALLERY_RULES.TEARDOWN_DEADLINE.WEEKDAY;
 }

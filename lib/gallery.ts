@@ -1,4 +1,5 @@
 import { dayOfWeek, toMinutes } from "@/lib/datetime";
+import { addDays } from "@/lib/rules/ymd";
 import { isHolidayCached, getHolidayNameCached, loadedHolidaySet } from "@/lib/holidays";
 import {
   availablePrepDates,
@@ -54,11 +55,8 @@ export function validateGalleryOperatingHours(dateYmd: string, startTime: string
   return { ok: false as const, message: "평일 운영시간(09:00~18:00) 내에서만 신청 가능합니다." };
 }
 
-function addDaysYmd(dateYmd: string, deltaDays: number): string {
-  const [y, m, d] = dateYmd.split("-").map((v) => parseInt(v, 10));
-  const dt = new Date(Date.UTC(y, m - 1, d + deltaDays));
-  return dt.toISOString().slice(0, 10);
-}
+// 날짜 더하기는 lib/rules/ymd.ts addDays (3-3)
+const addDaysYmd = addDays;
 
 /**
  * 전시 시작일 기준으로 선택 가능한 준비일 후보를 반환합니다.

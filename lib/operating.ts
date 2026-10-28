@@ -1,6 +1,7 @@
 import { OPERATING_RULES } from "@/lib/config";
 import { dayOfWeek, toMinutes, todayYmdSeoul } from "@/lib/datetime";
-import { isHolidayCached, getHolidayNameCached } from "@/lib/holidays";
+import { isHolidayCached, getHolidayNameCached, loadedHolidayNames, loadedHolidaySet } from "@/lib/holidays";
+import { lectureOperatingCheck, lectureOperatingRanges } from "@/lib/rules/lecturePlan";
 
 export type TimeRange = { start: string; end: string; label?: string };
 
@@ -29,13 +30,9 @@ function pad2(n: number) {
  * - 그 외 평일: 10:00~17:00
  */
 export function operatingRangesForDate(dateYmd: string): TimeRange[] {
-  const dow = dayOfWeek(dateYmd); // 0=Sun
-  if (dow === 0) return [];
+  // ★ 규칙 본체는 lib/rules/lecturePlan.ts(순수 함수 · 3-3). 여기는 공휴일 캐시를 넘기는 래퍼.
   // 공휴일 체크 (ensureHolidaysLoaded() 선행 필요)
-  if (isHolidayCached(dateYmd)) return [];
-  if (dow === 6) return [{ ...OPERATING_RULES.saturday, label: "토요일" }];
-  if (dow === 2) return [{ ...OPERATING_RULES.tuesday, label: "화요일" }];
-  return [{ ...OPERATING_RULES.weekday, label: "평일" }];
+  return lectureOperatingRanges(dateYmd, loadedHolidaySet());
 }
 
 /**
@@ -85,26 +82,9 @@ export function buildHourSlotsForDate(dateYmd: string): HourSlot[] {
  * 신청 시간(시작~종료)이 운영시간 내인지 검증합니다.
  */
 export function validateOperatingHours(dateYmd: string, startTime: string, endTime: string): { ok: true } | { ok: false; message: string } {
-  const dow = dayOfWeek(dateYmd);
-  if (dow === 0) return { ok: false, message: "일요일은 대관 신청이 불가합니다." };
-  if (isHolidayCached(dateYmd)) {
-    const hName = getHolidayNameCached(dateYmd);
-    return { ok: false, message: hName ? `공휴일(${hName})은 대관 신청이 불가합니다.` : "공휴일은 대관 신청이 불가합니다." };
-  }
-
-  const s = toMinutes(startTime);
-  const e = toMinutes(endTime);
-  if (!(s < e)) return { ok: false, message: "종료 시간이 시작 시간보다 빠를 수 없습니다." };
-
-  const ranges = operatingRangesForDate(dateYmd);
-  if (ranges.length === 0) return { ok: false, message: "운영 시간이 없습니다." };
-
-  const inAny = ranges.some(r => toMinutes(r.start) <= s && e <= toMinutes(r.end));
-  if (inAny) return { ok: true };
-
-  if (dow === 6) return { ok: false, message: "토요일 운영시간(10:00~12:00) 내에서만 신청 가능합니다." };
-  if (dow === 2) return { ok: false, message: "화요일 운영시간(10:00~20:00) 내에서만 신청 가능합니다." };
-  return { ok: false, message: "평일 운영시간(10:00~17:00) 내에서만 신청 가능합니다." };
+  // ★ 규칙·문구 본체는 lib/rules/lecturePlan.ts lectureOperatingCheck (3-3)
+  const r = lectureOperatingCheck(dateYmd, startTime, endTime, loadedHolidaySet(), loadedHolidayNames());
+  return r.ok ? { ok: true } : { ok: false, message: r.message };
 }
 
 /**

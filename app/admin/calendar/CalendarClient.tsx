@@ -15,6 +15,7 @@ import {
   type FloorId,
 } from "@/lib/space";
 import type { RequestStatus } from "@/lib/types";
+import { isYmd, todayYmdKst } from "@/lib/rules/ymd";
 
 type CalendarKind = "request" | "block" | "schedule";
 
@@ -57,9 +58,8 @@ type CalendarResponse = {
   holidays?: Array<{ date: string; name: string }>;
 };
 
-function isYmd(v: string) {
-  return /^\d{4}-\d{2}-\d{2}$/.test(v);
-}
+// isYmd·오늘(KST)은 lib/rules/ymd.ts 1벌 (3-3)
+const todayYmdSeoulClient = todayYmdKst;
 
 function ymdToUtcDate(ymd: string): Date {
   const [y, m, d] = ymd.split("-").map((n) => parseInt(n, 10));
@@ -70,11 +70,6 @@ function utcDateToYmd(dt: Date): string {
   return dt.toISOString().slice(0, 10);
 }
 
-function todayYmdSeoulClient(): string {
-  const now = new Date();
-  const k = new Date(now.getTime() + 9 * 60 * 60 * 1000);
-  return k.toISOString().slice(0, 10);
-}
 
 function isYm(v: string) {
   return /^\d{4}-\d{2}$/.test(v);
