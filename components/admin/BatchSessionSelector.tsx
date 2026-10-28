@@ -51,14 +51,14 @@ export default function BatchSessionSelector({ sessions }: { sessions: BatchSess
         <button
           type="button"
           onClick={allSelected ? clearAll : selectAll}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+          className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
         >
           {allSelected ? "전체 해제" : "전체 선택"}
         </button>
         <button
           type="button"
           onClick={selectPending}
-          className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
+          className="min-h-[44px] rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm hover:bg-slate-50"
         >
           대기만 선택
         </button>
@@ -75,7 +75,7 @@ export default function BatchSessionSelector({ sessions }: { sessions: BatchSess
               <th className="p-2">회차</th>
               <th className="p-2">일시</th>
               <th className="p-2">상태</th>
-              <th className="p-2">반려 사유</th>
+              <th className="p-2">반려·취소 사유</th>
               <th className="p-2 text-right">기본 이용료</th>
             </tr>
           </thead>
@@ -100,7 +100,7 @@ export default function BatchSessionSelector({ sessions }: { sessions: BatchSess
                     {s.isPrepDay ? <span className="ml-2 text-xs text-slate-500">(준비일)</span> : null}
                   </td>
                   <td className="p-2">{s.status}</td>
-                  <td className="p-2">{s.status === "반려" ? (s.rejectReason || "-") : "-"}</td>
+                  <td className="p-2">{(s.status === "반려" || s.status === "취소") && s.rejectReason ? s.rejectReason : "-"}</td>
                   <td className="p-2 text-right">{formatKRW(s.baseTotalKRW)}</td>
                 </tr>
               );

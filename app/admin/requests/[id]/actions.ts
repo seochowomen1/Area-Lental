@@ -93,7 +93,10 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
   const adminMemo = String(formData.get("adminMemo") || "").trim();
   const backUrl = `/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(categoryOf(current))}`;
   if (!VALID_STATUSES.has(status)) redirect(`${backUrl}&formError=status`);
-  if (status === "반려" && !rejectReason) redirect(`${backUrl}&formError=rejectReason`);
+  // 상태를 그대로 두는 저장(할인·메모)은 기존 사유를 지우지도, 다시 요구하지도 않는다(검수 M3)
+  const statusChanged = status !== current.status;
+  if (statusChanged && status === "반려" && !rejectReason) redirect(`${backUrl}&formError=rejectReason`);
+  const nextRejectReason = statusChanged ? (status === "반려" ? rejectReason : "") : (current.rejectReason ?? "");
 
   const discountModeRaw = String(formData.get("discountMode") || "rate").trim();
   const discountMode = discountModeRaw === "amount" ? "amount" : "rate";
@@ -128,7 +131,7 @@ export async function decideSingleAction(requestId: string, formData: FormData) 
         requestId: current.requestId,
         status,
         ...(formData.has("adminMemo") ? { adminMemo } : {}),
-        rejectReason: status === "반려" ? rejectReason : "",
+        rejectReason: nextRejectReason,
         decidedBy: getDefaultDecidedBy(),
       }],
       {
@@ -306,16 +309,19 @@ export async function saveBundleMetaAction(requestId: string, formData: FormData
   redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catB)}&saved=1`);
 }
 
-/** 묶음: 선택 회차 승인/반려 */
+/**
+ * 선택 회차 승인/반려 — 묶음과 단건 공용(audit-fix-3 3-2)
+ * - 상세 "다음 할 일" 카드의 승인 = 남은(접수) 회차 전부를 selectedIds로 넘김 + viewedStatuses
+ * - 단건은 그 1건만(batchId 없음) · 성공 시 `done=approve|reject`로 같은 상세에 초록 알림
+ */
 export async function decideSelectedSessionsAction(requestId: string, formData: FormData) {
   await assertAdminAuth();
   const db = getDatabase();
   const current = await db.getRequestById(requestId);
   if (!current) redirect("/admin");
-  if (!current.batchId) redirect(`/admin/requests/${encodeURIComponent(requestId)}`);
 
   const actionStatus = String(formData.get("actionStatus") || "").trim() as RequestStatus;
-  if (actionStatus !== "승인" && actionStatus !== "반려") redirect(`/admin/requests/${encodeURIComponent(requestId)}`);
+  if (actionStatus !== "승인" && actionStatus !== "반려" && actionStatus !== "취소") redirect(`/admin/requests/${encodeURIComponent(requestId)}`);
 
   const selectAll = String(formData.get("selectAll") || "").trim() === "1";
 
@@ -326,7 +332,8 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
   const rejectReason = String(formData.get("rejectReason") || "").trim();
   const adminMemo = String(formData.get("adminMemo") || "").trim();
 
-  const latest = sortSessions(await db.getRequestsByBatchId(current.batchId));
+  const isBatch = !!(current.batchId ?? "").trim();
+  const latest = isBatch ? sortSessions(await db.getRequestsByBatchId(current.batchId!)) : [current];
 
   const catS = categoryOf(current);
   if (actionStatus === "반려" && !rejectReason) {
@@ -338,51 +345,71 @@ export async function decideSelectedSessionsAction(requestId: string, formData: 
   // ★ audit-fix-1 [9]: 선택 회차만 시트 쓰기 1회로 (Promise.all 동시 쓰기 → 쿼터 초과·부분 반영 방지)
   // ★ audit-fix-3 3-1: 선택 회차가 화면을 연 시점의 상태 그대로일 때만 쓴다(다른 창·자동 취소가 먼저 저장했으면 stale)
   const selectedRows = latest.filter((s) => effectiveSelected.includes(s.requestId));
+  const expected = expectedStatuses(formData, selectedRows);
+  // 쓰지 않는 회차도 화면을 연 뒤 상태가 바뀌었으면 stale(다른 창이 먼저 같은 처리를 한 경우 "바뀐 내용 없음"으로 숨기지 않음)
+  if (selectedRows.some((s) => expected[s.requestId] !== s.status)) redirect(staleUrl(current));
+
+  // 취소(신청자 요청 · 검수 M1): 사유는 선택 — 비우면 "신청자 요청"(취소 메일 {{취소사유}}에 쓰임)
+  const reasonToWrite = actionStatus === "반려" ? rejectReason : actionStatus === "취소" ? rejectReason || "신청자 요청" : "";
+  // 검수 L1: 상태·사유·메모가 모두 그대로인 회차는 쓰지 않는다. 바뀌는 회차가 0개면 감사로그·초록 알림 없이 "바뀐 내용이 없습니다"
+  const changedRows = selectedRows.filter(
+    (s) =>
+      s.status !== actionStatus ||
+      (actionStatus !== "승인" && (s.rejectReason ?? "") !== reasonToWrite) ||
+      (!!adminMemo && adminMemo !== (s.adminMemo ?? ""))
+  );
+  if (changedRows.length === 0) {
+    redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&nochange=1`);
+  }
   let savedS = true;
   let failS: unknown = null;
   try {
     await db.updateRequestsStatusBatch(
-      selectedRows.map((s) => ({
+      changedRows.map((s) => ({
         requestId: s.requestId,
         status: actionStatus,
         decidedBy: getDefaultDecidedBy(),
-        rejectReason: actionStatus === "반려" ? rejectReason : "",
+        rejectReason: reasonToWrite,
         adminMemo: adminMemo || (s.adminMemo ?? ""),
       })),
       undefined,
       undefined,
-      { statusById: expectedStatuses(formData, selectedRows) }
+      { statusById: Object.fromEntries(changedRows.map((s) => [s.requestId, expected[s.requestId]])) }
     );
   } catch (e) {
     savedS = false;
     failS = e;
-    logger[isStaleWriteError(e) ? "warn" : "error"]("묶음 선택 회차 일괄 처리 실패", { batchId: current.batchId, stale: isStaleWriteError(e), error: e instanceof Error ? e.message : String(e) });
+    logger[isStaleWriteError(e) ? "warn" : "error"]("선택 회차 일괄 처리 실패", { batchId: current.batchId, requestId: current.requestId, stale: isStaleWriteError(e), error: e instanceof Error ? e.message : String(e) });
   }
   if (!savedS) redirect(writeFailUrl(current, failS));
 
-  const selectedDates = latest.filter((s) => effectiveSelected.includes(s.requestId)).map((s) => s.date);
+  const changedIds = changedRows.map((s) => s.requestId);
+  const selectedDates = changedRows.map((s) => s.date);
   await recordAudit({
-    action: actionStatus === "승인" ? "REQUEST_APPROVE" : "REQUEST_REJECT",
+    action: actionStatus === "승인" ? "REQUEST_APPROVE" : actionStatus === "반려" ? "REQUEST_REJECT" : "REQUEST_CANCEL",
     ip: getIpFromHeaders(),
     actor: getDefaultDecidedBy(),
-    target: current.batchId ?? current.requestId,
+    target: isBatch ? current.batchId! : current.requestId,
     summary: [
-      `묶음 ${effectiveSelected.length}/${latest.length}회 ${actionStatus}`,
+      isBatch
+        ? `묶음 ${changedIds.length}/${latest.length}회 ${actionStatus === "취소" ? "취소(신청자 요청)" : actionStatus}`
+        : `${current.status} → ${actionStatus === "취소" ? "취소(신청자 요청)" : actionStatus}`,
       current.roomName || current.roomId,
       current.orgName || current.applicantName,
       selectedDates.join(", "),
-      actionStatus === "반려" ? `사유: ${rejectReason}` : "",
+      actionStatus !== "승인" ? `사유: ${reasonToWrite}` : "",
     ].filter(Boolean).join(" · "),
     details: {
       decidedAt: nowIsoSeoul(),
       batchId: current.batchId,
-      selectedIds: effectiveSelected,
-      ...(actionStatus === "반려" ? { rejectReason } : {}),
+      selectedIds: changedIds,
+      ...(actionStatus !== "승인" ? { rejectReason: reasonToWrite } : {}),
     },
   });
 
   revalidateAdmin();
-  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1`);
+  const done = actionStatus === "승인" ? "approve" : actionStatus === "반려" ? "reject" : "cancel";
+  redirect(`/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(catS)}&saved=1&done=${done}`);
 }
 
 /** 메일 발송: 관리자가 확인한 내용으로 발송 */

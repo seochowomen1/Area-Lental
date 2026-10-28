@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { adminErrorText, adminFetch, AdminFetchError } from "@/lib/adminFetch";
+
 type ExpiredItem = {
   requestId: string;
   createdAt: string;
@@ -28,15 +30,16 @@ export default function DataRetentionPanel() {
     setLoading(true);
     setMessage("");
     try {
-      const res = await fetch("/api/admin/data-retention");
+      const res = await adminFetch("/api/admin/data-retention");
       const data = await res.json();
       if (data.ok) {
         setResult(data);
       } else {
         setMessage(data.message ?? "조회 실패");
       }
-    } catch {
-      setMessage("조회 중 오류가 발생했습니다.");
+    } catch (e) {
+      // P-4: 503 AUTH_STORE_BUSY는 G-1 문구 · 4xx는 서버 문구 · 그 밖은 기본 문구 (401은 adminFetch가 로그인으로)
+      setMessage(e instanceof AdminFetchError && !e.busy && e.status < 500 ? e.message : adminErrorText(e, "조회 중 오류가 발생했습니다."));
     } finally {
       setLoading(false);
     }
@@ -50,7 +53,7 @@ export default function DataRetentionPanel() {
     setMessage("");
     try {
       const ids = result.expired.map((e) => e.requestId);
-      const res = await fetch("/api/admin/data-retention", {
+      const res = await adminFetch("/api/admin/data-retention", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ requestIds: ids }),
@@ -62,8 +65,8 @@ export default function DataRetentionPanel() {
       } else {
         setMessage(data.message ?? "파기 처리 실패");
       }
-    } catch {
-      setMessage("파기 처리 중 오류가 발생했습니다.");
+    } catch (e) {
+      setMessage(e instanceof AdminFetchError && !e.busy && e.status < 500 ? e.message : adminErrorText(e, "파기 처리 중 오류가 발생했습니다."));
     } finally {
       setPurging(false);
     }

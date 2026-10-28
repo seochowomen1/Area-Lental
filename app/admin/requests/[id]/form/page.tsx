@@ -202,7 +202,7 @@ export default async function AdminRequestFormPage({
       <KeepText>
       <main className="mx-auto max-w-[800px] bg-white px-4 py-6 print:px-0 print:py-0">
         {/* ── 인쇄 버튼 ── */}
-        <PrintActions />
+        <PrintActions requestId={req.requestId} />
 
         {/* ════════════════════════════════════════════ */}
         {/* ═══ PAGE 1: 대관 신청서 (강의실 전용) ═══ */}

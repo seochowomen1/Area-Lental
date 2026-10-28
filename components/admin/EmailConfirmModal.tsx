@@ -134,9 +134,14 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
       });
       const data = await res.json();
       if (data.ok) {
-        setToast("메일이 발송되었습니다.");
         forceClose();
-        router.replace(pathname, { scroll: false });
+        // audit-fix-3 3-2: 결제 안내가 들어간 메일이면 같은 상세에 초록 알림 + 카드가 다음 단계(결제 확인)로
+        const params = new URLSearchParams(searchParams.toString());
+        ["saved", "mailed", "formError", "done", "emailError"].forEach((k) => params.delete(k));
+        if (content.paymentGuideIncluded) params.set("done", "mail");
+        else setToast("메일이 발송되었습니다.");
+        const qs = params.toString();
+        router.replace(qs ? `${pathname}?${qs}` : pathname, { scroll: false });
         router.refresh();
       } else {
         setSendError({ text: SEND_FAIL, busy: false });
@@ -146,7 +151,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
     } finally {
       setSending(false);
     }
-  }, [content, sending, router, pathname, requestId, forceClose]);
+  }, [content, sending, router, pathname, searchParams, requestId, forceClose]);
 
   const showSendButton = currentStatus !== "접수";
 
@@ -160,7 +165,7 @@ export default function EmailConfirmModal({ requestId, currentStatus }: EmailCon
       )}
 
       {/* 저장 완료 토스트 */}
-      {saved === "1" && !mailed && (
+      {saved === "1" && !mailed && !searchParams.get("done") && (
         <SavedToast />
       )}
 

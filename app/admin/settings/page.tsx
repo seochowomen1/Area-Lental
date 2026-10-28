@@ -1,4 +1,5 @@
 import Notice from "@/components/ui/Notice";
+import { AdminSpaceSwitch } from "@/components/AdminNavTabs";
 
 import SettingsClient from "@/app/admin/settings/SettingsClient";
 import KeepText from "@/components/ui/KeepText";
@@ -107,6 +108,11 @@ export default async function AdminSettingsPage({
             ? "내부 전시 일정을 관리합니다. 등록된 기간에는 외부 전시 신청이 불가능합니다."
             : "정규 수업시간 및 내부 대관 일정을 관리합니다. 등록된 시간/기간에는 대관 신청이 불가능합니다."}
         </p>
+      </div>
+
+      {/* audit-fix-3 3-2: 헤더 공간 탭은 목록으로 가므로 설정의 공간은 화면 안에서 바꾼다 */}
+      <div className="mb-3">
+        <AdminSpaceSwitch basePath="/admin/settings" current={category} />
       </div>
 
       {/* ③-F-7 공휴일 자동 조회 상태 — 페이지 제목 바로 아래 첫 줄 */}

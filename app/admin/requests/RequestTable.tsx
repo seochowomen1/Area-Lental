@@ -249,7 +249,19 @@ export default function RequestTable({
               const isSel = selected.has(r.key);
               const schedule = [r.roomName, r.dateDisplay, r.countDisplay, r.timeDisplay].filter(Boolean).join(" · ");
               return (
-                <li key={r.key} className={deletingKeys.has(r.key) ? "pointer-events-none opacity-40" : undefined}>
+                <li key={r.key} className={"relative " + (deletingKeys.has(r.key) ? "pointer-events-none opacity-40" : "")}>
+                  {/* P-5(audit-fix-3 3-2): 체크박스는 카드 링크 밖 형제 요소로 — 링크 안에 조작 요소를 넣지 않는다 */}
+                  {r.isDeletable && (
+                    <label className="absolute left-1 top-1 z-10 inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-lg focus-within:ring-2 focus-within:ring-sky">
+                      <input
+                        type="checkbox"
+                        checked={isSel}
+                        onChange={() => toggle(r.key)}
+                        aria-label={`${r.primaryId} 선택`}
+                        className="h-5 w-5 rounded border-slate-400 text-brand focus:outline-none"
+                      />
+                    </label>
+                  )}
                   <Link
                     href={r.idLink}
                     className={
@@ -259,38 +271,7 @@ export default function RequestTable({
                   >
                     {/* 1행: 이름 + 상태 칩 */}
                     <div className="flex items-start justify-between gap-2">
-                      <div className="flex min-w-0 items-center">
-                        {r.isDeletable && (
-                          <span
-                            role="checkbox"
-                            aria-checked={isSel}
-                            aria-label={`${r.primaryId} 선택`}
-                            tabIndex={0}
-                            onClick={(e) => {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              toggle(r.key);
-                            }}
-                            onKeyDown={(e) => {
-                              if (e.key === " " || e.key === "Enter") {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                toggle(r.key);
-                              }
-                            }}
-                            className="-my-2 -ml-2 mr-1 inline-flex h-11 w-11 shrink-0 cursor-pointer items-center justify-center rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky"
-                          >
-                            <span
-                              className={
-                                "inline-flex h-5 w-5 items-center justify-center rounded border-2 text-xs font-bold text-white " +
-                                (isSel ? "border-brand bg-brand" : "border-slate-400 bg-white")
-                              }
-                              aria-hidden="true"
-                            >
-                              {isSel ? "✓" : ""}
-                            </span>
-                          </span>
-                        )}
+                      <div className={"flex min-w-0 items-center " + (r.isDeletable ? "pl-8" : "")}>
                         <span className="truncate text-[17px] font-bold text-ink">{r.applicantName}</span>
                       </div>
                       <StatusBadge status={r.status} />
