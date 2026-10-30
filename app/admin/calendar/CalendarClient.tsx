@@ -667,7 +667,8 @@ export default function CalendarClient({
                     } else {
                       // block
                       if (it.roomId === "gallery") {
-                        label = "내부 전시";
+                        // 설정에 적은 일정 이름(사유)을 같이 보여 어떤 내부 전시인지 구분
+                        label = it.reason ? `내부 전시 / ${it.reason}` : "내부 전시";
                       } else {
                         label = `${it.startTime} ${it.title}`;
                       }
@@ -757,8 +758,8 @@ export default function CalendarClient({
                 detailMain = `${it.startTime}-${it.endTime} ${it.title}`;
               } else {
                 if (it.roomId === "gallery") {
-                  detailMain = "내부 전시";
-                  detailSub = it.reason ?? "";
+                  detailMain = it.reason ? `내부 전시 / ${it.reason}` : "내부 전시";
+                  detailSub = "";
                 } else {
                   detailMain = `${it.startTime}-${it.endTime} ${it.title}`;
                   detailSub = it.reason ?? "";
