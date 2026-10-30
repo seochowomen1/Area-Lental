@@ -299,6 +299,8 @@ export async function GET(req: Request) {
 
       for (const dt of blockDates) {
         if (!inRangeYmd(dt, from, to)) continue;
+        // 갤러리 내부 전시(기간 블록)는 휴관일(일요일·공휴일)을 그리지 않음 — 실적 집계(stats)와 동일 기준
+        if (b.roomId === "gallery" && b.endDate && !galleryOperatingWindow(dt)) continue;
 
         items.push({
           kind: "block",
