@@ -3,7 +3,8 @@
 /**
  * 강의실 목록 층 탭 (02_ui_apply §0-5 (2) · §2-2)
  * 4칸 같은 폭(52) · 기본 4층 · 주소에 ?floor= 남김 · role=tablist · 좌우 화살표 이동
- * 카드 = 링크 하나: 사진 120×90(PC 160×120) + 이름 20 + 인원·금액 / `이 강의실로 날짜 고르기 ›`
+ * 카드 = 링크 하나: 사진 가로 전체(16:9) + 이름 22 + 인원·금액 / `이 강의실로 날짜 고르기 ›`
+ * 2026-11-02 사용자 피드백: 카드·사진이 너무 작고 여백 없음 → 사진을 위로 크게, 2열(640↑), 층 탭 56, 간격 확대
  */
 import { useRef, useState } from "react";
 import Link from "next/link";
@@ -47,7 +48,8 @@ export default function LectureRoomList({
 
   return (
     <div>
-      <div role="tablist" aria-label="층 고르기" className="grid max-w-[560px] grid-cols-4 gap-1.5">
+      <h2 className="text-[17px] font-bold leading-7 text-ink">층 고르기</h2>
+      <div role="tablist" aria-label="층 고르기" className="mt-2.5 grid max-w-[640px] grid-cols-4 gap-2">
         {floors.map((f, i) => {
           const selected = f === floor;
           return (
@@ -65,7 +67,7 @@ export default function LectureRoomList({
               onClick={() => choose(f)}
               onKeyDown={(e) => onKey(e, i)}
               className={cn(
-                "min-h-[52px] rounded-xl text-[18px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2",
+                "min-h-[56px] rounded-xl text-[19px] font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2",
                 selected ? "bg-brand text-white" : "border border-slate-300 bg-white text-ink hover:bg-slate-50"
               )}
             >
@@ -75,36 +77,37 @@ export default function LectureRoomList({
         })}
       </div>
 
-      <div id="floor-panel" role="tabpanel" aria-labelledby={`floor-tab-${floor}`} className="mt-4 grid gap-3 min-[900px]:grid-cols-2 min-[900px]:gap-4">
+      <div id="floor-panel" role="tabpanel" aria-labelledby={`floor-tab-${floor}`} className="mt-6 grid gap-4 sm:grid-cols-2 sm:gap-5 min-[900px]:gap-6">
         {list.map((room) => (
           <Link
             key={room.id}
             href={`/space/${room.id}`}
-            className="block rounded-xl border border-line bg-white p-3.5 hover:border-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
+            className="flex flex-col overflow-hidden rounded-2xl border border-line bg-white hover:border-brand hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"
           >
-            <span className="flex gap-3.5">
-              {room.image ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={room.image}
-                  alt=""
-                  width={160}
-                  height={120}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-[90px] w-[120px] shrink-0 rounded-lg bg-slate-100 object-cover sm:h-[120px] sm:w-[160px]"
-                />
-              ) : null}
-              <span className="min-w-0 flex-1">
-                <span className="block text-[20px] font-extrabold leading-[30px] text-ink">{room.name}</span>
-                <InfoList rows={roomInfoRows(room, false)} className="mt-1" />
+            {room.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={room.image}
+                alt=""
+                width={640}
+                height={360}
+                loading="lazy"
+                decoding="async"
+                className="aspect-[16/9] w-full bg-slate-100 object-cover"
+              />
+            ) : null}
+            <span className="flex flex-1 flex-col p-4 sm:p-5">
+              <span className="block text-[22px] font-extrabold leading-8 text-ink">{room.name}</span>
+              <InfoList rows={roomInfoRows(room, false)} className="mt-2" />
+              <span className="mt-4 flex min-h-[48px] items-center justify-between border-t border-line pt-3 text-[17px] font-bold text-brand">
+                <span>이 강의실로 날짜 고르기</span>
+                <span aria-hidden="true" className="text-[22px] leading-none">›</span>
               </span>
             </span>
-            <span className="mt-3 flex min-h-[44px] items-center border-t border-line pt-2 text-[17px] font-bold text-brand">이 강의실로 날짜 고르기 ›</span>
           </Link>
         ))}
       </div>
-      <p className="mt-4 text-center text-[15px] leading-6 text-ink-2">다른 층 강의실은 위에서 층을 눌러 보세요.</p>
+      <p className="mt-6 text-center text-[15px] leading-6 text-ink-2">다른 층 강의실은 위에서 층을 눌러 보세요.</p>
     </div>
   );
 }

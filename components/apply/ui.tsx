@@ -47,43 +47,52 @@ export type StepNo = 1 | 2 | 3;
 const STEP_NAMES: Record<StepNo, string> = { 1: "공간 고르기", 2: "날짜 고르기", 3: "신청서 쓰기" };
 
 /**
- * 단계 표시 `1 공간 고르기 · 2 날짜 고르기 · 3 신청서 쓰기`
- * 지금 단계 = 굵게 + 밑줄(aria-current) · 지난 단계 = 링크 · 앞 단계 = 흐린 글자
+ * 단계 표시 — 번호 원 + 이름 + 연결선 (2026-11-02 사용자 피드백: 글자 나열 `1 공간 고르기 · 2 …`가 어색 → 단계 띠로)
+ * 지금 단계 = 남색 원 + 굵은 글자(aria-current) · 지난 단계 = 체크 원 + 링크 · 앞 단계 = 회색 원 + 흐린 글자
  */
 export function StepHeader({ current, step1Href, step2Href }: { current: StepNo; step1Href?: string; step2Href?: string }) {
   const hrefs: Partial<Record<StepNo, string | undefined>> = { 1: step1Href ?? "/", 2: step2Href };
   return (
-    <nav aria-label="신청 단계" className="text-[15px] leading-6">
+    <nav aria-label="신청 단계">
       <span className="sr-only">{`3단계 중 ${current}단계: ${STEP_NAMES[current]}`}</span>
-      <ol className="flex flex-wrap items-center gap-x-1.5" aria-hidden={false}>
+      <ol className="flex items-center">
         {([1, 2, 3] as StepNo[]).map((n, i) => {
-          const label = `${n} ${STEP_NAMES[n]}`;
-          const sep = i > 0 ? <span className="text-slate-300" aria-hidden="true">·</span> : null;
-          if (n === current) {
-            return (
-              <li key={n} className="flex items-center gap-x-1.5">
-                {sep}
-                <span aria-current="step" className="font-extrabold text-ink underline decoration-brand decoration-[3px] underline-offset-[6px]">
-                  {label}
-                </span>
-              </li>
-            );
-          }
+          const state = n === current ? "current" : n < current ? "done" : "todo";
+          const circle = cn(
+            "flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[15px] font-extrabold leading-none sm:h-10 sm:w-10 sm:text-[17px]",
+            state === "current" && "bg-brand text-white",
+            state === "done" && "border-2 border-brand bg-white text-brand",
+            state === "todo" && "border-2 border-slate-300 bg-white text-ink-3"
+          );
+          const label = cn(
+            "whitespace-nowrap text-[14px] leading-6 sm:text-[16px]",
+            state === "current" && "font-extrabold text-ink",
+            state === "done" && "font-bold text-brand underline underline-offset-4",
+            state === "todo" && "font-semibold text-ink-3"
+          );
+          const inner = (
+            <>
+              <span aria-hidden="true" className={circle}>
+                {state === "done" ? "✓" : n}
+              </span>
+              <span className={label}>{STEP_NAMES[n]}</span>
+            </>
+          );
           const href = hrefs[n];
-          if (n < current && href) {
-            return (
-              <li key={n} className="flex items-center gap-x-1.5">
-                {sep}
-                <Link href={href} className="inline-flex min-h-[44px] items-center font-semibold text-brand underline underline-offset-4">
-                  {label}
-                </Link>
-              </li>
+          const body =
+            state === "done" && href ? (
+              <Link href={href} className="inline-flex min-h-[44px] items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2 sm:gap-2.5">
+                {inner}
+              </Link>
+            ) : (
+              <span aria-current={state === "current" ? "step" : undefined} className="inline-flex min-h-[44px] items-center gap-2 sm:gap-2.5">
+                {inner}
+              </span>
             );
-          }
           return (
-            <li key={n} className="flex items-center gap-x-1.5">
-              {sep}
-              <span className="text-ink-3">{label}</span>
+            <li key={n} className={cn("flex items-center", i > 0 && "flex-1")}>
+              {i > 0 ? <span aria-hidden="true" className={cn("mx-2 h-0.5 min-w-[12px] flex-1 rounded-full sm:mx-3", n <= current ? "bg-brand" : "bg-slate-300")} /> : null}
+              {body}
             </li>
           );
         })}

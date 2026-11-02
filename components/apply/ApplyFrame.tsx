@@ -24,7 +24,7 @@ export default function ApplyFrame({
       <PublicHeader />
       <main id="main-content" className="mx-auto w-full max-w-[720px] px-4 pb-16 pt-5 sm:px-6">
         <StepHeader current={3} step1Href={step1Href} step2Href={step2Href} />
-        <div className="mt-2">{children}</div>
+        <div className="mt-6">{children}</div>
         <HelpPhoneLine roomId={roomId} className="mt-6" />
       </main>
       {modal}

@@ -33,7 +33,7 @@ export default function Step2Shell({
       <PublicHeader />
       <main id="main-content" className="mx-auto w-full max-w-[1120px] px-4 pb-[170px] pt-5 sm:px-6 min-[900px]:pb-12">
         <StepHeader current={2} step1Href={step1Href} />
-        <h1 className={`${A_H1} mt-2`}>{title}</h1>
+        <h1 className={`${A_H1} mt-6`}>{title}</h1>
         <div className="mt-3 min-[900px]:grid min-[900px]:grid-cols-[minmax(0,1fr)_380px] min-[900px]:items-start min-[900px]:gap-8">
           <div className="space-y-4">
             {room.image ? (
