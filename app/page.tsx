@@ -23,7 +23,7 @@ export default function Home() {
         </div>
         <p className="mt-2 text-[17px] leading-7 text-ink-2">원하는 공간을 고르면 날짜 선택과 신청서 작성으로 이어집니다.</p>
 
-        <div className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-4 min-[900px]:grid-cols-3 min-[900px]:gap-6">
+        <div className="mt-6 grid gap-2.5 sm:grid-cols-2 sm:gap-4 min-[900px]:mt-8 min-[900px]:grid-cols-3 min-[900px]:gap-6">
           <HomeCategoryCard
             title="강의실"
             description={"다양한 규모의 강의실을 시간 단위로\n대관할 수 있습니다"}
@@ -53,7 +53,8 @@ export default function Home() {
           />
         </div>
 
-        <div className="mt-6 flex flex-col gap-6">
+        {/* 2026-11-02 사용자 피드백: 카드 ↔ 안내 문장 ↔ 내 신청 확인 사이 여백 확대 */}
+        <div className="mt-10 flex flex-col gap-8 min-[900px]:mt-14 min-[900px]:gap-10">
           <section aria-labelledby="home-check" className="rounded-xl border border-line bg-white p-4 sm:p-5 min-[900px]:order-2 min-[900px]:mx-auto min-[900px]:w-full min-[900px]:max-w-[560px]">
             <h2 id="home-check" className="text-[18px] font-extrabold leading-7 text-ink">
               이미 신청하셨나요?
@@ -72,7 +73,7 @@ export default function Home() {
           </p>
         </div>
 
-        <HelpPhoneLine className="mt-6 text-center" />
+        <HelpPhoneLine className="mt-10 text-center min-[900px]:mt-12" />
       </main>
 
       <footer className="border-t border-slate-200 bg-white">
