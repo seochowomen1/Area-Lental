@@ -19,7 +19,8 @@ type Props = {
   href: string;
   badgeLabel: string;
   ctaLabel: string;
-  fee: ReactNode;
+  /** 요금 줄(선택) — 2026-11-02부터 홈에서는 쓰지 않음(요금은 2단계·이용 안내에서) */
+  fee?: ReactNode;
 };
 
 export default function HomeCategoryCard({ title, description, shortDescription, icon, href, badgeLabel, ctaLabel, fee }: Props) {
@@ -43,7 +44,7 @@ export default function HomeCategoryCard({ title, description, shortDescription,
             <span className={cn(HOME_BADGE, "px-2.5 py-0.5 text-[14px]")}>{badgeLabel}</span>
           </span>
           <span className="text-[17px] leading-7 text-ink-2">{shortDescription}</span>
-          <span className="text-[15px] leading-6 text-ink-2">{fee}</span>
+          {fee ? <span className="text-[15px] leading-6 text-ink-2">{fee}</span> : null}
           <span className="mt-1 self-end text-[15px] font-bold leading-6 text-brand">{ctaLabel} ›</span>
         </span>
       </Link>
@@ -56,7 +57,7 @@ export default function HomeCategoryCard({ title, description, shortDescription,
         <div className={cn(HOME_BADGE, "mt-6")}>{badgeLabel}</div>
         <h2 className={cn(HOME_TITLE, "mt-3")}>{title}</h2>
         <p className="mt-3 min-h-[56px] whitespace-pre-line break-keep text-[17px] leading-7 text-ink-2">{description}</p>
-        <p className="mt-2 text-[15px] leading-6 text-ink-2">{fee}</p>
+        {fee ? <p className="mt-2 text-[15px] leading-6 text-ink-2">{fee}</p> : null}
         <Link
           href={href}
           className="mt-8 inline-flex min-h-[56px] items-center justify-center rounded-xl bg-brand px-10 text-[18px] font-bold text-white hover:bg-brand-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky focus-visible:ring-offset-2"

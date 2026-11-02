@@ -1,24 +1,15 @@
 import Link from "next/link";
 import HomeCategoryCard from "@/components/home/HomeCategoryCard";
 import { IconGallery, IconLecture, IconStudio } from "@/components/home/Icons";
-import { A_BTN_SECONDARY, A_H1, HelpPhoneLine, PublicHeader, StepHeader } from "@/components/apply/ui";
-import { GalleryFee, lectureMinFee, studioMinFee } from "@/components/apply/RoomInfo";
+import { A_BTN_SECONDARY, A_H1, HelpPhoneLine, PublicHeader } from "@/components/apply/ui";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
 
-/** `**50,000원**부터 (1시간)` (02_ui_apply §0-8 B-3) */
-function FromFee({ amount }: { amount: number }) {
-  return (
-    <>
-      <span className="font-bold text-ink">{amount.toLocaleString()}원</span>부터 (1시간)
-    </>
-  );
-}
-
 /**
  * 1단계 홈 — "어떤 공간?" (02_ui_apply §0-3 · §0-7 · §2-1)
  * 카드 3장 → 이미 신청하셨나요? → 안내 문장 → 전화 줄 → 개인정보 처리방침
+ * 2026-11-02 사용자 결정: 홈 카드의 요금 줄 삭제(요금은 2단계·이용 안내에서) · 단계 표시 대신 안내 한 줄(단계 표시는 2·3단계에만)
  */
 export default function Home() {
   return (
@@ -30,9 +21,7 @@ export default function Home() {
           <span aria-hidden="true" className="inline-block h-2 w-2 rounded-full bg-accent" />
           <h1 className={A_H1}>대관 · 전시 신청</h1>
         </div>
-        <div className="mt-2">
-          <StepHeader current={1} />
-        </div>
+        <p className="mt-2 text-[17px] leading-7 text-ink-2">원하는 공간을 고르면 날짜 선택과 신청서 작성으로 이어집니다.</p>
 
         <div className="mt-4 grid gap-2.5 sm:grid-cols-2 sm:gap-4 min-[900px]:grid-cols-3 min-[900px]:gap-6">
           <HomeCategoryCard
@@ -43,7 +32,6 @@ export default function Home() {
             href="/space?category=lecture"
             badgeLabel="대관"
             ctaLabel="대관 신청하기"
-            fee={<FromFee amount={lectureMinFee()} />}
           />
           <HomeCategoryCard
             title="E-스튜디오"
@@ -53,7 +41,6 @@ export default function Home() {
             href="/space/media"
             badgeLabel="대관"
             ctaLabel="대관 신청하기"
-            fee={<FromFee amount={studioMinFee()} />}
           />
           <HomeCategoryCard
             title="우리동네 갤러리"
@@ -63,7 +50,6 @@ export default function Home() {
             href="/space/gallery"
             badgeLabel="전시"
             ctaLabel="전시 신청하기"
-            fee={<GalleryFee />}
           />
         </div>
 
