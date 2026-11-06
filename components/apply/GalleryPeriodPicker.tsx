@@ -397,7 +397,7 @@ export default function GalleryPeriodPicker({
             </div>
           ) : null}
           <button type="button" className={A_BTN_PRIMARY} onClick={goNext}>
-            다음: 신청서 쓰기
+            신청서 쓰기
           </button>
         </div>
       }
@@ -423,7 +423,7 @@ export default function GalleryPeriodPicker({
             className={`${A_BTN_PRIMARY} mt-1.5`}
             onClick={goNext}
           >
-            다음: 신청서 쓰기
+            신청서 쓰기
           </button>
         </div>
       }

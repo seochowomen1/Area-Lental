@@ -3,11 +3,13 @@
 /**
  * 2단계 날짜 고르기 틀 (02_ui_apply §0-4 · §2-3)
  * 휴대폰: 단계 → h1 → 대표 사진 2:1(eager) → 위치·인원·금액 → (본문) → 비치물품·이용 규정 접힘 → 전화 줄 → 고정 바
- * PC(≥900): 2단 `1fr | 380` — 왼쪽 사진 12:5 · 본문 / 오른쪽 따라 내려오는 요약 카드. 고정 바 없음.
+ * PC(≥900): 2단 `1fr | 380` — 왼쪽 사진 12:5 · 본문 / 오른쪽 따라 내려오는 안내 카드(운영시간·비치물품) + 요약 카드. 고정 바 없음.
+ * 2026-11-06: 요약 카드만 있으면 오른쪽 열 아래가 비어 보여 안내 카드를 위에 둠(사용자 제안). 휴대폰은 본문 접힘이 대신하므로 그대로.
  */
 import type { ReactNode } from "react";
 import type { SpaceRoom } from "@/lib/space";
 import RoomGuideContent from "@/components/apply/RoomGuideContent";
+import RoomQuickInfo from "@/components/apply/RoomQuickInfo";
 import { roomInfoRows } from "@/components/apply/RoomInfo";
 import { A_H1, HelpPhoneLine, InfoList, PublicHeader, StepHeader } from "@/components/apply/ui";
 
@@ -60,6 +62,7 @@ export default function Step2Shell({
           </div>
           <aside className="hidden min-[900px]:block">
             <div className="sticky top-6 space-y-3">
+              <RoomQuickInfo room={room} />
               {summary}
               <HelpPhoneLine roomId={room.id} />
             </div>
