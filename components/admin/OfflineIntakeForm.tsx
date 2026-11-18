@@ -78,6 +78,7 @@ export default function OfflineIntakeForm({ category }: { category: "gallery" | 
         holidays: bm.holidaySet,
         holidayNames: bm.holidayNames,
         todayYmd: today,
+        offline: true,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [roomId, JSON.stringify(complete), isStudio, values.headcount, values.equipment, equipKeys, bm.holidaySet, bm.holidayNames, today]

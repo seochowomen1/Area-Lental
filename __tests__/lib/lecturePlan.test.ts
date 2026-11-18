@@ -327,3 +327,19 @@ describe("새 동작 — 오늘(KST) 이미 지난 시각 (⑧ Q9)", () => {
     expect(plan("12:00", "10:00", "15:00").sessions[0].issues).toEqual(["2026-11-04 12:00-10:00: 종료 시간은 시작 시간보다 늦어야 합니다."]);
   });
 });
+
+describe("서면 접수 강의실 평일 18:00 (2026-11-18)", () => {
+  const ops = (roomId: string, date: string, end: string, offline?: boolean) =>
+    planLecture({ roomId, sessions: [S(date, "16:00", end)], holidays: new Set(), todayYmd: TODAY, offline }).issues.map((i) => i.code);
+  it("온라인 강의실은 평일 17:00까지", () => {
+    expect(ops("sangsang1", "2026-12-02", "18:00")).toEqual(["OUT_OF_HOURS"]);
+  });
+  it("서면 강의실은 평일 18:00까지, 18:30은 안 됨", () => {
+    expect(ops("sangsang1", "2026-12-02", "18:00", true)).toEqual([]);
+    expect(ops("sangsang1", "2026-12-02", "18:30", true)).toEqual(["OUT_OF_HOURS"]);
+  });
+  it("서면이어도 E-스튜디오와 토요일은 그대로", () => {
+    expect(ops("media", "2026-12-02", "18:00", true)).toEqual(["OUT_OF_HOURS"]);
+    expect(planLecture({ roomId: "sangsang1", sessions: [S("2026-12-05", "10:00", "13:00")], holidays: new Set(), todayYmd: TODAY, offline: true }).issues.map((i) => i.code)).toEqual(["OUT_OF_HOURS"]);
+  });
+});

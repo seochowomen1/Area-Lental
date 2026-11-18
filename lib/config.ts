@@ -52,6 +52,12 @@ export const OPERATING_RULES = {
  * 사용자 화면에 고정 노출할 운영시간 안내 문구
  * (대표 사이트 톤/표기 방식에 맞춰 한 줄로 유지)
  */
+/**
+ * 관리자 서면 접수 등록(종이·이메일 신청서) 때만 쓰는 강의실 평일 마감 시각 (2026-11-18 사용자 확정)
+ * 온라인 신청은 OPERATING_RULES.weekday(17:00) 그대로 · E-스튜디오·화·토는 바꾸지 않음
+ */
+export const OFFLINE_LECTURE_WEEKDAY_END = "18:00";
+
 export const OPERATING_NOTICE_TEXT = "평일 10~17 / 화 10~20 / 토 10~12 (일·공휴일 휴관)";
 
 export const UPLOAD = {

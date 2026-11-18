@@ -8,7 +8,7 @@
  *   새로 생긴 것은 "오늘 이미 지난 시각"(nowHm을 넘길 때만) 하나뿐이다.
  */
 
-import { OPERATING_RULES } from "@/lib/config";
+import { OFFLINE_LECTURE_WEEKDAY_END, OPERATING_RULES } from "@/lib/config";
 import { TIME_CONSTANTS } from "@/lib/constants";
 import { overlaps, toMinutes } from "@/lib/datetime";
 import { computeBaseTotalKRW } from "@/lib/pricing";
@@ -106,14 +106,15 @@ function isHm(s: string): boolean {
  */
 export function lectureOperatingRanges(
   dateYmd: string,
-  holidays: ReadonlySet<string>
+  holidays: ReadonlySet<string>,
+  weekdayEnd?: string
 ): Array<{ start: string; end: string; label: string }> {
   const dow = dayOfWeek(dateYmd);
   if (dow === 0) return [];
   if (holidays.has(dateYmd)) return [];
   if (dow === 6) return [{ ...OPERATING_RULES.saturday, label: "토요일" }];
   if (dow === 2) return [{ ...OPERATING_RULES.tuesday, label: "화요일" }];
-  return [{ ...OPERATING_RULES.weekday, label: "평일" }];
+  return [{ ...OPERATING_RULES.weekday, ...(weekdayEnd ? { end: weekdayEnd } : {}), label: "평일" }];
 }
 
 /**
@@ -124,7 +125,9 @@ export function lectureOperatingCheck(
   startTime: string,
   endTime: string,
   holidays: ReadonlySet<string>,
-  holidayNames?: ReadonlyMap<string, string>
+  holidayNames?: ReadonlyMap<string, string>,
+  /** 서면 접수 강의실만 평일 마감을 늦춘다(OFFLINE_LECTURE_WEEKDAY_END) */
+  weekdayEnd?: string
 ): LectureOperatingResult {
   const dow = dayOfWeek(dateYmd);
   if (dow === 0) return { ok: false, code: "CLOSED_DAY", message: "일요일은 대관 신청이 불가합니다." };
@@ -137,7 +140,7 @@ export function lectureOperatingCheck(
   const e = toMinutes(endTime);
   if (!(s < e)) return { ok: false, code: "OUT_OF_HOURS", message: "종료 시간이 시작 시간보다 빠를 수 없습니다." };
 
-  const ranges = lectureOperatingRanges(dateYmd, holidays);
+  const ranges = lectureOperatingRanges(dateYmd, holidays, weekdayEnd);
   if (ranges.length === 0) return { ok: false, code: "OUT_OF_HOURS", message: "운영 시간이 없습니다." };
 
   const inAny = ranges.some((r) => toMinutes(r.start) <= s && e <= toMinutes(r.end));
@@ -145,6 +148,7 @@ export function lectureOperatingCheck(
 
   if (dow === 6) return { ok: false, code: "OUT_OF_HOURS", message: "토요일 운영시간(10:00~12:00) 내에서만 신청 가능합니다." };
   if (dow === 2) return { ok: false, code: "OUT_OF_HOURS", message: "화요일 운영시간(10:00~20:00) 내에서만 신청 가능합니다." };
+  if (weekdayEnd) return { ok: false, code: "OUT_OF_HOURS", message: `서면 접수는 평일 10:00~${weekdayEnd} 안에서 등록할 수 있습니다.` };
   return { ok: false, code: "OUT_OF_HOURS", message: "평일 운영시간(10:00~17:00) 내에서만 신청 가능합니다." };
 }
 
@@ -215,9 +219,12 @@ export function planLecture(args: {
   holidayNames?: ReadonlyMap<string, string>;
   todayYmd: string;
   nowHm?: string;
+  /** 관리자 서면 접수 등록 — 강의실(lecture)은 평일 OFFLINE_LECTURE_WEEKDAY_END까지 허용 */
+  offline?: boolean;
 }): LecturePlan {
   const { roomId, holidays, holidayNames, todayYmd } = args;
   const room = getRoom(roomId);
+  const weekdayEnd = args.offline && (room?.category ?? "lecture") === "lecture" ? OFFLINE_LECTURE_WEEKDAY_END : undefined;
   const maxHours = room?.durationLimitHours ?? 0;
   const nowMin = args.nowHm && isHm(args.nowHm) ? toMinutes(args.nowHm) : null;
   const equipment: RentalRequest["equipment"] = {
@@ -248,7 +255,7 @@ export function planLecture(args: {
         if (dayOfWeek(s.date) === 0) {
           push("CLOSED_DAY", SUNDAY_CLOSED_MESSAGE);
         } else {
-          const op = lectureOperatingCheck(s.date, s.startTime, s.endTime, holidays, holidayNames);
+          const op = lectureOperatingCheck(s.date, s.startTime, s.endTime, holidays, holidayNames, weekdayEnd);
           if (!op.ok) push(op.code, op.message);
         }
       }

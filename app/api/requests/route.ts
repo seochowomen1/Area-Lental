@@ -403,6 +403,8 @@ export async function POST(req: Request) {
         todayYmd: now.ymd,
         // 서면 접수(관리자 소급 등록)는 지난 날짜·시각도 등록할 수 있어야 한다 — 3-3 검수 #1
         nowHm: isOffline ? undefined : now.hm,
+        // 서면 접수 강의실은 평일 18:00까지 (2026-11-18)
+        offline: isOffline,
       });
       const byCode = (code: LecturePlanIssue["code"]) => lecturePlan!.issues.filter((i) => i.code === code);
 
