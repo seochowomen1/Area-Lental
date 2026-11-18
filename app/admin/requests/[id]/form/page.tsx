@@ -3,6 +3,7 @@ import { intakeChannelLabel, isOfflineIntake } from "@/lib/labels";
 import KeepText from "@/components/ui/KeepText";
 
 import PrintActions from "./PrintActions";
+import PrintFit from "./PrintFit";
 
 import { assertAdminAuth } from "@/lib/adminAuth";
 import { pickFeeBasisSessions } from "@/lib/bundle";
@@ -192,15 +193,18 @@ export default async function AdminRequestFormPage({
               body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
               .no-print { display: none !important; }
               @page { margin: 10mm 10mm; size: A4; }
-              .page-section { page-break-after: always; }
+              .page-section { page-break-after: always; break-inside: avoid; }
               .page-section:last-child { page-break-after: auto; }
             }
+            /* 화면 미리보기도 인쇄 폭(A4 - 여백 20mm)으로 — PrintFit이 쪽마다 한 쪽에 맞춘다 */
+            .print-sheet { width: 190mm; max-width: 100%; }
           `,
         }}
       />
+      <PrintFit />
 
       <KeepText>
-      <main className="mx-auto max-w-[800px] bg-white px-4 py-6 print:px-0 print:py-0">
+      <main className="print-sheet mx-auto bg-white px-4 py-6 print:px-0 print:py-0">
         {/* ── 인쇄 버튼 ── */}
         <PrintActions requestId={req.requestId} />
 
