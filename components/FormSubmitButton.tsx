@@ -64,17 +64,21 @@ export default function FormSubmitButton({
   }, [locked, pending]);
 
   const isPending = pending || locked;
-  const isDisabled = disabled || isPending;
+  // ★ 2026-11-19: 누르는 순간(locked)에는 disabled 속성을 걸지 않는다.
+  //   클릭 처리 중에 버튼이 disabled로 다시 그려지면 브라우저가 제출 자체를 하지 않는다
+  //   (실제 마우스 클릭에서 '할인/메모 저장'이 아무 반응 없던 원인). 연타는 onClick에서 막는다.
+  const isDisabled = disabled || pending;
 
   return (
     <button
       type="submit"
       className={cn(BUTTON_BASE, BUTTON_VARIANT[variant], className)}
       disabled={isDisabled}
+      aria-disabled={isDisabled || locked}
       aria-busy={isPending}
       onClick={(e) => {
         // pending 반영 전 연타 방지
-        if (isDisabled) {
+        if (isDisabled || locked) {
           e.preventDefault();
           return;
         }
