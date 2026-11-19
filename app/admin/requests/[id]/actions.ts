@@ -3,7 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
+import { nowIsoSeoul, todayYmdSeoul, dayOfWeek, inRangeYmd, overlaps } from "@/lib/datetime";
 import { isOfflineIntake } from "@/lib/labels";
 
 import { getDatabase } from "@/lib/database";
@@ -540,10 +540,47 @@ export async function fixIntakeAction(requestId: string, formData: FormData) {
   const headcountOk = Number.isInteger(headcount) && headcount >= 1 && (cap <= 0 || headcount <= cap);
   if (!isYmd(appliedAt) || !isYmd(pledgeDate) || !headcountOk) redirect(`${backUrl}&formError=intakeInvalid`);
 
-  const patch: { appliedAt?: string; pledgeDate?: string; headcount?: number } = {};
+  const patch: { appliedAt?: string; pledgeDate?: string; headcount?: number; startTime?: string; endTime?: string; discountAmountKRW?: number } = {};
   if (appliedAt !== (current.appliedAt ?? "")) patch.appliedAt = appliedAt;
   if (pledgeDate !== current.pledgeDate) patch.pledgeDate = pledgeDate;
   if (headcount !== Number(current.headcount)) patch.headcount = headcount;
+
+  // 이용 시간 고치기(2026-11-19) — 한 번만 쓰는 강의실·E-스튜디오 건만. 칸이 없으면(묶음·갤러리) 건드리지 않는다
+  const startTime = String(formData.get("startTime") ?? "").trim();
+  const endTime = String(formData.get("endTime") ?? "").trim();
+  if ((startTime || endTime) && (startTime !== current.startTime || endTime !== current.endTime)) {
+    const isHm = (v: string) => /^([01]\d|2[0-3]):(00|30)$/.test(v);
+    if (current.batchId || current.roomId === "gallery" || !isHm(startTime) || !isHm(endTime) || startTime >= endTime) {
+      redirect(`${backUrl}&formError=intakeTime`);
+    }
+    const [all, schedules, blocks] = await Promise.all([db.getAllRequestsFresh(), db.getClassSchedules(), db.getBlocks()]);
+    const dow = dayOfWeek(current.date);
+    const busy =
+      all.some(
+        (r) =>
+          r.requestId !== current.requestId &&
+          r.roomId === current.roomId &&
+          (r.status === "접수" || r.status === "승인") &&
+          r.date === current.date &&
+          overlaps(r.startTime, r.endTime, startTime, endTime)
+      ) ||
+      schedules
+        .filter((sc) => (sc.roomId === current.roomId || sc.roomId === "all") && sc.dayOfWeek === dow)
+        .filter((sc) => inRangeYmd(current.date, sc.effectiveFrom || undefined, sc.effectiveTo || undefined))
+        .some((sc) => overlaps(sc.startTime, sc.endTime, startTime, endTime)) ||
+      blocks
+        .filter((b) => (b.roomId === current.roomId || b.roomId === "all") && current.date >= b.date && current.date <= (b.endDate || b.date))
+        .some((b) => overlaps(b.startTime, b.endTime, startTime, endTime));
+    if (busy) redirect(`${backUrl}&formError=intakeTimeBusy`);
+    patch.startTime = startTime;
+    patch.endTime = endTime;
+    // 할인이 있으면 할인률을 그대로 두고 새 총액에 맞춰 할인금액을 다시 계산한다
+    const rate = Number(current.discountRatePct ?? 0);
+    if (rate > 0) {
+      const total = computeBaseTotalKRW({ ...current, startTime, endTime }).totalFeeKRW;
+      patch.discountAmountKRW = normalizeDiscount(total, { ratePct: rate, mode: "rate" }).discountAmountKRW;
+    }
+  }
   if (!Object.keys(patch).length) redirect(`${backUrl}&formError=intakeNoChange`);
 
   let saved = false;
@@ -564,8 +601,9 @@ export async function fixIntakeAction(requestId: string, formData: FormData) {
       patch.appliedAt !== undefined ? `접수일 ${current.appliedAt ?? "-"} → ${patch.appliedAt}` : "",
       patch.pledgeDate !== undefined ? `서약일 ${current.pledgeDate} → ${patch.pledgeDate}` : "",
       patch.headcount !== undefined ? `인원 ${current.headcount} → ${patch.headcount}명` : "",
+      patch.startTime !== undefined ? `시간 ${current.startTime}~${current.endTime} → ${patch.startTime}~${patch.endTime}` : "",
     ].filter(Boolean).join(" · "),
-    details: { before: { appliedAt: current.appliedAt, pledgeDate: current.pledgeDate, headcount: current.headcount }, after: patch },
+    details: { before: { appliedAt: current.appliedAt, pledgeDate: current.pledgeDate, headcount: current.headcount, startTime: current.startTime, endTime: current.endTime, discountAmountKRW: current.discountAmountKRW }, after: patch },
   });
 
   revalidateAdmin();

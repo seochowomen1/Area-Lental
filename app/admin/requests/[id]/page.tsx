@@ -109,6 +109,10 @@ export default async function AdminRequestDetail({
                     ? "기간에 공휴일이 없어 바꿀 금액이 없습니다."
                     : searchParams?.formError === "intakeInvalid"
                       ? "접수일, 서약일(오늘까지의 날짜)과 인원(수용 인원 이내)을 다시 확인해 주세요. 저장되지 않았습니다."
+                      : searchParams?.formError === "intakeTime"
+                        ? "이용 시간을 다시 확인해 주세요. 30분 단위로, 끝 시각이 시작 시각보다 늦어야 합니다. 저장되지 않았습니다."
+                      : searchParams?.formError === "intakeTimeBusy"
+                        ? "고치려는 시간에 다른 신청, 정규 수업 또는 운영 차단이 있어 저장하지 않았습니다."
                       : searchParams?.formError === "intakeNoChange"
                         ? "바뀐 내용이 없어 저장하지 않았습니다."
                         : "";
@@ -528,7 +532,7 @@ export default async function AdminRequestDetail({
             )}
             {isOfflineIntake(req.intakeChannel) && (
               <details className="my-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-                <summary className="cursor-pointer text-[15px] font-semibold text-ink">접수 정보 고치기 (접수일, 서약일, 인원)</summary>
+                <summary className="cursor-pointer text-[15px] font-semibold text-ink">접수 정보 고치기 (접수일, 서약일, 인원, 시간)</summary>
                 <form action={fixIntakeAction.bind(null, req.requestId)} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
                   <label className="text-sm font-semibold text-slate-700">
                     접수일
@@ -542,9 +546,21 @@ export default async function AdminRequestDetail({
                     인원
                     <input type="number" name="headcount" required min={1} defaultValue={req.headcount} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
                   </label>
+                  {!isGallery && !isBatch && (
+                    <>
+                      <label className="text-sm font-semibold text-slate-700">
+                        시작 시각
+                        <input type="time" name="startTime" required step={1800} defaultValue={req.startTime} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
+                      </label>
+                      <label className="text-sm font-semibold text-slate-700">
+                        끝 시각
+                        <input type="time" name="endTime" required step={1800} defaultValue={req.endTime} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
+                      </label>
+                    </>
+                  )}
                   <FormSubmitButton idleText="고친 내용 저장" pendingText="저장 중…" />
                 </form>
-                <p className="mt-2 text-sm text-slate-600">종이 신청서에 적힌 날짜와 인원으로 맞춥니다. 여러 회차면 모든 회차에 같이 적용됩니다.</p>
+                <p className="mt-2 text-sm text-slate-600">종이 신청서에 적힌 날짜와 인원으로 맞춥니다. 여러 회차면 모든 회차에 같이 적용됩니다. 시간은 한 번만 쓰는 건에서만 고칠 수 있고, 할인이 있으면 할인률은 그대로 두고 금액을 다시 계산합니다.</p>
               </details>
             )}
             {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}

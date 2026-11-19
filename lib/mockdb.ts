@@ -382,6 +382,9 @@ export async function mock_updateIntake(args: IntakeFix): Promise<RentalRequest[
       ...(args.appliedAt !== undefined ? { appliedAt: args.appliedAt } : {}),
       ...(args.pledgeDate !== undefined ? { pledgeDate: args.pledgeDate } : {}),
       ...(args.headcount !== undefined ? { headcount: args.headcount } : {}),
+    ...(args.startTime !== undefined ? { startTime: args.startTime } : {}),
+    ...(args.endTime !== undefined ? { endTime: args.endTime } : {}),
+    ...(args.discountAmountKRW !== undefined ? { discountAmountKRW: args.discountAmountKRW } : {}),
     };
     out.push(next);
     return next;

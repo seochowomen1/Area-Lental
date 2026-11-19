@@ -1024,6 +1024,9 @@ export async function updateIntake(args: IntakeFix): Promise<RentalRequest[]> {
   if (args.appliedAt !== undefined) cells.push(["appliedAt", args.appliedAt]);
   if (args.pledgeDate !== undefined) cells.push(["pledgeDate", args.pledgeDate]);
   if (args.headcount !== undefined) cells.push(["headcount", String(args.headcount)]);
+  if (args.startTime !== undefined) cells.push(["startTime", args.startTime]);
+  if (args.endTime !== undefined) cells.push(["endTime", args.endTime]);
+  if (args.discountAmountKRW !== undefined) cells.push(["discountAmountKRW", String(args.discountAmountKRW)]);
   if (!cells.length) return targets;
 
   const data: Array<{ range: string; values: string[][] }> = [];
@@ -1047,6 +1050,9 @@ export async function updateIntake(args: IntakeFix): Promise<RentalRequest[]> {
     ...(args.appliedAt !== undefined ? { appliedAt: args.appliedAt } : {}),
     ...(args.pledgeDate !== undefined ? { pledgeDate: args.pledgeDate } : {}),
     ...(args.headcount !== undefined ? { headcount: args.headcount } : {}),
+    ...(args.startTime !== undefined ? { startTime: args.startTime } : {}),
+    ...(args.endTime !== undefined ? { endTime: args.endTime } : {}),
+    ...(args.discountAmountKRW !== undefined ? { discountAmountKRW: args.discountAmountKRW } : {}),
   }));
 }
 
