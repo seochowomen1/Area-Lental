@@ -103,7 +103,7 @@ export const ROOMS: SpaceRoom[] = [
     id: "classroom_all",
     floor: "4",
     name: "모두의교실",
-    capacity: 30,
+    capacity: 60,
     durationLimitHours: 6,
     // 시간당 대관료
     feeKRW: 100000,

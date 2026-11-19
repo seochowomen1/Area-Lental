@@ -1,6 +1,6 @@
 import fs from "fs";
 import path from "path";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPatch, GalleryFeeUpdate } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentPatch, GalleryFeeUpdate, IntakeFix } from "@/lib/types";
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
 import { ROOMS } from "@/lib/config";
@@ -367,6 +367,27 @@ export async function mock_updateGalleryFee(args: GalleryFeeUpdate): Promise<Ren
   };
   saveDb(db);
   return db.requests[i];
+}
+
+/** 서면 접수 정보 고치기 (Mock · 2026-11-19) — 묶음이면 전 회차 */
+export async function mock_updateIntake(args: IntakeFix): Promise<RentalRequest[]> {
+  const db = ensureDb();
+  const cur = db.requests.find((r) => r.requestId === args.requestId);
+  if (!cur) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  const out: RentalRequest[] = [];
+  db.requests = db.requests.map((r) => {
+    if (r.requestId !== cur.requestId && !(cur.batchId && r.batchId === cur.batchId)) return r;
+    const next = {
+      ...r,
+      ...(args.appliedAt !== undefined ? { appliedAt: args.appliedAt } : {}),
+      ...(args.pledgeDate !== undefined ? { pledgeDate: args.pledgeDate } : {}),
+      ...(args.headcount !== undefined ? { headcount: args.headcount } : {}),
+    };
+    out.push(next);
+    return next;
+  });
+  saveDb(db);
+  return out;
 }
 
 export async function mock_getClassSchedules(): Promise<ClassSchedule[]> {

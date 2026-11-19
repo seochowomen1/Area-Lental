@@ -3,7 +3,8 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
-import { nowIsoSeoul } from "@/lib/datetime";
+import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
+import { isOfflineIntake } from "@/lib/labels";
 
 import { getDatabase } from "@/lib/database";
 import type { RequestStatus, RentalRequest } from "@/lib/types";
@@ -512,4 +513,61 @@ export async function recalcGalleryFeeAction(requestId: string, _formData?: Form
 
   revalidateAdmin();
   redirect(`${backUrl}&saved=recalc`);
+}
+
+/**
+ * 서면 접수 정보 고치기 (2026-11-19)
+ * - 종이 신청서를 손으로 옮겨 적다 틀린 접수일·서약일·인원을 바로잡는다. 서면 접수 건만.
+ * - 묶음이면 전 회차에 같은 값 · 감사 로그 1건
+ * - 결과 redirect: 성공 `saved=intake` · 값이 틀림 `formError=intakeInvalid` · 바뀔 것 없음 `formError=intakeNoChange`
+ */
+export async function fixIntakeAction(requestId: string, formData: FormData) {
+  await assertAdminAuth();
+  const db = getDatabase();
+  const current = await db.getRequestById(requestId);
+  if (!current) redirect("/admin");
+  const backUrl = `/admin/requests/${encodeURIComponent(current.requestId)}?category=${encodeURIComponent(categoryOf(current))}`;
+  if (!isOfflineIntake(current.intakeChannel)) redirect(`${backUrl}&formError=intakeInvalid`);
+
+  const today = todayYmdSeoul();
+  const isYmd = (v: string) => /^\d{4}-\d{2}-\d{2}$/.test(v) && v <= today;
+  const appliedAt = String(formData.get("appliedAt") ?? "").trim();
+  const pledgeDate = String(formData.get("pledgeDate") ?? "").trim();
+  const headcountRaw = String(formData.get("headcount") ?? "").trim();
+  const headcount = Number(headcountRaw);
+  const room = (ROOMS_BY_ID as Record<string, { capacity?: number }>)[current.roomId];
+  const cap = current.roomId === "gallery" ? 0 : room?.capacity ?? 0;
+  const headcountOk = Number.isInteger(headcount) && headcount >= 1 && (cap <= 0 || headcount <= cap);
+  if (!isYmd(appliedAt) || !isYmd(pledgeDate) || !headcountOk) redirect(`${backUrl}&formError=intakeInvalid`);
+
+  const patch: { appliedAt?: string; pledgeDate?: string; headcount?: number } = {};
+  if (appliedAt !== (current.appliedAt ?? "")) patch.appliedAt = appliedAt;
+  if (pledgeDate !== current.pledgeDate) patch.pledgeDate = pledgeDate;
+  if (headcount !== Number(current.headcount)) patch.headcount = headcount;
+  if (!Object.keys(patch).length) redirect(`${backUrl}&formError=intakeNoChange`);
+
+  let saved = false;
+  try {
+    await db.updateIntake({ requestId: current.requestId, ...patch });
+    saved = true;
+  } catch (e) {
+    logger.error("서면 접수 정보 고치기 저장 실패", { requestId: current.requestId, error: e instanceof Error ? e.message : String(e) });
+  }
+  if (!saved) redirect(sheetBusyUrl(current));
+
+  await recordAudit({
+    action: "INTAKE_FIX",
+    ip: getIpFromHeaders(),
+    actor: getDefaultDecidedBy(),
+    target: current.requestId,
+    summary: [
+      patch.appliedAt !== undefined ? `접수일 ${current.appliedAt ?? "-"} → ${patch.appliedAt}` : "",
+      patch.pledgeDate !== undefined ? `서약일 ${current.pledgeDate} → ${patch.pledgeDate}` : "",
+      patch.headcount !== undefined ? `인원 ${current.headcount} → ${patch.headcount}명` : "",
+    ].filter(Boolean).join(" · "),
+    details: { before: { appliedAt: current.appliedAt, pledgeDate: current.pledgeDate, headcount: current.headcount }, after: patch },
+  });
+
+  revalidateAdmin();
+  redirect(`${backUrl}&saved=intake`);
 }

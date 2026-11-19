@@ -78,6 +78,9 @@ export type GalleryFeeUpdate = {
   galleryAuditJson: string;
 };
 
+/** 서면 접수 정보 고치기(2026-11-19) — 손으로 옮겨 적다 틀린 접수일·서약일·인원만. 묶음이면 전 회차에 같은 값 */
+export type IntakeFix = { requestId: string; appliedAt?: string; pledgeDate?: string; headcount?: number };
+
 /** 결제 필드 갱신 패치 — null 또는 "" 은 "비움" */
 export type PaymentPatch = { [K in keyof PaymentFields]?: PaymentFields[K] | null };
 

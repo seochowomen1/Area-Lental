@@ -5,7 +5,7 @@
  * 환경 변수에 따라 자동으로 적절한 구현체를 선택합니다.
  */
 
-import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch, GalleryFeeUpdate } from "./types";
+import type { RentalRequest, BlockedSlot, ClassSchedule, RequestStatus, PaymentPatch, GalleryFeeUpdate, IntakeFix } from "./types";
 import { isMockMode } from "./env";
 import type { WriteExpect } from "./writeExpect";
 
@@ -66,6 +66,8 @@ export interface Database {
   updateRequestPayment(args: { requestId: string; patch: PaymentPatch; expect?: WriteExpect }): Promise<RentalRequest[]>;
   /** 갤러리 이용료 다시 계산 — 이 1행의 일수 3열 + galleryAuditJson만 (audit-fix-2 R2) */
   updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRequest>;
+  /** 서면 접수 정보(접수일·서약일·인원) 고치기 — 묶음이면 전 회차 (2026-11-19) */
+  updateIntake(args: IntakeFix): Promise<RentalRequest[]>;
   /** 반려/취소된 신청건 삭제 */
   deleteRequests(requestIds: string[]): Promise<void>;
 
@@ -141,6 +143,11 @@ class MockDatabase implements Database {
   async updateGalleryFee(args: GalleryFeeUpdate) {
     const { mock_updateGalleryFee } = await this.mockdb;
     return mock_updateGalleryFee(args);
+  }
+
+  async updateIntake(args: IntakeFix) {
+    const { mock_updateIntake } = await this.mockdb;
+    return mock_updateIntake(args);
   }
 
   async deleteRequests(requestIds: string[]) {
@@ -273,6 +280,12 @@ class SheetsDatabase implements Database {
     this.requestsCache.invalidate();
     const { updateGalleryFee } = await this.sheets;
     try { return await updateGalleryFee(args); } finally { this.requestsCache.invalidate(); }
+  }
+
+  async updateIntake(args: IntakeFix) {
+    this.requestsCache.invalidate();
+    const { updateIntake } = await this.sheets;
+    try { return await updateIntake(args); } finally { this.requestsCache.invalidate(); }
   }
 
   async deleteRequests(requestIds: string[]) {

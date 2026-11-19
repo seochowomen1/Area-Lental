@@ -34,6 +34,7 @@ import {
   saveBundleMetaAction,
   decideSelectedSessionsAction,
   recalcGalleryFeeAction,
+  fixIntakeAction,
 } from "./actions";
 import GalleryHolidayBanner from "@/components/admin/GalleryHolidayBanner";
 import { getGalleryRecalcView } from "@/lib/galleryRecalc";
@@ -106,7 +107,11 @@ export default async function AdminRequestDetail({
                   ? "지금도 공휴일 정보를 불러오지 못했습니다. 기간에 공휴일이 있는지 달력에서 직접 확인해 주세요."
                   : searchParams?.formError === "recalcNoChange"
                     ? "기간에 공휴일이 없어 바꿀 금액이 없습니다."
-                    : "";
+                    : searchParams?.formError === "intakeInvalid"
+                      ? "접수일, 서약일(오늘까지의 날짜)과 인원(수용 인원 이내)을 다시 확인해 주세요. 저장되지 않았습니다."
+                      : searchParams?.formError === "intakeNoChange"
+                        ? "바뀐 내용이 없어 저장하지 않았습니다."
+                        : "";
 
   const db = getDatabase();
   let req: RentalRequest | null = null;
@@ -385,6 +390,12 @@ export default async function AdminRequestDetail({
         </div>
       )}
 
+      {searchParams?.saved === "intake" && (
+        <div role="status" className="rounded-xl border border-emerald-200 bg-emerald-50 px-5 py-3 text-[15px] font-semibold text-emerald-700">
+          접수 정보를 고쳤습니다. 신청서를 다시 출력하면 바뀐 내용으로 나옵니다.
+        </div>
+      )}
+
       {formErrorMessage && (
         <div role="alert" className="rounded-xl border border-red-200 bg-red-50 px-5 py-3 text-[15px] font-semibold text-red-700">
           {formErrorMessage}
@@ -504,6 +515,27 @@ export default async function AdminRequestDetail({
                 {req.appliedAt ? <span className="ml-2 text-slate-600">신청일 {req.appliedAt}</span> : null}
                 {req.intakeNote ? <span className="ml-2 text-slate-500">· {req.intakeNote}</span> : null}
               </InfoRow>
+            )}
+            {isOfflineIntake(req.intakeChannel) && (
+              <details className="my-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <summary className="cursor-pointer text-[15px] font-semibold text-ink">접수 정보 고치기 (접수일, 서약일, 인원)</summary>
+                <form action={fixIntakeAction.bind(null, req.requestId)} className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4 md:items-end">
+                  <label className="text-sm font-semibold text-slate-700">
+                    접수일
+                    <input type="date" name="appliedAt" required max={todayYmdSeoul()} defaultValue={req.appliedAt ?? ""} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700">
+                    서약일
+                    <input type="date" name="pledgeDate" required max={todayYmdSeoul()} defaultValue={req.pledgeDate} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
+                  </label>
+                  <label className="text-sm font-semibold text-slate-700">
+                    인원
+                    <input type="number" name="headcount" required min={1} defaultValue={req.headcount} className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-[15px]" />
+                  </label>
+                  <FormSubmitButton idleText="고친 내용 저장" pendingText="저장 중…" />
+                </form>
+                <p className="mt-2 text-sm text-slate-600">종이 신청서에 적힌 날짜와 인원으로 맞춥니다. 여러 회차면 모든 회차에 같이 적용됩니다.</p>
+              </details>
             )}
             {req.orgName && req.orgName !== "-" && <InfoRow label="단체명">{req.orgName}</InfoRow>}
             {!isStudio && req.headcount && <InfoRow label="인원">{req.headcount}명</InfoRow>}

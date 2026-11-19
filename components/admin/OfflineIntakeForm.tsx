@@ -56,7 +56,7 @@ export default function OfflineIntakeForm({ category }: { category: "gallery" | 
 
   // 접수 정보
   const [intakeChannel, setIntakeChannel] = useState<string>("visit");
-  const [appliedAt, setAppliedAt] = useState<string>(today);
+  const [appliedAt, setAppliedAt] = useState<string>(""); // 오늘 날짜를 미리 넣지 않는다 — 종이 신청서 날짜를 꼭 고르게(2026-11-19)
   const [intakeNote, setIntakeNote] = useState<string>("");
 
   // 공용 블록 값(갤러리 단체 이름 기본 "개인" — 3-4 전과 같음)
@@ -280,6 +280,11 @@ export default function OfflineIntakeForm({ category }: { category: "gallery" | 
           <div>
             <FieldLabel htmlFor="pledgeDate">서약일 *</FieldLabel>
             <Input id="pledgeDate" type="date" max={today} value={effPledgeDate} onChange={(e) => setPledgeDate(e.target.value)} />
+            {isYmd(appliedAt) && isYmd(effPledgeDate) && appliedAt !== effPledgeDate ? (
+              <FieldHelp>접수일({appliedAt})과 서약일이 다릅니다. 종이 서류의 날짜가 정말 다른지 확인해 주세요.</FieldHelp>
+            ) : (
+              <FieldHelp>따로 고르지 않으면 접수일과 같은 날로 들어갑니다.</FieldHelp>
+            )}
           </div>
           <div>
             <FieldLabel htmlFor="pledgeName">서약자 성명 *</FieldLabel>

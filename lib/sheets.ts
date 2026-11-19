@@ -1,7 +1,7 @@
 import { getGoogleClient } from "@/lib/google";
 import { isMockMode, requireGoogleEnv } from "@/lib/env";
 import { nowIsoSeoul, todayYmdSeoul } from "@/lib/datetime";
-import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch, GalleryFeeUpdate } from "@/lib/types";
+import type { BlockTime, ClassSchedule, RentalRequest, RequestStatus, PaymentFields, PaymentPatch, GalleryFeeUpdate, IntakeFix } from "@/lib/types";
 import { PAYMENT_FIELD_KEYS, PAYMENT_NUMERIC_KEYS } from "@/lib/types";
 import { ROOMS } from "@/lib/config";
 import { assertWriteExpect, type WriteExpect } from "@/lib/writeExpect";
@@ -11,6 +11,7 @@ import {
   mock_appendRequest,
   mock_updateRequestPayment,
   mock_updateGalleryFee,
+  mock_updateIntake,
   mock_updateRequestsStatusBatch,
   mock_getRevokedAdminSessions,
   mock_addRevokedAdminSession,
@@ -992,6 +993,61 @@ export async function updateGalleryFee(args: GalleryFeeUpdate): Promise<RentalRe
     galleryExhibitionDayCount: args.exhibitionDayCount,
     galleryAuditJson: args.galleryAuditJson,
   };
+}
+
+/**
+ * 서면 접수 정보 고치기 (2026-11-19)
+ * - 손으로 옮겨 적다 틀린 접수일(appliedAt)·서약일(pledgeDate)·인원(headcount)만 바꾼다
+ * - 묶음(batchId)이면 같은 묶음 전 행에 같은 값 · values.batchUpdate 1회
+ */
+export async function updateIntake(args: IntakeFix): Promise<RentalRequest[]> {
+  if (isMockMode()) return mock_updateIntake(args);
+
+  const env = requireGoogleEnv();
+  await ensureRequestOptionalHeaders({ allowCached: true });
+  const { sheets } = getGoogleClient();
+
+  const rows = await readRequestsSheet();
+  const all = parseRequestRows(rows);
+  const current = all.find((r) => r.requestId === args.requestId);
+  if (!current) throw new Error("해당 신청건을 찾을 수 없습니다.");
+  const targets = all.filter((r) => r.requestId === current.requestId || (!!current.batchId && r.batchId === current.batchId));
+  const targetIds = new Set(targets.map((r) => r.requestId));
+
+  const header = (rows[0] ?? []).map((v) => String(v ?? "").trim());
+  const col = new Map<string, number>();
+  header.forEach((h, i) => { if (h && !col.has(h)) col.set(h, i); });
+  const idCol = col.get("requestId");
+  if (idCol === undefined) throw new Error("requests 시트에 'requestId' 헤더가 없습니다.");
+
+  const cells: Array<[string, string]> = [];
+  if (args.appliedAt !== undefined) cells.push(["appliedAt", args.appliedAt]);
+  if (args.pledgeDate !== undefined) cells.push(["pledgeDate", args.pledgeDate]);
+  if (args.headcount !== undefined) cells.push(["headcount", String(args.headcount)]);
+  if (!cells.length) return targets;
+
+  const data: Array<{ range: string; values: string[][] }> = [];
+  for (let i = 1; i < rows.length; i++) {
+    if (!targetIds.has(String(rows[i]?.[idCol] ?? "").trim())) continue;
+    for (const [name, value] of cells) {
+      const ci = col.get(name);
+      if (ci === undefined) throw new Error(`requests 시트에 '${name}' 헤더가 없습니다.`);
+      const letter = colToLetter(ci + 1);
+      data.push({ range: `${SHEET_REQUESTS}!${letter}${i + 1}:${letter}${i + 1}`, values: [[value]] });
+    }
+  }
+  if (!data.length) throw new Error("시트에서 해당 신청건의 행을 찾지 못했습니다.");
+  await sheets.spreadsheets.values.batchUpdate({
+    spreadsheetId: env.GOOGLE_SHEET_ID,
+    requestBody: { valueInputOption: "RAW", data },
+  });
+
+  return targets.map((r) => ({
+    ...r,
+    ...(args.appliedAt !== undefined ? { appliedAt: args.appliedAt } : {}),
+    ...(args.pledgeDate !== undefined ? { pledgeDate: args.pledgeDate } : {}),
+    ...(args.headcount !== undefined ? { headcount: args.headcount } : {}),
+  }));
 }
 
 // class_schedule 시트의 선택 컬럼(없으면 헤더 끝에 자동 추가) — 업무 시스템 동기화 표식

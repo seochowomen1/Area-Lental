@@ -47,6 +47,7 @@ export type AuditAction =
   | "REQUEST_DUPLICATE_AUTO_CANCEL"
   // 갤러리 이용료 다시 계산 (audit-fix-2 R2)
   | "GALLERY_FEE_RECALC"
+  | "INTAKE_FIX"
   // 저장소 안전망 (audit-fix-3 3-1)
   | "SHEET_BACKUP"
   | "SHEET_BACKUP_FAIL"
@@ -85,6 +86,7 @@ const PERSISTED_ACTIONS: ReadonlySet<AuditAction> = new Set<AuditAction>([
   "ADMIN_LOGOUT",
   "REQUEST_DUPLICATE_AUTO_CANCEL",
   "GALLERY_FEE_RECALC",
+  "INTAKE_FIX",
   "SHEET_BACKUP",
   "SHEET_BACKUP_FAIL",
   "SHEET_BACKUP_DELETE",
@@ -122,6 +124,7 @@ const ACTION_LABEL: Partial<Record<AuditAction, string>> = {
   PAYMENT_DEADLINE_AUTO_CANCEL: "결제 기한 경과 자동 취소",
   PAYMENT_REMINDER_SEND: "결제 기한 리마인드",
   GALLERY_FEE_RECALC: "갤러리 이용료 다시 계산",
+  INTAKE_FIX: "서면 접수 정보 고침",
   SHEET_BACKUP: "시트 백업",
   SHEET_BACKUP_FAIL: "시트 백업 실패",
   SHEET_BACKUP_DELETE: "백업 파일 삭제",
