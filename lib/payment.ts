@@ -276,9 +276,12 @@ export function paymentListChip(view: PaymentView): { text: string; tone: "none"
       return { text: "자동 취소", tone: "gray", posted };
     case "overdue":
       return { text: "기한 지남", tone: "red", posted };
+    case "unnoticed":
+      // 무료 승인(승인 요금 0원)은 결제할 것이 없다 — "미결제"로 보이지 않게 (2026-11-19)
+      if (view.approvedFeeKRW <= 0) return { text: "무료", tone: "green", posted };
+      return { text: "미결제", tone: "gray", posted };
     case "waiting":
     case "dueTomorrow":
-    case "unnoticed":
       return { text: "미결제", tone: "gray", posted };
     default:
       return { text: "-", tone: "none", posted: false };
