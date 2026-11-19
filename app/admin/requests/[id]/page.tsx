@@ -376,6 +376,16 @@ export default async function AdminRequestDetail({
 
       {/* ═══ 1-0. 알림 줄 — 처리 성공(초록) · 저장 실패(빨강) ═══ */}
       {doneMessage && !formErrorMessage && <DoneAlert message={doneMessage} />}
+      {/* 할인·메모 저장 뒤에도 알림을 낸다(2026-11-19: 저장해도 화면에 아무 표시가 없어 안 바뀐 것처럼 보였음) */}
+      {searchParams?.saved === "1" && !doneMessage && !formErrorMessage && (
+        <DoneAlert
+          message={
+            isGallery
+              ? "메모를 저장했습니다."
+              : `할인·메모를 저장했습니다. 지금 할인 ${formatKRW(feeBasis.discountAmountKRW ?? 0)}, 최종 금액 ${formatKRW(feeBasis.finalFeeKRW)}`
+          }
+        />
+      )}
 
       {/* 검수 L1: 이미 그 상태인 회차만 다시 처리 → 쓰기·감사로그 없음 · 초록 알림 대신 회색 한 줄 */}
       {searchParams?.nochange === "1" && !doneMessage && !formErrorMessage && (
